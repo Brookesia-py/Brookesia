@@ -1,0 +1,77 @@
+#=============================================
+#           Main parameters
+#=============================================
+main_path         = VALID_2_PSR
+mech              = C1_GRI30.cti
+verbose           = 4
+show_plots        = True
+tspc              = OH, CO2, CH4
+T_check           = True
+sp_T              = CO2
+Sl_check          = False
+sp_Sl             = H
+ig_check          = False
+sp_ig             = CH3
+error_calculation = points
+error_coupling    = mean
+
+
+#=============================================
+#           Simulation cases
+#=============================================
+
+#======> Case 1
+config            = PSR
+fuel              = CH4
+oxidant           = O2
+diluent           = N2
+diluent_ratio     = N2/O2 3.76
+Ts                = 600,610,620,630,640,650,660,670,680,690,700,710,720,730,740,750,760,770,780,790,800,810,820,830,840,850,860,870,880,890,900,910,920,930,940,950,960,970,980,990,1000,1010,1020,1030,1040,1050,1060,1070,1080,1090,1100,1110,1120,1130,1140,1150,1160,1170,1180,1190,1200
+Ps                = 100000.0
+phis              = 0.5, 1.0, 1.5
+tol_ts            = 1e-12, 1e-18
+t_max             = 0.2
+
+
+
+#=============================================
+#           Operators
+#=============================================
+
+
+#===========> Op: DRGEP_sp
+operator        = DRGEP_sp 
+eps             = 0.02
+delta_eps       = 0.01
+n_points        = 10.0
+max_error_sp    = 12, 12, 12
+max_error_T     = 10
+inter_sp_inter  = True
+optim           = False
+
+#===========> Op: DRG_r
+operator        = DRG_r 
+eps             = 0.02
+delta_eps       = 0.01
+n_points        = 10.0
+max_error_sp    = 12, 12, 12
+max_error_T     = 10
+inter_sp_inter  = True
+optim           = True
+#====> Optimization
+n_gen              = 5
+n_indiv            = 5
+error_fitness      = mean
+Arrh_max_variation = 5, 5, 5
+optim_on_meth      = False
+frac_r2opt         = 30
+selection_operator = Roulette
+selection_options  = 0.2
+Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
+Xover_num          = 2, 4, 4, 4
+Xover_opt          = , , , 
+mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
+mut_num            = 2, 2, 6
+mut_opt            = , 3, 
+mut_intensity      = 20
+
