@@ -65,8 +65,8 @@ max_error_K     = 30
 inter_sp_inter  = True
 optim           = False
 
-#===========> Op: SARGEP_sp
-operator        = SARGEP_sp 
+#===========> Op: DRG_r
+operator        = DRG_r 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0

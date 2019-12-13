@@ -47,7 +47,7 @@ prune             = 0.01
 
 
 #===========> Op: DRGEP_sp
-operator        = SA_r 
+operator        = DRGEP_sp 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -56,38 +56,11 @@ max_error_T     = 30
 max_error_Sl    = 30
 inter_sp_inter  = True
 optim           = True
-#====> Optimization
-n_gen              = 10
-n_indiv            = 15
-error_fitness      = mean
-Arrh_max_variation = 5, 5, 5
-optim_on_meth      = True
-frac_r2opt         = 30
-selection_operator = Roulette
-selection_options  = 0.2
-Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
-Xover_num          = 2, 3, 3, 3
-Xover_opt          = , , , 
-mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
-mut_num            = 2, 2, 5
-mut_opt            = , 3, 
-mut_intensity      = 20
 
 
-#===========> Op: DSRG_sp
-operator        = DSRG_sp 
-eps             = 0.02
-delta_eps       = 0.01
-n_points        = 10.0
-max_error_sp    = 30, 30, 30
-max_error_T     = 30
-max_error_Sl    = 30
-inter_sp_inter  = True
-optim           = False
-ttol_sensi      = [False, False]
 
-#===========> Op: SA_r
-operator        = SA_r 
+#===========> Op: SARGEP_sp
+operator        = SARGEP_sp 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -98,8 +71,8 @@ inter_sp_inter  = True
 optim           = True
 ttol_sensi      = [False, False]
 #====> Optimization
-n_gen              = 10
-n_indiv            = 15
+n_gen              = 5
+n_indiv            = 5
 error_fitness      = mean
 Arrh_max_variation = 5, 5, 5
 optim_on_meth      = True

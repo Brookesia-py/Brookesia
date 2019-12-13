@@ -56,16 +56,6 @@ prune             = 0.01
 #=============================================
 
 
-#===========> Op: DRGEP_sp
-operator        = DRGEP_sp 
-eps             = 0.02
-delta_eps       = 0.01
-n_points        = 10.0
-max_error_sp    = 30, 30, 30
-max_error_T     = 30
-inter_sp_inter  = True
-optim           = False
-
 #===========> Op: DRG_sp
 operator        = DRG_sp 
 eps             = 0.02
@@ -76,8 +66,8 @@ max_error_T     = 30
 inter_sp_inter  = True
 optim           = False
 
-#===========> Op: SARGEP_sp
-operator        = SARGEP_sp 
+#===========> Op: SAR_r
+operator        = SAR_r 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
