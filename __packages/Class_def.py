@@ -1870,7 +1870,7 @@ class Sim_Results :
                     l1_conditions += ";K_ext(1/s)"
             elif "reactor" in self.conditions.config:
                 l1_conditions += ";Ti(K);rtol_ts;atol_ts;ig_time(s)"
-            elif "PSR" in self.conditions.config:
+            elif "JSR" in self.conditions.config:
                 l1_conditions += ";time(s);rtol_ts;atol_ts"
             elif "PFR" in self.conditions.config:
                 l1_conditions += ";Ti(K);rtol_ts;atol_ts;length(m);u_0(m/s);area(m**2)"
@@ -1914,7 +1914,7 @@ class Sim_Results :
                         l2_conditions+=str(self.ign_time_sp)
                 else:
                     l2_conditions+=str(self.ign_time)
-            elif "PSR" in self.conditions.config:
+            elif "JSR" in self.conditions.config:
                 l2_conditions+=str(self.conditions.simul_param.end_sim)+";"\
                         +str(self.conditions.simul_param.tol_ts[0])+";"\
                         +str(self.conditions.simul_param.tol_ts[1])
@@ -1932,7 +1932,7 @@ class Sim_Results :
         fichier_data.write("\n* Step: "+step)
 
         if errors:
-            if "PSR" not in self.conditions.config:
+            if "JSR" not in self.conditions.config:
                 txt_error='\nTemperature error: '+'%0.1f'%(errors.qoi_T*100)+'%\n'
             else: txt_error='\n'
             if "reactor" in self.conditions.config:
@@ -1964,7 +1964,7 @@ class Sim_Results :
         # headers
         if "reactor" in self.conditions.config:
             fichier_data.write("\nTime(s);T(K)")
-        elif "PSR" in self.conditions.config:
+        elif "JSR" in self.conditions.config:
             fichier_data.write("\nTi(K);Tf(K)")
         elif "flame" in self.conditions.config:
             fichier_data.write("\nZ(m);T(K)")

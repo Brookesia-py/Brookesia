@@ -542,7 +542,7 @@ class Chromosome:
                 if errors.qoi_s[sp]:
                     qoi_tot.append(errors.qoi_s[sp])
                     pond+=optim_param.coeff_s[sp]
-            if 'PSR' not in conditions.config and T_check  and errors.qoi_T:
+            if 'JSR' not in conditions.config and T_check  and errors.qoi_T:
                 qoi_tot.append(errors.qoi_T)
                 pond+=optim_param.coeff_T
             if 'reactor' in conditions.config and ig_check and errors.qoi_ig:
@@ -619,7 +619,7 @@ class Chromosome:
                 if errors_list[-1].qoi_s[sp]:
                     qoi_tot.append(errors_list[-1].qoi_s[sp])
                     pond+=optim_param.coeff_s[sp]
-            if 'PSR' not in conditions.config and T_check  and errors_list[-1].qoi_T:
+            if 'JSR' not in conditions.config and T_check  and errors_list[-1].qoi_T:
                 qoi_tot.append(errors_list[-1].qoi_T)
                 pond+=optim_param.coeff_T
             if 'reactor' in conditions.config and ig_check and errors_list[-1].qoi_ig:

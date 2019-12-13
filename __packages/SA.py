@@ -847,7 +847,7 @@ def write_sensitivities(red_data,sensi_scatter,S_react_x,T_react_z,S_AB_tsp_z_r,
             l1_conditions += ";z(m);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl0(m/s)"
         elif "reactor" in conditions.config:
             l1_conditions += ";t(s);Ti(K);rtol_ts;atol_ts;ig_time(s)"
-        elif "PSR" in conditions.config:
+        elif "JSR" in conditions.config:
             l1_conditions += ";time(s);rtol_ts;atol_ts"
         l2_conditions = "\n"+conditions.config+";"\
                 +conditions.composition.fuel+";"\
@@ -871,7 +871,7 @@ def write_sensitivities(red_data,sensi_scatter,S_react_x,T_react_z,S_AB_tsp_z_r,
                     +str(conditions.simul_param.tol_ts[0])+";"\
                     +str(conditions.simul_param.tol_ts[1])+";"\
                     +str(red_results.ign_time)
-        elif "PSR":
+        elif "JSR":
             l2_conditions+=str(red_results.pts_scatter[s])+";"\
                     +str(conditions.simul_param.end_sim)+";"\
                     +str(conditions.simul_param.tol_ts[0])+";"\
@@ -1057,7 +1057,7 @@ def plot_sentitivities(sp2plot,red_results,mech_data,sensi_scatter,S_react_x,T_r
                     xlabel+='t = '+'%0.2f'%(red_results.pts_scatter[s]*1000)+' ms'
                 elif 'flame' in red_results.conditions.config :
                     xlabel+='z = '+'%0.1f'%(red_results.pts_scatter[s]*1000)+' mm'
-                elif 'PSR' in red_results.conditions.config :
+                elif 'JSR' in red_results.conditions.config :
                     xlabel+='T = '+'%.0f'%(red_results.pts_scatter[s])+'K'
                 ax.set_xlabel(xlabel)
 

@@ -687,7 +687,7 @@ def ref_computation(conditions, verbose=0):
         conditions.simul_param.pts_scatter=np.array(timeVec)
 
 
-    elif 'PSR' in conditions.config:
+    elif 'JSR' in conditions.config:
         # adapted from https://www.cantera.org/examples/jupyter/reactors/stirred_reactor.ipynb.html
 
         # =============================================================================
@@ -796,7 +796,7 @@ def ref_computation(conditions, verbose=0):
 
         results = cdef.Sim_Results(conditions, gas, np.array(T_list), list(T), \
                              list(P), list(conc), list(kf), list(kr))
-        conditions.simul_param.time_psr_ref_lim = toc_sim-tic_sim
+        conditions.simul_param.time_jsr_ref_lim = toc_sim-tic_sim
 
 
     elif 'PFR' in conditions.config:
@@ -1391,7 +1391,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
 
 
 
-    elif 'PSR' in conditions.config:
+    elif 'JSR' in conditions.config:
         # adapted from https://www.cantera.org/examples/jupyter/reactors/stirred_reactor.ipynb.html
 
         # =============================================================================
@@ -1476,7 +1476,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 simul_success = True
                 while t < maxSimulationTime:
                     toc_sim = timer.time()
-                    if (toc_sim-tic_sim) > (100*conditions.simul_param.time_psr_ref_lim):  # if calculation time becomes too long
+                    if (toc_sim-tic_sim) > (100*conditions.simul_param.time_jsr_ref_lim):  # if calculation time becomes too long
                         simul_success = False
                         t = maxSimulationTime + 1
                         if verbose >= 3:

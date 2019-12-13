@@ -49,7 +49,7 @@ def computation_reference(conditions, verbose=1):
     if verbose >=1:
         print_('\n\n============================ ',mp)
         print_('Configuration: '+ conditions.config,mp)
-        if conditions.config=='PSR':
+        if conditions.config=='JSR':
             print_('T   = '+ str(conditions.simul_param.pts_scatter[0])+ '-'+ \
                             str(conditions.simul_param.pts_scatter[-1])+ ' K',mp)
         else:
@@ -153,7 +153,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 if verbose >=1:
                     print_('\n\n============================ ',mp)
                     print_('Configuration: '+conditions.config,mp)
-                    if conditions.config=='PSR':
+                    if conditions.config=='JSR':
                         print_('T   = '+ str(conditions.simul_param.pts_scatter[0])+ '-'+ \
                                         str(conditions.simul_param.pts_scatter[-1])+ ' K',mp)
                     else:
@@ -174,7 +174,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if red_data.optim_param.optim_on_meth:
                             red_data = drg.ric(red_data, mech_data, red_results)
                 elif 'SA' in red_method :
-                    if conditions.config=='PSR': break
+                    if conditions.config=='JSR': break
                     # Sensitivity coefficients calculation
                     red_data = sa.sensitivities_computation_SA(red_data,mech_data,\
                                                             red_results)
@@ -189,7 +189,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
 
                 # define eps
-                if conditions.error_param.T_check and conditions.config!='PSR':
+                if conditions.error_param.T_check and conditions.config!='JSR':
                     for sp in conditions.error_param.sp_T:
                         idx = tspc.index(sp)
                         if sp not in tspc[0:red_data.n_tspc]:
@@ -238,7 +238,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 eps_stop = [True]*n_tspecies   # stop reduction if errors>tolerance
                 for sp in range(red_data.n_tspc): eps_stop[sp]=False
                 for sp in conditions.error_param.sp_T:
-                    if conditions.error_param.T_check and not 'PSR' in conditions.config:
+                    if conditions.error_param.T_check and not 'JSR' in conditions.config:
                         if sp in tspc: idx = tspc.index(sp) ; eps_stop[idx] = False
                 for sp in conditions.error_param.sp_Sl:
                     if conditions.error_param.Sl_check and 'free_flame'  in conditions.config:
@@ -327,7 +327,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     #                  Check Errors
 
                     # Error threshold on T
-                    if conditions.error_param.T_check and conditions.config!='PSR':
+                    if conditions.error_param.T_check and conditions.config!='JSR':
                         if errors.under_tol_T : # under tol -> continuing reduction
                             T_error = False ; First_try_T_error = False
                         else:                   # above tol
@@ -507,7 +507,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                 +  First_try_sp_error
                     if not cross_red_error: 
                         if True in first_try or not errors.under_tol: # if reduced mech fails to respect the accuracy requirements
-                            if (conditions.error_param.T_check and conditions.config!='PSR')\
+                            if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
                                 for sp in conditions.error_param.sp_T:
                                     idx = tspc.index(sp)
@@ -533,7 +533,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     eps_evol[sp] = 'decrease'
                         else: # if reduced mech respects the accuracy requirements
                             one_simul_success = True
-                            if conditions.error_param.T_check and conditions.config!='PSR':
+                            if conditions.error_param.T_check and conditions.config!='JSR':
                                 for sp in conditions.error_param.sp_T:
                                     idx = tspc.index(sp)
                                     if not eps_stop[idx] :
@@ -617,7 +617,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
                     # conditions / errors / eps_stop / eps_evol / tspc / First_try_(...)_error
                     if verbose>=3:
-                        if conditions.error_param.T_check and conditions.config!='PSR':
+                        if conditions.error_param.T_check and conditions.config!='JSR':
                             txt_T='  Temperature error:   '+'%0.1f' %(errors.qoi_T*100)
                             if errors.under_tol_T: txt_T+='% < '
                             else:                  txt_T+='% > '
@@ -1005,19 +1005,19 @@ def spec2check(conditions, tspc):
         for sp in conditions.error_param.sp_Sl:
             if sp not in tspc[0:conditions.error_param.n_tspc]:
                 spc2rem += 1
-    if 'PSR' in conditions.config and conditions.error_param.ig_check:
+    if 'JSR' in conditions.config and conditions.error_param.ig_check:
         for sp in conditions.error_param.sp_ig:
             if sp not in tspc[0:conditions.error_param.n_tspc]:
                 spc2rem += 1
-    if 'PSR' in conditions.config and conditions.error_param.Sl_check:
+    if 'JSR' in conditions.config and conditions.error_param.Sl_check:
         for sp in conditions.error_param.sp_Sl:
             if sp not in tspc[0:conditions.error_param.n_tspc]:
                 spc2rem += 1
-    if 'PSR' in conditions.config and conditions.error_param.T_check:
+    if 'JSR' in conditions.config and conditions.error_param.T_check:
         for sp in conditions.error_param.sp_T:
             if sp not in tspc[0:conditions.error_param.n_tspc]:
                 spc2rem += 1
-    if 'PSR' in conditions.config and conditions.error_param.K_check:
+    if 'JSR' in conditions.config and conditions.error_param.K_check:
         for sp in conditions.error_param.sp_K:
             if sp not in tspc[0:conditions.error_param.n_tspc]:
                 spc2rem += 1
@@ -1089,7 +1089,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
                         step_nb = -1
                         read_data=0   # if applicable, stop recording data in data list
 
-                    if "reactor" in line[0] or "flame" in line[0] or "PSR" in line[0] or "PFR" in line[0]:
+                    if "reactor" in line[0] or "flame" in line[0] or "JSR" in line[0] or "PFR" in line[0]:
                         case_titles.append(line)
 
                     if "Step" in line[0]:
@@ -1154,7 +1154,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         if "flame" in config:
             rtol_ss   = float(case_titles[c][11])
             atol_ss   = float(case_titles[c][12])
-        elif "PSR" in config:
+        elif "JSR" in config:
             end_sim   = float(case_titles[c][8])
         elif "PFR" in config:
             end_sim   = float(case_titles[c][11])
@@ -1202,7 +1202,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         else: conditions_list[-1].composition.X = conditions_list[-1].composition.molarFraction(False)
 
         conditions_list[-1].simul_param.verbose = verbose
-        if "PSR" in config:
+        if "JSR" in config:
             conditions_list[-1].simul_param.end_sim = end_sim
             conditions_list[-1].simul_param.pts_scatter = np.array(pts_scatter)
         elif "PFR" in config:
@@ -1294,7 +1294,7 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
         ax.set_xlabel('t (s)')
     elif "flame" in ref_results.conditions.config:
         ax.set_xlabel('Z (mm)')
-    elif "PSR" in ref_results.conditions.config:
+    elif "JSR" in ref_results.conditions.config:
         ax.set_xlabel('T (K)')
 
     sp2plt_idx=[]
@@ -1344,7 +1344,7 @@ def get_reduction_parameters(filename):
     try :   fs = open('_conditions_input/'+filename, 'r')
     except: fs = open(filename, 'r')
 
-    caution_opt_psr      = True
+    caution_opt_jsr      = True
     caution_opt_fflame   = True
     caution_opt_cf_flame = True
     first_it             = True
@@ -1434,8 +1434,8 @@ def get_reduction_parameters(filename):
             if txt[0] == 'grad_curv_ratio':   grad_curv_ratio = float(txt[1])
             if txt[0] == 'tign_nPoints':      tign_nPoints    = float(txt[1])
             if txt[0] == 'tign_dt':           tign_dt         = float(txt[1])
-            # options for psr
-            if txt[0] == 't_max':             t_max           = float(txt[1]); caution_opt_psr=False
+            # options for jsr
+            if txt[0] == 't_max':             t_max           = float(txt[1]); caution_opt_jsr=False
             # options for flame
             if txt[0] == 'tol_ss':            tol_ss          = txt2list_float(txt[1])
             if txt[0] == 'transport_model':   transport_model = clean_txt(txt[1])
@@ -1494,7 +1494,7 @@ def get_reduction_parameters(filename):
             for sp in sp_ig:
                 if sp not in tspc and ig_check:  tspc.append(sp)
 
-            if config == 'PSR':
+            if config == 'JSR':
                 T_scatter = copy.deepcopy(Ts)
                 Ts = [Ts[0]]
 
@@ -1552,11 +1552,11 @@ def get_reduction_parameters(filename):
                             conditions_list[-1].simul_param.tign_nPoints = int(tign_nPoints)
                         if 'tign_dt' in locals():
                             conditions_list[-1].simul_param.tign_dt = tign_dt
-                        # options for psr
+                        # options for jsr
                         if 't_max' in locals():
-                            caution_opt_psr=False
+                            caution_opt_jsr=False
                             conditions_list[-1].simul_param.end_sim = t_max
-                        if config == 'PSR':
+                        if config == 'JSR':
                             conditions_list[-1].simul_param.pts_scatter = T_scatter
                         # options for flame
                         if 'tol_ss' in locals():
@@ -1664,8 +1664,8 @@ def get_reduction_parameters(filename):
                         conditions_list[-1].error_param.n_tspc = n_tspc
                         conditions_list[-1].main_path = main_path_ext
 
-            if caution_opt_psr and config=='PSR':
-                print('WARNING: resident time for PSR not given (t_max) !')
+            if caution_opt_jsr and config=='JSR':
+                print('WARNING: resident time for JSR not given (t_max) !')
                 print('default value: t_max = 0.02 s')
                 conditions_list[-1].simul_param.end_sim = 0.02
             if caution_opt_fflame and config=='free_flame':
@@ -1702,8 +1702,8 @@ def get_reduction_parameters(filename):
             if 'grad_curv_ratio'  in locals(): del grad_curv_ratio
             if 'tign_nPoints'     in locals(): del tign_nPoints
             if 'tign_dt'          in locals(): del tign_dt
-            # options for psr
-            if 't_max'            in locals(): del t_max ; caution_opt_psr=True
+            # options for jsr
+            if 't_max'            in locals(): del t_max ; caution_opt_jsr=True
             # options for flame
             if 'tol_ss'           in locals(): del tol_ss
             if 'transport_model'  in locals(): del transport_model

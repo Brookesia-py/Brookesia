@@ -683,7 +683,7 @@ def write_sensitivities(red_data,red_results,drg_i):
             l1_conditions += ";z(m);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl0(m/s)"
         elif "reactor" in conditions.config:
             l1_conditions += ";t(s);Ti(K);rtol_ts;atol_ts;ig_time(s)"
-        elif "PSR" in conditions.config:
+        elif "JSR" in conditions.config:
             l1_conditions += ";time(s);rtol_ts;atol_ts"
         l2_conditions = "\n"+conditions.config+";"\
                 +conditions.composition.fuel+";"\
@@ -707,7 +707,7 @@ def write_sensitivities(red_data,red_results,drg_i):
                     +str(conditions.simul_param.tol_ts[0])+";"\
                     +str(conditions.simul_param.tol_ts[1])+";"\
                     +str(red_results.ign_time)
-        elif "PSR":
+        elif "JSR":
             l2_conditions+=str(red_results.pts_scatter[s])+";"\
                     +str(conditions.simul_param.end_sim)+";"\
                     +str(conditions.simul_param.tol_ts[0])+";"\
