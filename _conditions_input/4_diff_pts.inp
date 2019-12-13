@@ -1,7 +1,7 @@
 #=============================================
 #           Main parameters
 #=============================================
-main_path         = VALID_4_diff_pts
+main_path         = TEST_4_diff_pts
 mech              = C0_H2_Law.cti
 verbose           = 4
 show_plots        = True
@@ -27,19 +27,19 @@ config            = diff_flame
 Ps                = 100000.0
 fuel_1            = H2
 diluent_1         = N2
-diluent_ratio_1   = 0
+diluent_ratio_1   = 0.0
 Ts_1              = 300.0
-mdots_1           = 1.0
+mdots_1           = 2.0
 oxidant_2         = O2
 diluent_2         = N2
-diluent_ratio_2   = 79
+diluent_ratio_2   = 79.0
 Ts_2              = 300.0
-mdots_2           = 1.0
+mdots_2           = 2.0
 width             = 0.02
-tol_ts            = 1e-05, 1e-08
-tol_ss            = [1e-06, 1e-08]
+tol_ts            = 1e-08, 1e-05
+tol_ss            = [1e-08, 1e-06]
 transport_model   = Mix
-pts_scatter       = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+pts_scatter       = [0.0,0.2,0.4,0.6,0.8,1.0]
 slope             = 0.05
 curve             = 0.05
 ratio             = 2.0
@@ -51,41 +51,48 @@ prune             = 0.01
 #           Operators
 #=============================================
 
+
 #===========> Op: DRGEP_sp
 operator        = DRGEP_sp 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
-max_error_sp    = 50
+max_error_sp    = 30, 30, 30
 max_error_T     = 30
 max_error_ig    = 30
+max_error_Sl    = 30
+max_error_K     = 30
 inter_sp_inter  = True
 optim           = False
-
 
 #===========> Op: SARGEP_sp
 operator        = SARGEP_sp 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
-max_error_sp    = 50
+max_error_sp    = 30, 30, 30
 max_error_T     = 30
 max_error_ig    = 30
+max_error_Sl    = 30
+max_error_K     = 30
 inter_sp_inter  = True
 optim           = True
+ttol_sensi      = [1e-05, 1e-08]
 #====> Optimization
 n_gen              = 5
 n_indiv            = 5
 error_fitness      = mean
-Arrh_max_variation = 8, 3, 3
+Arrh_max_variation = 5, 5, 5
 optim_on_meth      = False
-frac_r2opt         = 30
+nb_r2opt           = 30
 selection_operator = Roulette
 selection_options  = 0.2
 Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
-Xover_pct          = 10, 20, 30, 20
+Xover_pct          = 10, 20, 20, 20
 Xover_opt          = , , , 
 mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
-mut_pct            = 10, 70, 40
+mut_pct            = 30, 30, 10
 mut_opt            = , 3, 
-mut_intensity      = 30
+mut_intensity      = 20
+sub_mech_sel       = H2, CO, C1, C2, C3, N
+
