@@ -1,7 +1,7 @@
 #=============================================
 #           Main parameters
 #=============================================
-main_path         = VALID_3_Freeflame_pts
+main_path         = TEST_3_Freeflame_pts
 mech              = C1_GRI30.cti
 verbose           = 4
 show_plots        = True
