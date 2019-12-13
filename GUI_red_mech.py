@@ -35,7 +35,6 @@ import locale as lc
 lc.setlocale(lc.LC_ALL, 'en_US.utf8')
 
 
-
 # =============================================================================
 #  default options
 # =============================================================================
@@ -1682,19 +1681,19 @@ class Ui_MainWindow(object):
             self.txt_GA_Xover_int_4[-1].setObjectName("txt_GA_Xover_int_4")
             self.txt_GA_Xover_int_4[-1].setPlainText(_translate("MainWindow", d_GA_Xover_int_4))
             self.txt_GA_Xover_opt_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_1[-1].setGeometry(QtCore.QRect(310, 50, 71, 31))
+            self.txt_GA_Xover_opt_1[-1].setGeometry(QtCore.QRect(3100, 50, 71, 31))
             self.txt_GA_Xover_opt_1[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_1))
             self.txt_GA_Xover_opt_1[-1].setObjectName("txt_GA_Xover_opt_1")
             self.txt_GA_Xover_opt_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_2[-1].setGeometry(QtCore.QRect(310, 80, 71, 31))
+            self.txt_GA_Xover_opt_2[-1].setGeometry(QtCore.QRect(3100, 80, 71, 31))
             self.txt_GA_Xover_opt_2[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_2))
             self.txt_GA_Xover_opt_2[-1].setObjectName("txt_GA_Xover_opt_2")
             self.txt_GA_Xover_opt_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_3[-1].setGeometry(QtCore.QRect(310, 110, 71, 31))
+            self.txt_GA_Xover_opt_3[-1].setGeometry(QtCore.QRect(3100, 110, 71, 31))
             self.txt_GA_Xover_opt_3[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_3))
             self.txt_GA_Xover_opt_3[-1].setObjectName("txt_GA_Xover_opt_3")
             self.txt_GA_Xover_opt_4.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_4[-1].setGeometry(QtCore.QRect(310, 140, 71, 31))
+            self.txt_GA_Xover_opt_4[-1].setGeometry(QtCore.QRect(3100, 140, 71, 31))
             self.txt_GA_Xover_opt_4[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_4))
             self.txt_GA_Xover_opt_4[-1].setObjectName("txt_GA_Xover_opt_4")
             self.label_GA_Xover_int.append(QtWidgets.QLabel(self.GA_Box_Xover[-1]))
@@ -1702,7 +1701,7 @@ class Ui_MainWindow(object):
             self.label_GA_Xover_int[-1].setObjectName("label_GA_Xover_int")
             self.label_GA_Xover_int[-1].setText(_translate("MainWindow", "Intensity(%)"))
             self.label_GA_Xover_opt.append(QtWidgets.QLabel(self.GA_Box_Xover[-1]))
-            self.label_GA_Xover_opt[-1].setGeometry(QtCore.QRect(320, 30, 71, 18))
+            self.label_GA_Xover_opt[-1].setGeometry(QtCore.QRect(3200, 30, 71, 18))
             self.label_GA_Xover_opt[-1].setObjectName("label_GA_Xover_opt")
             self.label_GA_Xover_opt[-1].setText(_translate("MainWindow", "Options"))
             self.pB_GA_remove.append(QtWidgets.QPushButton(self.GA[-1]))
@@ -1752,13 +1751,13 @@ class Ui_MainWindow(object):
 #            self.txt_GA_mut_int_4[-1].setGeometry(QtCore.QRect(250, 150, 71, 31))
 #            self.txt_GA_mut_int_4[-1].setObjectName("txt_GA_mut_int_4")
             self.txt_GA_mut_opt_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_opt_1[-1].setGeometry(QtCore.QRect(310, 50, 71, 31))
+            self.txt_GA_mut_opt_1[-1].setGeometry(QtCore.QRect(3100, 50, 71, 31))
             self.txt_GA_mut_opt_1[-1].setObjectName("txt_GA_mut_opt_1")
             self.txt_GA_mut_opt_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
             self.txt_GA_mut_opt_2[-1].setGeometry(QtCore.QRect(310, 80, 71, 31))
             self.txt_GA_mut_opt_2[-1].setObjectName("txt_GA_mut_opt_2")
             self.txt_GA_mut_opt_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_opt_3[-1].setGeometry(QtCore.QRect(310, 110, 71, 31))
+            self.txt_GA_mut_opt_3[-1].setGeometry(QtCore.QRect(3100, 110, 71, 31))
             self.txt_GA_mut_opt_3[-1].setObjectName("txt_GA_mut_opt_3")
 #            self.txt_GA_mut_opt_4.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
 #            self.txt_GA_mut_opt_4[-1].setGeometry(QtCore.QRect(350, 150, 71, 31))
@@ -3444,6 +3443,7 @@ class Ui_MainWindow(object):
                         fd.write('diluent_1         = ' + diluent[case_act]            + '\n')
                         fd.write('diluent_ratio_1   = ' + str(diluent_ratio[case_act]) + '\n')
                     fd.write('Ts_1              = ' + list2txt(Ts[case_act])       + '\n')
+                if 'diff_' not in configs[case_act]:
                     fd.write('phis_1            = ' + list2txt(phis[case_act])     + '\n')
                 if 'diff_' in configs[case_act] or 'pp_' in configs[case_act]:
                     fd.write('mdots_1           = ' + list2txt(mdots_1[case_act])      + '\n')
