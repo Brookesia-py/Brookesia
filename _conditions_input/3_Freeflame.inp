@@ -55,7 +55,7 @@ max_error_sp    = 30, 30, 30
 max_error_T     = 30
 max_error_Sl    = 30
 inter_sp_inter  = True
-optim           = True
+optim           = False
 
 
 
