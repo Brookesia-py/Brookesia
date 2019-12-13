@@ -1,7 +1,7 @@
 #=============================================
 #           Main parameters
 #=============================================
-main_path         = VALID_1_reactor
+main_path         = TEST_1_reactor
 mech              = C1_GRI30.cti
 verbose           = 4
 show_plots        = True
@@ -12,6 +12,8 @@ Sl_check          = False
 sp_Sl             = H
 ig_check          = True
 sp_ig             = CH3
+K_check           = False
+sp_K              = H
 error_calculation = points
 error_coupling    = mean
 
@@ -22,6 +24,7 @@ error_coupling    = mean
 
 #======> Case 1
 config            = reactor_UV
+Ps                = 100000.0
 fuel              = CH4
 oxidant           = O2
 diluent           = N2
@@ -29,7 +32,6 @@ diluent_ratio     = N2/O2 3.76
 Ts                = 1600.0
 Ps                = 100000.0
 phis              = 0.5, 1.0, 1.5
-tol_ts            = 1e-06, 1e-12
 n_pts             = 250.0
 delta_npts        = 20.0
 t_max_coeff       = 5.0
@@ -37,6 +39,7 @@ Scal_ref          = H2O
 grad_curv_ratio   = 0.5
 tign_nPoints      = 130.0
 tign_dt           = 1e-09
+tol_ts            = 1e-06, 1e-12
 
 
 
@@ -50,7 +53,7 @@ operator        = DRGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
-max_error_sp    = 50
+max_error_sp    = 30, 30, 30
 max_error_T     = 30
 max_error_ig    = 30
 inter_sp_inter  = True
@@ -59,36 +62,39 @@ optim           = True
 n_gen              = 5
 n_indiv            = 5
 error_fitness      = mean
-Arrh_max_variation = 6, 5, 4
+Arrh_max_variation = 5, 5, 5
 optim_on_meth      = False
-frac_r2opt         = 30
+nb_r2opt           = 30
 selection_operator = Roulette
 selection_options  = 0.2
 Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
-Xover_pct          = 10, 20, 30, 20
+Xover_pct          = 10, 20, 20, 20
 Xover_opt          = , , , 
 mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
-mut_pct            = 10, 70, 40
+mut_pct            = 30, 30, 10
 mut_opt            = , 3, 
-mut_intensity      = 30
+mut_intensity      = 20
+sub_mech_sel       = H2, CO, C1, C2, C3, N
 
-#===========> Op: SA_sp
-operator        = SA_sp 
+
+#===========> Op: SAR_sp
+operator        = SAR_sp 
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
-max_error_sp    = 50
-max_error_T     = 30
-max_error_ig    = 30
+max_error_sp    = 30.0, 30.0, 30.0
+max_error_T     = 30.0
+max_error_ig    = 30.0
 inter_sp_inter  = True
 optim           = True
+ttol_sensi      = [1e-05, 1e-08]
 #====> Optimization
 n_gen              = 5
 n_indiv            = 5
 error_fitness      = mean
-Arrh_max_variation = 6, 5, 4
+Arrh_max_variation = 8, 3, 3
 optim_on_meth      = False
-frac_r2opt         = 30
+nb_r2opt           = 30
 selection_operator = Roulette
 selection_options  = 0.2
 Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
@@ -98,3 +104,5 @@ mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct            = 10, 70, 40
 mut_opt            = , 3, 
 mut_intensity      = 30
+sub_mech_sel       = H2, CO
+
