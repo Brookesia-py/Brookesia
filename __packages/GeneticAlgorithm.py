@@ -374,7 +374,8 @@ class Chromosome:
 
     def shift_flame_data(self,conditions_list,optim_param,ref_results_list):
         verbose = conditions_list[0].simul_param.verbose
-
+        
+        os.chdir(conditions_list[0].main_path+'/GA')
         filename = 'temp.cti'
         self.mech.write_new_mech(filename)
 
@@ -443,6 +444,7 @@ class Chromosome:
         verbose = conditions_list[0].simul_param.verbose
 
         print_('time step optimization',mp)
+        os.chdir(conditions_list[0].main_path+'/GA')
         filename = 'temp.cti'
         self.mech.write_new_mech(filename)
         # --------------------------------------------------------------------------------
@@ -494,8 +496,9 @@ class Chromosome:
 
 
     def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0):
+        
         verbose = conditions_list[0].simul_param.verbose
-
+        os.chdir(conditions_list[0].main_path+'/GA')
         filename = 'temp_'+str(n_par)+'.cti'
         self.mech.write_new_mech(filename)
 
@@ -601,18 +604,17 @@ class Chromosome:
             # Simulation condition
             conditions   = conditions_list[i]
             ref_results = ref_results_list[i]
-
+            os.chdir(conditions_list[0].main_path+'/GA')
             self.mech.write_new_mech(filename)
 
             T_check  = conditions_list[i].error_param.T_check
             Sl_check = conditions_list[i].error_param.Sl_check
             ig_check = conditions_list[i].error_param.ig_check
             K_check  = conditions_list[i].error_param.K_check
-
-            cur_path = os.getcwd()
+            
             Opt_results_list.append(comp.red_computation(conditions, \
                        gas,self.mech.spec.activ_m,self.mech.react.activ_m))
-            os.chdir(cur_path)
+            os.chdir(conditions_list[0].main_path+'/GA')
             errors_list.append(cdef.Errors(conditions,ref_results,\
                                          Opt_results_list[-1],optim_param))
             for sp in range(optim_param.n_tspc):

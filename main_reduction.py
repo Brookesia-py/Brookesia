@@ -151,4 +151,4 @@ if len(sys.argv)>1:
     filename = sys.argv[1]
     run_reduction(filename)
 
-#run_reduction('1_reactor_pts.inp')
+#run_reduction('4_diff.inp')

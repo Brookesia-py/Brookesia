@@ -286,6 +286,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             print_("  "+str(active_sp_pm.count(True))+\
                                   " species, "+ str(active_r_pm.count(True))+\
                                   " reactions remaining",mp)
+                        os.chdir(conditions_list[0].main_path+'/__'+red_method)
                         mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
                         # --------------------------------------------------------------------------------
                         # interpretation of the new mech
@@ -307,8 +308,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         errors = cdef.Errors(conditions,ref_results,\
                                       red_results_loop,red_data,red_data.red_op)
                         # error calculation
-                        if errors.under_tol:
-                            os.system('cp temp.cti previous_mech.cti')
+#                        if errors.under_tol:
+#                            os.system('cp temp.cti previous_mech.cti')
                         if conditions.simul_param.show_plots:
                             plotData(tspc[0:red_data.n_tspc],ref_results,red_results_loop)
 

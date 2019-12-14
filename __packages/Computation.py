@@ -1212,8 +1212,8 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                         if verbose<9:
                             old_stdout = sys.stdout ; old_stderr = sys.stderr
                             with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                        if it_n == 1: f.restore(fnK, 'solution')
-                        else:         f.restore(fnKi, 'solution')
+                        if first_it: f.restore(fnK, 'solution')
+                        else:        f.restore(fnKi, 'solution')
                         if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
 
                         # Create an initial guess based on the previous solution
