@@ -1,7 +1,7 @@
 #=============================================
 #           Main parameters
 #=============================================
-main_path         = TEST_2_PSR
+main_path         = TEST_2_JSR
 mech              = C1_GRI30.cti
 verbose           = 4
 show_plots        = True
@@ -23,7 +23,7 @@ error_coupling    = mean
 #=============================================
 
 #======> Case 1
-config            = PSR
+config            = JSR
 Ps                = 100000.0
 fuel              = CH4
 oxidant           = O2
