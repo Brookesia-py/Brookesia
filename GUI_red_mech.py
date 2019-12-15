@@ -79,13 +79,13 @@ d_grad_curv_ratio       = 0.5
 d_tign_nPoints          = '130'
 d_tign_dt               = '1e-9'
 
-# options for PSR
-d_T_min_psr             = '600'
-d_T_max_psr             = '1200'
-d_T_incr_psr            = '10'
-d_tol_ts_psr            = '1e-15,1e-8'         # abs/rel
+# options for JSR
+d_T_min_jsr             = '600'
+d_T_max_jsr             = '1200'
+d_T_incr_jsr            = '10'
+d_tol_ts_jsr            = '1e-15,1e-8'         # abs/rel
 d_t_max                 = 0.2
-d_diluent_ratio_psr     = '0.99'
+d_diluent_ratio_jsr     = '0.99'
 
 # options for PFR
 d_T_min_pfr             = '1600'
@@ -420,7 +420,7 @@ class Ui_MainWindow(object):
         self.num_case       = []
         self.rB_reactor_UV  = []
         self.rB_reactor_HP  = []
-        self.rB_PSR         = []
+        self.rB_JSR         = []
         self.rB_PFR         = []
         self.rB_fflame      = []
         self.rB_cfflame     = []
@@ -589,16 +589,16 @@ class Ui_MainWindow(object):
         self.txt7_5         = []
         self.df_mdot3_2        = []
         self.df_mdot4_2        = []
-        # psr options
-        self.GPSR           = []
-        self.GPSR1          = []
-        self.txtpsr_3       = []
-        self.tol_ts_abs_psr = []
-        self.txtpsr_2       = []
-        self.tol_ts_rel_psr = []
-        self.txtpsr_1       = []
-        self.GPSR2          = []
-        self.t_max_psr      = []
+        # jsr options
+        self.GJSR           = []
+        self.GJSR1          = []
+        self.txtjsr_3       = []
+        self.tol_ts_abs_jsr = []
+        self.txtjsr_2       = []
+        self.tol_ts_rel_jsr = []
+        self.txtjsr_1       = []
+        self.GJSR2          = []
+        self.t_max_jsr      = []
         # pfr options
         self.Gpfr           = []
         self.Gpfr1          = []
@@ -1884,9 +1884,9 @@ class Ui_MainWindow(object):
         self.rB_reactor_HP.append(QtWidgets.QRadioButton(self.GCases[-1]))
         self.rB_reactor_HP[-1].setGeometry(QtCore.QRect(10, 43, 105, 22))
         self.rB_reactor_HP[-1].setObjectName("rB_reactor_HP")
-        self.rB_PSR.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_PSR[-1].setGeometry(QtCore.QRect(10, 61, 105, 22))
-        self.rB_PSR[-1].setObjectName("rB_PSR")
+        self.rB_JSR.append(QtWidgets.QRadioButton(self.GCases[-1]))
+        self.rB_JSR[-1].setGeometry(QtCore.QRect(10, 61, 105, 22))
+        self.rB_JSR[-1].setObjectName("rB_JSR")
         self.rB_PFR.append(QtWidgets.QRadioButton(self.GCases[-1]))
         self.rB_PFR[-1].setGeometry(QtCore.QRect(10, 79, 151, 22))
         self.rB_PFR[-1].setObjectName("rB_PFR")
@@ -1905,7 +1905,7 @@ class Ui_MainWindow(object):
         self.GCases[-1].setTitle(_translate("MainWindow", "Cases"))
         self.rB_reactor_UV[-1].setText(_translate("MainWindow", "Reactor (&U,V)"))
         self.rB_reactor_HP[-1].setText(_translate("MainWindow", "Reactor (&H,p)"))
-        self.rB_PSR[-1].setText(_translate("MainWindow", "P&SR"))
+        self.rB_JSR[-1].setText(_translate("MainWindow", "J&SR"))
         self.rB_PFR[-1].setText(_translate("MainWindow", "&PFR"))
         self.rB_fflame[-1].setText(_translate("MainWindow", "&Flat flame"))
         self.rB_cfflame[-1].setText(_translate("MainWindow", "&Counter-flow flame"))
@@ -1922,7 +1922,7 @@ class Ui_MainWindow(object):
         add_new_condition = True
         if not  self.rB_reactor_UV[num_case-1].isChecked() \
         and not self.rB_reactor_HP[num_case-1].isChecked() \
-        and not self.rB_PSR[num_case-1].isChecked() \
+        and not self.rB_JSR[num_case-1].isChecked() \
         and not self.rB_fflame[num_case-1].isChecked()\
         and not self.rB_cfflame[num_case-1].isChecked()\
         and not self.rB_PFR[num_case-1].isChecked():
@@ -2204,7 +2204,7 @@ class Ui_MainWindow(object):
 
                 # add options
                 self.add_reactor_options(num_case)
-                self.add_psr_options(num_case)
+                self.add_jsr_options(num_case)
                 self.add_flame_options(num_case)
                 self.add_pfr_options(num_case)
 
@@ -2232,15 +2232,15 @@ class Ui_MainWindow(object):
                 self.tol_ts_abs_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[0]))
                 self.tol_ts_rel_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[1]))
 
-            elif self.rB_PSR[num_case-1].isChecked(): # psr
-                self.GPSR[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 311, 171))
-                self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_psr))
-                self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_psr))
-                self.Tincr[num_case-1].setPlainText(_translate("MainWindow",  d_T_incr_psr))
-                self.tol_ts_abs_psr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_psr.split(',')[0]))
-                self.tol_ts_rel_psr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_psr.split(',')[1]))
+            elif self.rB_JSR[num_case-1].isChecked(): # jsr
+                self.GJSR[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 311, 171))
+                self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_jsr))
+                self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_jsr))
+                self.Tincr[num_case-1].setPlainText(_translate("MainWindow",  d_T_incr_jsr))
+                self.tol_ts_abs_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[0]))
+                self.tol_ts_rel_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[1]))
 
-            elif self.rB_PFR[num_case-1].isChecked(): # psr
+            elif self.rB_PFR[num_case-1].isChecked(): # jsr
                 self.Gpfr[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 460, 171))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_pfr))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_pfr))
@@ -2346,7 +2346,7 @@ class Ui_MainWindow(object):
         self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(2000, 10000, 670, 171))
         self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(2000, 10000, 670, 171))
         self.Gr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 731, 171))
-        self.GPSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
+        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
         self.Gpfr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
         self.Gf[num_case-1].setGeometry(QtCore.QRect(20000, 10, 670, 171))
         self.condition_activated[num_case-1] = False
@@ -2704,55 +2704,55 @@ class Ui_MainWindow(object):
 
 
 
-    def add_psr_options(self, num_case):
-        # Options for PSR
+    def add_jsr_options(self, num_case):
+        # Options for JSR
         _translate = QtCore.QCoreApplication.translate
 
-        self.GPSR.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.GPSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
-        self.GPSR[num_case-1].setObjectName("GPSR")
-        self.GPSR[num_case-1].setTitle(_translate("MainWindow", "Options for PSR"))
+        self.GJSR.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
+        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
+        self.GJSR[num_case-1].setObjectName("GJSR")
+        self.GJSR[num_case-1].setTitle(_translate("MainWindow", "Options for JSR"))
 
 
         # tolerances
-        self.GPSR1.append(QtWidgets.QGroupBox(self.GPSR[num_case-1]))
-        self.GPSR1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
-        self.GPSR1[num_case-1].setObjectName("GPSR1")
-        self.GPSR1[num_case-1].setTitle(_translate("MainWindow", "Tolerances"))
-        self.txtpsr_3.append(QtWidgets.QLabel(self.GPSR1[num_case-1]))
-        self.txtpsr_3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
-        self.txtpsr_3[num_case-1].setObjectName("txtpsr_3")
-        self.tol_ts_abs_psr.append(QtWidgets.QPlainTextEdit(self.GPSR1[num_case-1]))
-        self.tol_ts_abs_psr[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
-        self.tol_ts_abs_psr[num_case-1].setObjectName("tol_ts_abs_psr")
-        self.txtpsr_2.append(QtWidgets.QLabel(self.GPSR1[num_case-1]))
-        self.txtpsr_2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
-        self.txtpsr_2[num_case-1].setObjectName("txtpsr_2")
-        self.tol_ts_rel_psr.append(QtWidgets.QPlainTextEdit(self.GPSR1[num_case-1]))
-        self.tol_ts_rel_psr[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
-        self.tol_ts_rel_psr[num_case-1].setObjectName("tol_ts_rel_psr")
-        self.txtpsr_1.append(QtWidgets.QLabel(self.GPSR1[num_case-1]))
-        self.txtpsr_1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
-        self.txtpsr_1[num_case-1].setObjectName("txtpsr_1")
-        self.txtpsr_3[num_case-1].setText(_translate("MainWindow", "tol ts"))
-        self.txtpsr_2[num_case-1].setText(_translate("MainWindow", "rel"))
-        self.txtpsr_1[num_case-1].setText(_translate("MainWindow", "abs"))
-        self.tol_ts_abs_psr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_psr.split(',')[0]))
-        self.tol_ts_rel_psr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_psr.split(',')[1]))
+        self.GJSR1.append(QtWidgets.QGroupBox(self.GJSR[num_case-1]))
+        self.GJSR1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
+        self.GJSR1[num_case-1].setObjectName("GJSR1")
+        self.GJSR1[num_case-1].setTitle(_translate("MainWindow", "Tolerances"))
+        self.txtjsr_3.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
+        self.txtjsr_3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
+        self.txtjsr_3[num_case-1].setObjectName("txtjsr_3")
+        self.tol_ts_abs_jsr.append(QtWidgets.QPlainTextEdit(self.GJSR1[num_case-1]))
+        self.tol_ts_abs_jsr[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
+        self.tol_ts_abs_jsr[num_case-1].setObjectName("tol_ts_abs_jsr")
+        self.txtjsr_2.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
+        self.txtjsr_2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
+        self.txtjsr_2[num_case-1].setObjectName("txtjsr_2")
+        self.tol_ts_rel_jsr.append(QtWidgets.QPlainTextEdit(self.GJSR1[num_case-1]))
+        self.tol_ts_rel_jsr[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
+        self.tol_ts_rel_jsr[num_case-1].setObjectName("tol_ts_rel_jsr")
+        self.txtjsr_1.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
+        self.txtjsr_1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
+        self.txtjsr_1[num_case-1].setObjectName("txtjsr_1")
+        self.txtjsr_3[num_case-1].setText(_translate("MainWindow", "tol ts"))
+        self.txtjsr_2[num_case-1].setText(_translate("MainWindow", "rel"))
+        self.txtjsr_1[num_case-1].setText(_translate("MainWindow", "abs"))
+        self.tol_ts_abs_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[0]))
+        self.tol_ts_rel_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[1]))
 
         # resident time
-        self.GPSR2.append(QtWidgets.QGroupBox(self.GPSR[num_case-1]))
-        self.GPSR2[num_case-1].setGeometry(QtCore.QRect(170, 30, 131, 131))
-        self.GPSR2[num_case-1].setObjectName("GPSR2")
-        self.GPSR2[num_case-1].setTitle(_translate("MainWindow", "Resident time"))
-        self.t_max_psr.append(QtWidgets.QDoubleSpinBox(self.GPSR2[num_case-1]))
-        self.t_max_psr[num_case-1].setGeometry(QtCore.QRect(40, 50, 61, 32))
-        self.t_max_psr[num_case-1].setDecimals(2)
-        self.t_max_psr[num_case-1].setMaximum(10.0)
-        self.t_max_psr[num_case-1].setSingleStep(0.1)
-        self.t_max_psr[num_case-1].setObjectName("t_max_psr")
-        self.t_max_psr[num_case-1].setProperty("value", d_t_max)
-        self.Diluent_2[num_case-1].setPlainText(_translate("MainWindow", d_diluent_ratio_psr));
+        self.GJSR2.append(QtWidgets.QGroupBox(self.GJSR[num_case-1]))
+        self.GJSR2[num_case-1].setGeometry(QtCore.QRect(170, 30, 131, 131))
+        self.GJSR2[num_case-1].setObjectName("GJSR2")
+        self.GJSR2[num_case-1].setTitle(_translate("MainWindow", "Resident time"))
+        self.t_max_jsr.append(QtWidgets.QDoubleSpinBox(self.GJSR2[num_case-1]))
+        self.t_max_jsr[num_case-1].setGeometry(QtCore.QRect(40, 50, 61, 32))
+        self.t_max_jsr[num_case-1].setDecimals(2)
+        self.t_max_jsr[num_case-1].setMaximum(10.0)
+        self.t_max_jsr[num_case-1].setSingleStep(0.1)
+        self.t_max_jsr[num_case-1].setObjectName("t_max_jsr")
+        self.t_max_jsr[num_case-1].setProperty("value", d_t_max)
+        self.Diluent_2[num_case-1].setPlainText(_translate("MainWindow", d_diluent_ratio_jsr));
 
 
     def add_cf_pprem_options(self,num_case): # partially premixed flame conditions
@@ -3243,7 +3243,7 @@ class Ui_MainWindow(object):
             if self.condition_activated[case]:
                 if self.rB_reactor_UV[case].isChecked(): configs.append('reactor_UV')
                 elif self.rB_reactor_HP[case].isChecked(): configs.append('reactor_HP')
-                elif self.rB_PSR[case].isChecked(): configs.append('PSR')
+                elif self.rB_JSR[case].isChecked(): configs.append('JSR')
                 elif self.rB_PFR[case].isChecked(): configs.append('PFR')
                 elif self.rB_fflame[case].isChecked(): configs.append('free_flame')
                 elif  self.rB_cfflame[case].isChecked():
@@ -3335,11 +3335,11 @@ class Ui_MainWindow(object):
                         phis_2.append(False)
                         mdots_2.append(False)
 
-                # PSR + reactor + flame options
+                # JSR + reactor + flame options
                 if 'reactor' in configs[-1]:
                     tol_ts.append([float(self.tol_ts_rel_r[case].document().toPlainText()),float(self.tol_ts_abs_r[case].document().toPlainText())])
-                elif configs[-1] == 'PSR':
-                    tol_ts.append([float(self.tol_ts_rel_psr[case].document().toPlainText()),float(self.tol_ts_abs_psr[case].document().toPlainText())])
+                elif configs[-1] == 'JSR':
+                    tol_ts.append([float(self.tol_ts_rel_jsr[case].document().toPlainText()),float(self.tol_ts_abs_jsr[case].document().toPlainText())])
                 elif configs[-1] == 'PFR':
                     tol_ts.append([float(self.tol_ts_rel_pfr[case].document().toPlainText()),float(self.tol_ts_abs_pfr[case].document().toPlainText())])
                 elif 'flame' in configs[-1]:
@@ -3355,8 +3355,8 @@ class Ui_MainWindow(object):
                 tign_nPoints.append(float(self.txt_Gr_ipn[case].document().toPlainText()))       # number of time step for auto-ignition detection
                 tign_dt.append(float(self.txt_Gr_its[case].document().toPlainText()))            # initial time step for auto-ignition detection
 
-                # PSR options
-                t_max.append(float(self.t_max_psr[case].text().replace(',','.')))
+                # JSR options
+                t_max.append(float(self.t_max_jsr[case].text().replace(',','.')))
 
                 # PFR options
                 n_pts_pfr.append(float(self.pts_num_pfr[case].text()))
@@ -3455,7 +3455,7 @@ class Ui_MainWindow(object):
                     fd.write('grad_curv_ratio   = ' + str(grad_curv_ratio[case_act])   + '\n')
                     fd.write('tign_nPoints      = ' + str(tign_nPoints[case_act])      + '\n')
                     fd.write('tign_dt           = ' + str(tign_dt[case_act])           + '\n')
-                elif 'PSR' in configs[case_act]:
+                elif 'JSR' in configs[case_act]:
                     fd.write('t_max             = ' + str(t_max[case_act])             + '\n')
                 elif 'PFR' in configs[case_act]:
                     fd.write('n_pts             = ' + str(n_pts_pfr[case_act])             + '\n')
@@ -3745,8 +3745,8 @@ class Ui_MainWindow(object):
                 if txt[0] == 'grad_curv_ratio':   grad_curv_ratio   = float(txt[1])
                 if txt[0] == 'tign_nPoints':      tign_nPoints      = genf.clean_txt(txt[1])
                 if txt[0] == 'tign_dt':           tign_dt           = genf.clean_txt(txt[1])
-                # options for psr
-                if txt[0] == 't_max':             t_max             = float(txt[1]); caution_opt_psr=False
+                # options for jsr
+                if txt[0] == 't_max':             t_max             = float(txt[1]); caution_opt_jsr=False
                 # options for pfr
                 if txt[0] == 'n_pts':             n_pts             = float(txt[1])
                 if txt[0] == 'area':              area              = float(txt[1])
@@ -3820,17 +3820,17 @@ class Ui_MainWindow(object):
                         if 'tign_dt' in locals():
                             self.txt_Gr_its[case_n].setPlainText(_translate("MainWindow", tign_dt));  del tign_dt
 
-                    if config=='PSR':
-                        self.rB_PSR[case_n].setChecked(True)
+                    if config=='JSR':
+                        self.rB_JSR[case_n].setChecked(True)
                         self.add_conditions(case_n+1)
-                        self.GPSR[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 311, 171))
-                        # options for PSR
+                        self.GJSR[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 311, 171))
+                        # options for JSR
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_psr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_psr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_abs_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_rel_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 't_max' in locals():
-                            self.t_max_psr[case_n].setProperty("value", float(t_max)); del t_max
+                            self.t_max_jsr[case_n].setProperty("value", float(t_max)); del t_max
 
                     if config=='PFR':
                         self.rB_PFR[case_n].setChecked(True)
