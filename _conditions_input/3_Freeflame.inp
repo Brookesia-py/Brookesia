@@ -12,6 +12,8 @@ Sl_check          = True
 sp_Sl             = H
 ig_check          = False
 sp_ig             = CH3
+K_check           = False
+sp_K              = H
 error_calculation = QoI
 error_coupling    = mean
 
@@ -22,18 +24,18 @@ error_coupling    = mean
 
 #======> Case 1
 config            = free_flame
+Ps                = 100000.0
 fuel              = CH4
 oxidant           = O2
 diluent           = N2
 diluent_ratio     = N2/O2 3.76
 Ts                = 300.0
-Ps                = 100000.0
 phis              = 0.5, 1.0, 1.5
-tol_ts            = 1e-05, 1e-08
 xmax              = 0.02
-tol_ss            = [1e-06, 1e-08]
+tol_ts            = 1e-08, 1e-05
+tol_ss            = [1e-08, 1e-06]
 transport_model   = Mix
-pts_scatter       = [0.0, 0.03, 0.3, 0.5, 0.7, 1.0]
+pts_scatter       = [0.0,0.03,0.3,0.5,0.7,1.0]
 slope             = 0.05
 curve             = 0.05
 ratio             = 2.0
@@ -57,8 +59,6 @@ max_error_Sl    = 30
 inter_sp_inter  = True
 optim           = False
 
-
-
 #===========> Op: SARGEP_sp
 operator        = SARGEP_sp 
 eps             = 0.02
@@ -69,21 +69,21 @@ max_error_T     = 30
 max_error_Sl    = 30
 inter_sp_inter  = True
 optim           = True
-ttol_sensi      = [False, False]
+ttol_sensi      = [1e-05, 1e-08]
 #====> Optimization
 n_gen              = 5
 n_indiv            = 5
 error_fitness      = mean
 Arrh_max_variation = 5, 5, 5
-optim_on_meth      = True
-frac_r2opt         = 30
+optim_on_meth      = False
+nb_r2opt           = 30
 selection_operator = Roulette
 selection_options  = 0.2
 Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
-Xover_num          = 2, 3, 3, 3
-Xover_opt          = , , , 
+Xover_pct          = 10, 20, 20, 20
 mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
-mut_num            = 2, 2, 5
+mut_pct            = 30, 30, 10
 mut_opt            = , 3, 
 mut_intensity      = 20
+sub_mech_sel       = H2, CO, C1, C2, C3, N
 

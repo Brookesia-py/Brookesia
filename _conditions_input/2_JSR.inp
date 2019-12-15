@@ -22,19 +22,6 @@ error_coupling    = mean
 #           Simulation cases
 #=============================================
 
-#======> Case 1
-config            = JSR
-Ps                = 100000.0
-fuel              = CH4
-oxidant           = O2
-diluent           = N2
-diluent_ratio     = N2/O2 3.76
-Ts                = 600.0, 610.0, 620.0, 630.0, 640.0, 650.0, 660.0, 670.0, 680.0, 690.0, 700.0, 710.0, 720.0, 730.0, 740.0, 750.0, 760.0, 770.0, 780.0, 790.0, 800.0, 810.0, 820.0, 830.0, 840.0, 850.0, 860.0, 870.0, 880.0, 890.0, 900.0, 910.0, 920.0, 930.0, 940.0, 950.0, 960.0, 970.0, 980.0, 990.0, 1000.0, 1010.0, 1020.0, 1030.0, 1040.0, 1050.0, 1060.0, 1070.0, 1080.0, 1090.0, 1100.0, 1110.0, 1120.0, 1130.0, 1140.0, 1150.0, 1160.0, 1170.0, 1180.0, 1190.0, 1200.0
-Ps                = 100000.0
-phis              = 0.5, 1.0, 1.5
-t_max             = 0.2
-tol_ts            = 1e-18, 1e-12
-
 
 
 #=============================================
@@ -72,7 +59,6 @@ selection_operator = Roulette
 selection_options  = 0.2
 Xover_operator     = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct          = 10, 20, 20, 20
-Xover_opt          = , , , 
 mut_operator       = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct            = 30, 30, 10
 mut_opt            = , 3, 

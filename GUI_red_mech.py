@@ -3432,7 +3432,7 @@ class Ui_MainWindow(object):
                         fd.write('diluent           = ' + diluent[case_act]            + '\n')
                         fd.write('diluent_ratio     = ' + str(diluent_ratio[case_act]) + '\n')
                     fd.write('Ts                = ' + list2txt(Ts[case_act])       + '\n')
-                    fd.write('Ps                = ' + list2txt(Ps[case_act])       + '\n')
+#                    fd.write('Ps                = ' + list2txt(Ps[case_act])       + '\n')
                     fd.write('phis              = ' + list2txt(phis[case_act])     + '\n')
                 else:
                     if ':' in fuel[case_act]:
@@ -3523,7 +3523,7 @@ class Ui_MainWindow(object):
                 fd.write('selection_options  = ' + list2txt(selection_options[ag])  + '\n')
                 fd.write('Xover_operator     = ' + list2txt(Xover_operator[ag])     + '\n')
                 fd.write('Xover_pct          = ' + list2txt(Xover_pct[ag])          + '\n')
-                fd.write('Xover_opt          = ' + list2txt(Xover_opt[ag])          + '\n')
+#                fd.write('Xover_opt          = ' + list2txt(Xover_opt[ag])          + '\n')
                 fd.write('mut_operator       = ' + list2txt(mut_operator[ag])       + '\n')
                 fd.write('mut_pct            = ' + list2txt(mut_pct[ag])            + '\n')
                 fd.write('mut_opt            = ' + list2txt(mut_opt[ag])            + '\n')
@@ -3572,7 +3572,7 @@ class Ui_MainWindow(object):
                     fd.write('selection_options  = ' + list2txt(selection_options[ag])  + '\n')
                     fd.write('Xover_operator     = ' + list2txt(Xover_operator[ag])     + '\n')
                     fd.write('Xover_pct          = ' + list2txt(Xover_pct[ag])          + '\n')
-                    fd.write('Xover_opt          = ' + list2txt(Xover_opt[ag])          + '\n')
+#                    fd.write('Xover_opt          = ' + list2txt(Xover_opt[ag])          + '\n')
                     fd.write('mut_operator       = ' + list2txt(mut_operator[ag])       + '\n')
                     fd.write('mut_pct            = ' + list2txt(mut_pct[ag])            + '\n')
                     fd.write('mut_opt            = ' + list2txt(mut_opt[ag])            + '\n')
