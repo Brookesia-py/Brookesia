@@ -24,7 +24,7 @@ import time as timer
 import __packages.Class_def as cdef
 from  __packages.Class_def import print_
 import multiprocessing
-
+import os
 
 
 
@@ -149,6 +149,7 @@ def dic(red_data,mech_data,results):
     num_cores = multiprocessing.cpu_count()
 
     dic=[]
+    if os.name == 'nt': multiprocessing.get_context('spawn')    
     with multiprocessing.Pool(num_cores) as p:
         dic=p.map(dic_par, dic_par_arg_i)
 

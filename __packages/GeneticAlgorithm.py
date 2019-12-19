@@ -827,6 +827,7 @@ class Population:
 #        pool.close()
 
         # Parallelisation 3 ---------------------------------------------------
+        if os.name == 'nt': multiprocessing.get_context('spawn')            
         with multiprocessing.Pool(num_cores) as p:
             fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
 
@@ -905,6 +906,7 @@ class Population:
 #        else:
 #        # byposs parallelisation for debugging -------------------------------
         # Fitness calculation
+        if os.name == 'nt': multiprocessing.get_context('spawn')            
         with multiprocessing.Pool(num_cores) as p:
             fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
 
