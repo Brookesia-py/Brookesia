@@ -212,8 +212,6 @@ def ric(red_data, mech_data, red_results):
     if verbose >=8 :
         print_("   reactions direct interaction coefficients computation ...",mp)
 
-    bar = cdef.ProgressBar(n_points)
-    bar.update(0)
     for i in range(n_points):
         if i%max(div_DRG_points,1)==0:
             k_f = red_results.kf[i]
@@ -254,10 +252,6 @@ def ric(red_data, mech_data, red_results):
                         num = abs(nu[t_sp, r]*reactionRate[r])
                         if den > 0:
                             r_interCoeff[t_sp,r]=max(num/den,r_interCoeff[t_sp,r])
-        bar.update(i)
-
-    bar.update(n_points);print_("\n",mp)
-
 
     red_data.red_op.r_interaction_coeffs = list(r_interCoeff)
     del r_interCoeff
