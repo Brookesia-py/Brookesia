@@ -155,10 +155,8 @@ def ref_computation(conditions, verbose=0):
         os.chdir(conditions.main_path)
 
     if 'pp_flame' in conditions.config :
-        if conditions.composition.phi == conditions.composition.phi2:
-            print_('Warning: same equivalence ratio in burner 1 and 2',mp)
-            print_('         phi1 = '+str(conditions.composition.phi),mp)
-            print_('         phi2 = '+str(conditions.composition.phi2),mp)
+        if conditions.composition.X == conditions.composition.X2:
+            print_('Warning: same mixture composition in burner 1 and 2',mp)
             print_('         -> condition config is modified to "tp_flame"',mp)
             conditions.config = 'tp_flame'
 
@@ -174,7 +172,8 @@ def ref_computation(conditions, verbose=0):
         if conditions.exp_data and 'cflow' in conditions.config:
             initial_points = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
         else:
-            initial_points = list(conditions.simul_param.pts_scatter)
+            initial_points = np.array(conditions.simul_param.pts_scatter)\
+                            /np.max(conditions.simul_param.pts_scatter)
 
         # =============================================================================
         # # PART 1: INITIALIZATION

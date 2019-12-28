@@ -516,7 +516,7 @@ class Errors:
                         sumDiff += abs(T_ref[j] - T_red[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
                         sumdata += abs(T_ref[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
                     else:
-                        sumDiff += abs(data1[j] - T_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
+                        sumDiff += abs(T_ref[j] - T_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
                         sumdata += abs(T_ref[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
                                   #/np.amax(data1)
                 #sumDiff = sumDiff/len(pts_scatter)
@@ -1862,12 +1862,13 @@ class Sim_Results :
                 +"P(Pa)"
             if "free_flame" in self.conditions.config:
                 l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl0(m/s)"
+            if "burner_flame" in self.conditions.config:
+                l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;mdot(kg/m2/s)"
+            if "tp_flame" in self.conditions.config:
+                l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model"   
             if 'diff_' in self.conditions.config\
-            or 'tp_'   in self.conditions.config\
             or 'pp_'   in self.conditions.config:
-                l1_conditions += ";fuel2;oxidant2;diluent2;phi2;diluent_ratio2;mixt2;Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model"
-                if "diff_flame" in self.conditions.config:
-                    l1_conditions += ";K_ext(1/s)"
+                l1_conditions += ";mdot;fuel2;oxidant2;diluent2;phi2;diluent_ratio2;mixt2;mdot2;Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;K_max(1/s)"
             elif "reactor" in self.conditions.config:
                 l1_conditions += ";Ti(K);rtol_ts;atol_ts;ig_time(s)"
             elif "JSR" in self.conditions.config:
@@ -1883,14 +1884,15 @@ class Sim_Results :
                     +str(self.conditions.composition.X)+";"\
                     +str(self.conditions.state_var.P)+";"
             if 'diff_' in self.conditions.config\
-            or 'tp_'   in self.conditions.config\
             or 'pp_'   in self.conditions.config:
-                l2_conditions += str(self.conditions.composition.fuel2)+";"\
+                l2_conditions += str(self.conditions.simul_param.mdot)+";"\
+                                +str(self.conditions.composition.fuel2)+";"\
                                 +self.conditions.composition.oxidant2+";"\
                                 +self.conditions.composition.diluent2+";"\
                                 +str(self.conditions.composition.phi2)+";"\
                                 +str(self.conditions.composition.diluent_ratio2)+";"\
-                                +str(self.conditions.composition.X2)+";"
+                                +str(self.conditions.composition.X2)+";"\
+                                +str(self.conditions.simul_param.mdot2)+";"
             if "free_flame" in self.conditions.config\
             or 'diff_' in self.conditions.config\
             or 'tp_'   in self.conditions.config\
@@ -1901,8 +1903,12 @@ class Sim_Results :
                         +str(self.conditions.simul_param.tol_ss[0])+";"\
                         +str(self.conditions.simul_param.tol_ss[1])+";"\
                         +self.conditions.simul_param.transport_model+";"
-                if "free_" in self.conditions.config: l2_conditions+=str(self.Sl)
-                if "diff_" in self.conditions.config: l2_conditions+=str(self.K_ext)
+                if "free_" in self.conditions.config: 
+                    l2_conditions+=str(self.Sl)
+                if "diff_" in self.conditions.config or "pp_" in self.conditions.config: 
+                    l2_conditions+=str(self.K_max)
+                if "burner" in self.conditions.config: 
+                    l2_conditions+=str(self.conditions.simul_param.mdot)
             elif "reactor" in self.conditions.config:
                 l2_conditions+=str(self.conditions.state_var.T)+";"\
                         +str(self.conditions.simul_param.tol_ts[0])+";"\
@@ -1925,22 +1931,26 @@ class Sim_Results :
                         +str(self.conditions.simul_param.end_sim)+";"\
                         +str(self.conditions.simul_param.u_0)+";"\
                         +str(self.conditions.simul_param.area)
-
             fichier_data.write(l1_conditions)
             fichier_data.write(l2_conditions)
 
         fichier_data.write("\n* Step: "+step)
 
         if errors:
+            txt_error=''
             if "JSR" not in self.conditions.config:
-                txt_error='\nTemperature error: '+'%0.1f'%(errors.qoi_T*100)+'%\n'
+                if errors.qoi_T!=0:
+                    txt_error+='\nTemperature error: '+'%0.1f'%(errors.qoi_T*100)+'%\n'
             else: txt_error='\n'
             if "reactor" in self.conditions.config:
-                txt_error+='Ignition delay time error: '+'%2.1f'%(errors.qoi_ig*100)+'%\n'
+                if errors.qoi_ig!=0:
+                    txt_error+='Ignition delay time error: '+'%2.1f'%(errors.qoi_ig*100)+'%\n'
             elif "free_flame" in self.conditions.config:
-                txt_error+='Flame speed error: '+'%0.1f' %(errors.qoi_Sl*100)+'%\n'
+                if errors.qoi_Sl!=0:
+                    txt_error+='Flame speed error: '+'%0.1f' %(errors.qoi_Sl*100)+'%\n'
             elif "diff_flame" in self.conditions.config:
-                txt_error+='Extinction strain rate error: '+'%0.1f' %(errors.qoi_K*100)+'%\n'
+                if errors.qoi_K!=0:
+                    txt_error+='Extinction strain rate error: '+'%0.1f' %(errors.qoi_K*100)+'%\n'
             txt_error+='Target species errors:;'
             for sp in range(self.conditions.error_param.n_tspc):
                     txt_error+=self.conditions.error_param.tspc[sp]\
@@ -1958,8 +1968,9 @@ class Sim_Results :
                 fichier_data.write(str(self.ign_time))
         elif "free_flame" in self.conditions.config:
             fichier_data.write("\nSl0(cm/s):;"+str(self.Sl*100))
-        elif "diff_flame" in self.conditions.config:
-            fichier_data.write("\nK_max(1/s):;"+str(self.K_max))
+        elif "diff_" in self.conditions.config or "pp_" in self.conditions.config:
+            if self.K_ext!=0:
+                fichier_data.write("\nK_ext(1/s):;"+str(self.K_ext))
 
         # headers
         if "reactor" in self.conditions.config:

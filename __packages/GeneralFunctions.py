@@ -1063,6 +1063,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
     case_titles = []
     case_data = []
     case_steps = []
+    K_ext = []
 
     try:    open(data_file_name)
     except:
@@ -1085,14 +1086,17 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
                             case_data.append(data_save); data_save = []
                             case_steps.append(steps_save); steps_save = []
                             headers_steps_save.append(headers_steps); headers_steps=[]
-
+                        
+                        if len(K_ext)<len(case_data):
+                            K_ext.append(False)
                         case_nb += 1
                         step_nb = -1
                         read_data=0   # if applicable, stop recording data in data list
 
                     if "reactor" in line[0] or "flame" in line[0] or "JSR" in line[0] or "PFR" in line[0]:
                         case_titles.append(line)
-
+                    
+                        
                     if "Step" in line[0]:
                         # if applicable, save previous step data
                         if step_nb>-1:
@@ -1102,6 +1106,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
                         step_title = line[0].split(": ")[1]
                         step_nb +=1
                         read_data=0      # if applicable, stop recording data in data list
+
+                    if "K_ext(1/s):" in line[0] and step_nb==0: #get K_ext ref
+                        K_ext.append(float(line[1]))
 
                     if line[0] == "":
                         read_data=0      # if applicable, stop recording data in data list
@@ -1114,14 +1121,13 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
                         data.append(line) # Construct the data list
 
 
-
     # Save previous config data
     data_save.append(data)
     case_data.append(data_save)
     steps_save.append(step_title)
     case_steps.append(steps_save)
     headers_steps_save.append(headers_steps)
-
+    if len(K_ext)<len(case_data): K_ext.append(False)
 
     #==========================================================================
     ###    Store data
@@ -1134,7 +1140,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         fuel          = case_titles[c][1]
         oxidant       = case_titles[c][2]
         diluent       = case_titles[c][3]
-        phi           = float(case_titles[c][4])
+        if "diff_" not in config: 
+            phi           = float(case_titles[c][4])
+        else: phi = False
         if "/" in case_titles[c][5]:
             diluent_ratio = [case_titles[c][5].split('[')[1].split(',')[0],\
             float(case_titles[c][5].split('[')[1].split(',')[1].split(']')[0])]
@@ -1149,19 +1157,41 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             mixt   = True
             mixt_X = case_titles[c][6]
         P             = float(case_titles[c][7])
-        Ti            = float(case_titles[c][8])
-        rtol_ts       = float(case_titles[c][9])
-        atol_ts       = float(case_titles[c][10])
-        if "flame" in config:
+        if "diff_" not in config and "pp_" not in config:
+            Ti            = float(case_titles[c][8])
+            rtol_ts       = float(case_titles[c][9])
+            atol_ts       = float(case_titles[c][10])
+        else:
+            Ti            = float(case_titles[c][16])
+            rtol_ts       = float(case_titles[c][17])
+            atol_ts       = float(case_titles[c][18])
+        if "flame" in config and "diff_" not in config and "pp_" not in config:
             rtol_ss   = float(case_titles[c][11])
             atol_ss   = float(case_titles[c][12])
+            transport_model = case_titles[c][13]
         elif "JSR" in config:
             end_sim   = float(case_titles[c][8])
         elif "PFR" in config:
             end_sim   = float(case_titles[c][11])
             u_0       = float(case_titles[c][12])
             area      = float(case_titles[c][13])
-
+        elif "diff_" in config or "pp_" in config:
+            mdot      = float(case_titles[c][8])
+            fuel_2    = case_titles[c][9]
+            oxidant_2 = case_titles[c][10]
+            diluent_2 = case_titles[c][11]
+            if "diff_" not in config: 
+                phi_2 = float(case_titles[c][12])
+            else: phi_2 = False            
+            diluent_r_2 = case_titles[c][13]
+            mixt2     = case_titles[c][14]
+            mdot2     = float(case_titles[c][15])
+            Ti        = float(case_titles[c][16])
+            rtol_ts   = float(case_titles[c][17])
+            atol_ts   = float(case_titles[c][18])
+            rtol_ss   = float(case_titles[c][19])
+            atol_ss   = float(case_titles[c][20])
+            transport_model = case_titles[c][21]
         pts_scatter=[] ; T=[] ; conc=[] ; z1=[]
         for pt in range(len(case_data[c][0])):
             pts_scatter.append(float(case_data[c][0][pt][0]))
@@ -1222,10 +1252,20 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             conditions_list[-1].simul_param.rtol_ts       = rtol_ts
             conditions_list[-1].simul_param.atol_ts       = atol_ts
 
-            if "flame" in config:
-                conditions_list[-1].simul_param.rtol_ss = rtol_ss
-                conditions_list[-1].simul_param.atol_ss = atol_ss
-                conditions_list[-1].simul_param.transport_model=case_titles[c][13]
+        if "flame" in config:
+            conditions_list[-1].simul_param.rtol_ss = rtol_ss
+            conditions_list[-1].simul_param.atol_ss = atol_ss
+            conditions_list[-1].simul_param.transport_model=transport_model
+        if "diff_"  in config or "pp_" in config:
+            conditions_list[-1].simul_param.mdot           = mdot
+            conditions_list[-1].composition.fuel2          = fuel_2
+            conditions_list[-1].composition.oxidant2       = oxidant_2
+            conditions_list[-1].composition.diluent2       = diluent_2
+            conditions_list[-1].composition.phi2           = phi_2
+            conditions_list[-1].composition.diluent_ratio2 = diluent_r_2            
+            conditions_list[-1].composition.X2             = mixt2
+            conditions_list[-1].simul_param.mdot2          = mdot2  # kg/m^2/s
+            conditions_list[-1].state_var.T2               = Ti  # K            
 
         conditions_list[-1].exp_data  = True
         conditions_list[-1].conc_unit = conc_unit
@@ -1253,8 +1293,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             try:     ref_results_list[-1].Sl=float(case_titles[c][14])
             except:  ref_results_list[-1].Sl=0
         elif "diff_flame" in config or "pp_flame" in config :
-            try:     ref_results_list[-1].K_ext=float(case_titles[c][14])
-            except:  ref_results_list[-1].K_ext=0
+            ref_results_list[-1].K_ext = K_ext[c]
+            try:     ref_results_list[-1].K_max=float(case_titles[c][22])
+            except:  ref_results_list[-1].K_max=0
         elif "PFR" in config:
             ref_results_list[-1].z1 = list(z1)
 

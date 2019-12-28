@@ -118,7 +118,10 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
 
 
     new_filename = str(red_data_list[0].op+1) + 'opt_' + conditions_list[0].mech_ext
-    os.chdir(conditions_list[0].main_path+'/Red_mech')
+    
+    os.chdir(conditions_list[0].main_path)
+    if not os.path.exists('Red_mech'):  os.mkdir('Red_mech')
+    os.chdir('Red_mech')    
     best_ind.mech.write_new_mech(new_filename)
     os.chdir(conditions_list[0].main_path)
 

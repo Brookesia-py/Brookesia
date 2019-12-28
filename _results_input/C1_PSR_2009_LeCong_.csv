@@ -4,7 +4,7 @@
 ;;;;;;;;;;
 Case nb: 2;*** figure 14 ***;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);time (s);rtol_ts;atol_ts
-PSR;CH4;O2;N2;0.3;0.923;CH4:0.01, O2:0.06667, N2:0.9233334;101325;0.12;0.0001;1E-08
+JSR;CH4;O2;N2;0.3;0.923;CH4:0.01, O2:0.06667, N2:0.9233334;101325;0.12;0.0001;1E-08
 * Step: Reference;;;;;;;;;;
 Ti(K);Tf(K);CH4;CO;CO2;H2O;;;;;
 1001.678;1001.678;0.009107;0;0;0.0003376;;;;;
@@ -21,7 +21,7 @@ Ti(K);Tf(K);CH4;CO;CO2;H2O;;;;;
 ;;;;;;;;;;
 Case nb: 3;*** figure 15 ***;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);time (s);rtol_ts;atol_ts
-PSR;CH4;O2;N2;0.6;0.9567;CH4:0.01, O2:0.033333, N2:0.956667;101325;0.12;0.0001;1E-08
+JSR;CH4;O2;N2;0.6;0.9567;CH4:0.01, O2:0.033333, N2:0.956667;101325;0.12;0.0001;1E-08
 * Step: Reference;;;;;;;;;;
 Ti(K);Tf(K);CH4;CO;CO2;C2H4;;;;;
 1100.392;1100.392;0.008751;3.127E-06;0;0;;;;;
@@ -36,7 +36,7 @@ Ti(K);Tf(K);CH4;CO;CO2;C2H4;;;;;
 ;;;;;;;;;;
 Case nb: 4;*** figure 16 ***;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);time (s);rtol_ts;atol_ts
-PSR;CH4;O2;N2;0.1;0.79;CH4:0.01, O2:0.2, H2O:0.1, N2:0.69;101325;0.12;0.0001;1E-08
+JSR;CH4;O2;N2;0.1;0.79;CH4:0.01, O2:0.2, H2O:0.1, N2:0.69;101325;0.12;0.0001;1E-08
 * Step: Reference;;;;;;;;;;
 Ti(K);Tf(K);CH4;CO;CO2;C2H4;;;;;
 1025.869;1025.869;0.008754;9.075E-06;0;0;;;;;
@@ -50,7 +50,7 @@ Ti(K);Tf(K);CH4;CO;CO2;C2H4;;;;;
 ;;;;;;;;;;
 Case nb: 5;*** figure 17 ***;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);time (s);rtol_ts;atol_ts
-PSR;CH4;O2;N2;0.3;0.923;CH4:0.01, O2:0.06667, H2O:0.1, N2:0.8233334;101325;0.12;0.0001;1E-08
+JSR;CH4;O2;N2;0.3;0.923;CH4:0.01, O2:0.06667, H2O:0.1, N2:0.8233334;101325;0.12;0.0001;1E-08
 * Step: Reference;;;;;;;;;;
 Ti(K);Tf(K);CH4;CO;CO2;C2H4;;;;;
 1076.211;1076.211;0.008291;0;0;0;;;;;

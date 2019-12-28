@@ -2015,7 +2015,7 @@ class Ui_MainWindow(object):
                 self.rB_cff_tp[-1].setText(_translate("MainWindow", "Premixed flame"))
                 self.rB_cff_diff[-1].setGeometry(QtCore.QRect(10, 20, 141, 22))
                 self.rB_cff_pp[-1].setGeometry(QtCore.QRect(10, 70, 141, 41))
-                self.rB_cff_tp[-1].setGeometry(QtCore.QRect(10, 1200, 141, 22))
+                self.rB_cff_tp[-1].setGeometry(QtCore.QRect(10, 120, 141, 22))
                 self.rB_cff_diff[-1].toggled.connect(lambda: self.add_cf_diff_options(num_case))
                 self.rB_cff_pp[-1].toggled.connect(lambda: self.add_cf_pprem_options(num_case))
                 self.rB_cff_tp[-1].toggled.connect(lambda: self.add_cf_tprem_options(num_case))
@@ -3295,13 +3295,16 @@ class Ui_MainWindow(object):
                     phi_min  = float(self.df_eqmin_1[case].document().toPlainText())
                     phi_max  = float(self.df_eqmax_1[case].document().toPlainText())
                     phi_incr = float(self.df_eqincr_1[case].document().toPlainText())
-                    phis.append(list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr)))
+                    if phi_incr==0: phis.append([phi_min])
+                    else: phis.append(list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr)))
                     mdot_min  = float(self.df_mdot1_1[case].document().toPlainText())
                     mdot_max  = float(self.df_mdot2_1[case].document().toPlainText())
                     if 'diff' in configs[-1]:
                         mdot_incr  = float(self.df_mdot4_1[case].document().toPlainText())
+                    elif self.df_mdot3_1[case].text() == 'error':
+                        mdot_incr  = 0
                     else:
-                        mdot_incr  = float(self.df_mdot3_1[case].text())
+                        mdot_incr  = float(self.df_mdot3_1[case].text())                        
                     if mdot_incr==0: mdot_incr=mdot_max-mdot_min+mdot_max*5
                     mdots_1.append(list(np.arange(mdot_min, mdot_max+mdot_min/2, mdot_incr)))
                     # Burner 2
@@ -4318,9 +4321,9 @@ class Ui_MainWindow(object):
                         else:                    self.cB_sub_H[-1].setChecked(False)
                         if 'CO' in sub_mech_sel: self.cB_sub_CO[-1].setChecked(True)
                         else:                    self.cB_sub_CO[-1].setChecked(False)
-                        if 'N' in sub_mech_sel: self.cB_sub_N[-1].setChecked(True)
+                        if 'N'  in sub_mech_sel: self.cB_sub_N[-1].setChecked(True)
                         else:                    self.cB_sub_N[-1].setChecked(False)
-                        if 'S' in sub_mech_sel: self.cB_sub_S[-1].setChecked(True)
+                        if 'S'  in sub_mech_sel: self.cB_sub_S[-1].setChecked(True)
                         else:                    self.cB_sub_S[-1].setChecked(False)
                         if 'Si' in sub_mech_sel: self.cB_sub_Si[-1].setChecked(True)
                         else:                    self.cB_sub_Si[-1].setChecked(False)

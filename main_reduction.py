@@ -72,7 +72,7 @@ def run_reduction(filename):
         copyfile('_uncertainties/uncertainties.csv',mp+'/uncertainties.csv')
     os.chdir(conditions_list[0].main_path)
 
-    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.0\n\n',mp)
+    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.1\n\n',mp)
 
     try:
         #==============================================================================
@@ -143,12 +143,15 @@ def run_reduction(filename):
             ref_results_list[0].write_mech_info('')
             for l in range(len(ref_results_list)):
                 ref_results_list[l].write_case_data('Reference','',l+1)
-
+        os.chdir(conditions_list[0].main_path)
+        
     except:
         print_(traceback.format_exc(),mp)
+    os.chdir(conditions_list[0].main_path)
+        
 
 if len(sys.argv)>1:
     filename = sys.argv[1]
     run_reduction(filename)
 
-#run_reduction('4_diff.inp')
+run_reduction('test_imp_all.inp')
