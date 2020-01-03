@@ -942,20 +942,22 @@ def input_results_treatment(conditions_list,ref_results_list):
                     conc_smooth[pt][sp]=conc_smooth_sp(pts_scatter_mech[pt])
             conc_smooth[-1] = conc_smooth[-2]
 
-
-
+        if 'False' not in ref_results_list[i].T:
+            T_v = np.array(ref_results_list[i].T)
+            if len(T_v)==1: T_v=np.append(T_v,T_v)
+            T = interp1d(x, T_v, kind='linear')
+            T_smooth = np.zeros((len(pts_scatter_mech)))
+            for pt in range(len(pts_scatter_mech)):
+                if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
+                    T_smooth[pt]=T(pts_scatter_mech[pt])
+            T_smooth[-1]=T_smooth[-2]
+            ref_results_list_smooth[i].T = list(T_smooth)
+            ref_results_list_smooth[i].X2conc()
+        else: ref_results_list_smooth[i].T = ref_results_list[i].T
+            
+        
         ref_results_list_smooth[i].X = list(conc_smooth)
-        T_v = np.array(ref_results_list[i].T)
-        if len(T_v)==1: T_v=np.append(T_v,T_v)
-        T = interp1d(x, T_v, kind='linear')
-        T_smooth = np.zeros((len(pts_scatter_mech)))
-        for pt in range(len(pts_scatter_mech)):
-            if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
-                T_smooth[pt]=T(pts_scatter_mech[pt])
-        T_smooth[-1]=T_smooth[-2]
-        ref_results_list_smooth[i].T = list(T_smooth)
-        ref_results_list_smooth[i].X = list(conc_smooth)
-        ref_results_list_smooth[i].X2conc()
+        
         ref_results_list_smooth[i].pts_scatter=list(pts_scatter_mech)
         ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
         ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
@@ -1075,7 +1077,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         read_data=0
         for line in readcsv:
             if line!=[]:
-                if "#Comment:" in line[0]:
+                line_com = line
+                while ' ' in line_com: line_com=line_com.replace(' ','')
+                if "#" in line_com[0][0]:
                     a=2
                 else:
                     if "Case" in line[0]:
@@ -1203,9 +1207,11 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
                     T.append(270.5)
                     z1.append(0)
             else:
-                try:     T.append(float(case_data[c][0][pt][1]))
-                except:
-                    T.append(270.5)
+                if case_data[c][0][pt][1] != 'False':
+                    try:     T.append(float(case_data[c][0][pt][1]))
+                    except:
+                        T.append(270.5)
+                else: T=['False']
 
         # conc matric construction
         conc=[]
@@ -1278,8 +1284,10 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         ref_results_list[-1].P = P
         if conc_unit=="mol_m3":
             ref_results_list[-1].conc = list(conc) ; ref_results_list[-1].conc2X()
-        if conc_unit=="Molar_fraction":
-            ref_results_list[-1].X = list(conc) ;    ref_results_list[-1].X2conc()
+        if conc_unit=="Molar_fraction":            
+            ref_results_list[-1].X = list(conc) ;    
+            if 'False' not in ref_results_list[-1].T:
+                ref_results_list[-1].X2conc()
         ref_results_list[-1].kf = False
         ref_results_list[-1].kf = False
         if "reactor" in config:

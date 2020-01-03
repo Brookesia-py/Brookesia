@@ -497,8 +497,12 @@ class Errors:
         T_red             = red_results.T
 
         n_points = len(pts_scatter)
-
-        if error_calculation=="points" and np.mean(T_ref)<273:
+        
+        T_data = True
+        if 'False' in T_ref:     T_data = False
+        elif np.min(T_ref)<273:  T_data = False
+        
+        if error_calculation=="points" and T_data:
 
             # ========   2 - Temperature error   ==========
             sumDiff = 0
@@ -532,7 +536,7 @@ class Errors:
             QoI = sumDiff
 
 
-        elif error_calculation=="QoI" and 'False' not in T_ref:
+        elif error_calculation=="QoI" and T_data:
             # ========   2 - Temperature QoI   ==========
             T_variation = (max(T_ref)-min(T_ref))/min(T_ref)
             if T_variation > 0.05:
@@ -1937,11 +1941,10 @@ class Sim_Results :
         fichier_data.write("\n* Step: "+step)
 
         if errors:
-            txt_error=''
+            txt_error='\n'
             if "JSR" not in self.conditions.config:
                 if errors.qoi_T!=0:
-                    txt_error+='\nTemperature error: '+'%0.1f'%(errors.qoi_T*100)+'%\n'
-            else: txt_error='\n'
+                    txt_error+='Temperature error: '+'%0.1f'%(errors.qoi_T*100)+'%\n'
             if "reactor" in self.conditions.config:
                 if errors.qoi_ig!=0:
                     txt_error+='Ignition delay time error: '+'%2.1f'%(errors.qoi_ig*100)+'%\n'

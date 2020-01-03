@@ -20,22 +20,6 @@
 """
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-import cantera as ct
-import copy
-import numpy as np
-import __packages.GeneralFunctions as genf
-import __packages.Class_def as cdef
-import main_reduction as mred
-import os
-import time as timer
-
-# set language parameters (for xml cantera files)
-import locale as lc
-lc.setlocale(lc.LC_ALL, 'en_US.utf8')
-
-
-
 # =============================================================================
 #  default options
 # =============================================================================
@@ -172,6 +156,29 @@ d_GA_mut_opt_3          = ''
 d_GA_mut_prob           = 30
 d_GA_fit                = 'mean'     #  mean / max
 
+
+# =============================================================================
+#%%         package import
+# =============================================================================
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+import cantera as ct
+import copy
+import numpy as np
+import __packages.GeneralFunctions as genf
+import __packages.Class_def as cdef
+import main_reduction as mred
+import os
+import time as timer
+
+# set language parameters (for xml cantera files)
+import locale as lc
+lc.setlocale(lc.LC_ALL, 'en_US.utf8')
+
+
+# tab_flag
+global condition_tab_removed
+condition_tab_removed = False
 
 
 class Ui_MainWindow(object):
@@ -852,7 +859,7 @@ class Ui_MainWindow(object):
 
         self.tablet.setTabText(self.tablet.indexOf(self.Conditions), _translate("MainWindow", "Conditions"))
         self.main_dir = os.getcwd()
-        self.menuKinetic_mechanism_optimization_tool.setTitle(_translate("MainWindow", "&Kinetic mechanism optimization tool"))
+        self.menuKinetic_mechanism_optimization_tool.setTitle(_translate("MainWindow", "&Brookesia GUI"))
 
 
 # =============================================================================
@@ -973,7 +980,10 @@ class Ui_MainWindow(object):
         self.tablet.setCurrentIndex(1)
         self.GA_clic()
         self.tablet.setCurrentIndex(0)
-
+        global condition_tab_removed
+        if condition_tab_removed == False:
+            self.tablet.removeTab(1)
+            condition_tab_removed = True
 
     def remove_tab(self,_option):
         idx = self.tablet.currentIndex()
@@ -3617,6 +3627,9 @@ class Ui_MainWindow(object):
             if txt[0] == 'main_path':         main_path_ext = genf.clean_txt(txt[1])
             if txt[0] == 'mech':              mech          = genf.clean_txt(txt[1])
             if txt[0] == 'mech_prev_red':     mech_prev_red = genf.clean_txt(txt[1])
+            if txt[0] == 'ext_results_file':  ext_results_file = genf.clean_txt(txt[1])
+            if txt[0] == 'ext_data_type':     ext_data_type    = genf.clean_txt(txt[1])
+            if txt[0] == 'conc_units':        conc_units       = genf.clean_txt(txt[1])
             if txt[0] == 'verbose':           verbose       = int(txt[1])
             if txt[0] == 'show_plots':        show_plots    = genf.str2bool(txt[1])
             if txt[0] == 'tspc':
@@ -3654,6 +3667,9 @@ class Ui_MainWindow(object):
                 self.list_spec.addItem(item)
                 item = self.list_spec.item(sp)
                 item.setText(_translate("MainWindow", self.gas_ref.species_name(sp)))
+            # appearance of "import external data" option
+            self.pB_External_data.setGeometry(QtCore.QRect(10, 90, 151, 34))
+            self.label_External_data.setGeometry(QtCore.QRect(180, 100, 350, 18))
         filename_save = filename.split('/')[-1].split('.')[0]
         self.Text_file_name.setPlainText(_translate("MainWindow", filename_save))
         if 'mech_prev_red' in locals():
@@ -3661,6 +3677,16 @@ class Ui_MainWindow(object):
             font = QtGui.QFont();font.setBold(True);font.setItalic(False);font.setWeight(75)
             self.label_reduced_mechanism.setFont(font)
             self.reduced_mechanism = mech_prev_red
+
+        if 'ext_results_file' in locals():
+            self.label_External_data.setText(_translate("MainWindow", ext_results_file.split('/')[-1]))
+            self.label_External_data.setFont(font)
+            self.external_results = ext_results_file
+            if 'ext_data_type' in locals():
+                self.ext_res_file_type = ext_data_type
+            if 'conc_units' in locals():
+                self.ext_res_conc_unit = conc_units
+            
         if 'verbose' in locals():     self.MP_verbose.setProperty("value", verbose)
         if 'show_plots' in locals():
             if show_plots:  self.cB_show_plots.setChecked(True)
@@ -4032,6 +4058,8 @@ class Ui_MainWindow(object):
     #    print('\r start operator ')
         while '> Op:' not in txt[-1] and txt[0] != '':
             txt = fs.readline().split('=')
+            
+        global condition_tab_removed
 
         # get data
         red_data_list = [] ; save_op = False ; op_n=0
@@ -4095,6 +4123,10 @@ class Ui_MainWindow(object):
                 elif  reduction_operator=='SAR_sp':    self.SA_clic('SAR_sp')
                 elif  reduction_operator=='SARGEP_sp':  self.SA_clic('SARGEP_sp')
                 elif  reduction_operator=='SAR_r':     self.SA_clic('SAR_r')
+                if reduction_operator != 'NULL' and 'ext_results_file' in locals():
+                    if condition_tab_removed == False:
+                        self.tablet.removeTab(1)
+                        condition_tab_removed = True
 
                 tspc_red = copy.deepcopy(tspc)
                 if 'max_error_sp' not in locals():  max_error_sp = []
@@ -4229,10 +4261,17 @@ class Ui_MainWindow(object):
                     idx_tab = self.tablet.indexOf(self.DRG[-1])
                     self.tablet.setCurrentIndex(idx_tab)
 
-
             if 'optim' in locals():
                 if optim:
-                    self.GA_clic()
+                    if reduction_operator == 'NULL':
+                        self.tablet.setCurrentIndex(1)
+                        self.GA_clic()
+                        if condition_tab_removed == False:
+                            self.tablet.removeTab(1)
+                            condition_tab_removed = True
+                        self.tablet.setCurrentIndex(0)
+                    else:
+                        self.GA_clic()
                     if 'n_gen'              in locals():
                         self.num_GA_gen[-1].setProperty("value", n_gen); del n_gen
                     if 'n_indiv'            in locals():

@@ -72,7 +72,7 @@ def run_reduction(filename):
         copyfile('_uncertainties/uncertainties.csv',mp+'/uncertainties.csv')
     os.chdir(conditions_list[0].main_path)
 
-    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.1\n\n',mp)
+    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.2\n\n',mp)
 
     try:
         #==============================================================================
@@ -154,4 +154,4 @@ if len(sys.argv)>1:
     filename = sys.argv[1]
     run_reduction(filename)
 
-run_reduction('test_imp_all.inp')
+#run_reduction('test_imp_all.inp')
