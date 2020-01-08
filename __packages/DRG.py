@@ -245,13 +245,13 @@ def ric(red_data, mech_data, red_results):
                 for r in range(n_r_ref):
                     if mech_data.react.activ_p[r]\
                     or True not in mech_data.react.activ_p: # (1st reduction)
-                        PA += max(0, nu[t_sp, r]*reactionRate[r])
-                        CA += max(0, -nu[t_sp, r]*reactionRate[r])
+                        PA += max(0, nu[tsp_idx[t_sp], r]*reactionRate[r])
+                        CA += max(0, -nu[tsp_idx[t_sp], r]*reactionRate[r])
                 den = max(PA, CA)
                 for r in range(n_r_ref):
                     if mech_data.react.activ_p[r]\
                     or True not in mech_data.react.activ_p: # (1st reduction)
-                        num = abs(nu[t_sp, r]*reactionRate[r])
+                        num = abs(nu[tsp_idx[t_sp], r]*reactionRate[r])
                         if den > 0:
                             r_interCoeff[t_sp,r]=max(num/den,r_interCoeff[t_sp,r])
         bar.update(i)
@@ -600,13 +600,12 @@ def reactionWithdrawal(mech_data,red_data,red_method,eps_r,conditions,active_spe
             r_int_c_sorted.sort()
             while 0 in r_int_c_sorted: r_int_c_sorted.remove(0)
             if len(r_int_c_sorted)>0:  # if sens are not equal to zero
-                lim_val = r_int_c_sorted[int((len(r_int_c_sorted)-1)\
-                                             *min(abs(eps_r[t]),1))]
+                lim_val = r_int_c_sorted[int((len(r_int_c_sorted)-1)*min(abs(eps_r[t]),1))]
                 for r in range(n_r_ref):
                     if not mech_data.react.activ_m[r]:
                         active_reactions[r] = False
                     else:
-                        if r_inter_coeffs[t][r]>lim_val and not active_reactions[r]:
+                        if r_inter_coeffs[t][r]>=lim_val and not active_reactions[r]:
                             active_reactions[r]=True
         for sp in range(n_sp_ref):
             if not active_species[sp]:
