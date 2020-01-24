@@ -76,8 +76,11 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         conditions_list, mech_results_list, ref_results_list \
                   = input_results_treatment(conditions_list,ref_results_list)
 
-    red_results_list = copy_ref_results(ref_results_list)
-
+    if 'mech_results_list' in locals(): 
+        red_results_list = copy_ref_results(mech_results_list)
+    else:
+        red_results_list = copy_ref_results(ref_results_list)
+        
     red_errors_list = []
 
 
@@ -115,7 +118,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
         simulation = 0 ;
 
-
         # main variables
         n_tspecies = len(red_data_list[op][0].tspc)
         tsp_idx    = red_data_list[op][0].targetSpeciesIdx
@@ -123,6 +125,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         mech_data.spec.activ_p  = [False]*len(mech_data.spec.name)
         mech_data.react.activ_p = [False]*len(mech_data.react.number)
 
+#        # for external results input : if no concentration data
+#        conc_ok = True
+#        for i in range(len(conditions_list)):
+#            if len(ref_results_list[i]) == 0: 
+#                conc_ok = False
+#                _print('Warning: no concentration data')
+#                _print(red_method + ' cannot be applied')
+#                red_data_list[op][0].optim_param.optim_on_meth = False
+            
 
         if red_method != 'NULL':
             for i in range(len(conditions_list)):
@@ -180,6 +191,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                                             red_results)
                     if red_data.optim:
                         red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                
 
                 # eps definition
                 eps_init   = copy.deepcopy(red_data.red_op.eps_init)

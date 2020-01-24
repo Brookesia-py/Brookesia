@@ -977,7 +977,7 @@ class Ui_MainWindow(object):
         (fileName,self.gas_ref,self.ext_res_conc_unit,self.ext_res_file_type,'tspc',False)
 
         # add GA option
-        self.tablet.setCurrentIndex(1)
+        self.tablet.setCurrentIndex(0)
         self.GA_clic()
         self.tablet.setCurrentIndex(0)
         global condition_tab_removed
@@ -987,17 +987,19 @@ class Ui_MainWindow(object):
 
     def remove_tab(self,_option):
         idx = self.tablet.currentIndex()
-        if len(self.list_operator)>idx-1:
-            next_operator = self.list_operator[idx-1]
+        if condition_tab_removed:   _idx = idx + 1
+        else:                       _idx = idx
+        if len(self.list_operator)>_idx-1:
+            next_operator = self.list_operator[_idx-1]
         else:
             next_operator = False
 
         if next_operator == 'GA':
             self.tablet.removeTab(idx+1)
-            del self.list_operator[idx-1]
-
-        self.tablet.removeTab(idx)
-        del self.list_operator[idx-2]
+            del self.list_operator[_idx-1]
+            
+        self.tablet.removeTab(idx)            
+        del self.list_operator[_idx-2]
 
 
 
@@ -1417,8 +1419,12 @@ class Ui_MainWindow(object):
     def GA_clic(self):
         idx = self.tablet.currentIndex()
         add_GA = True
-        if len(self.list_operator)>=max(1,idx):
-            if self.list_operator[idx-1]=='GA':
+        if condition_tab_removed:   _idx = idx + 1
+        else:                       _idx = idx
+        if idx == 0: idx = 1
+        
+        if len(self.list_operator)>=max(1,_idx):
+            if self.list_operator[_idx-1]=='GA':
                 add_GA = False
 
         if add_GA:
@@ -1831,8 +1837,8 @@ class Ui_MainWindow(object):
             # Optimization on method
             self.GA_group5[-1].setTitle(_translate("MainWindow", "Optimization on method"))
 #            self.scrollArea_subM[-1].setTitle(_translate("MainWindow", "Sub-Mechanism optimization "))
-            if idx != 1:
-                self.cB_GA_meth[-1].setText(_translate("MainWindow", "Optimization based on "+self.list_operator[idx-2]))
+            if _idx != 0:
+                self.cB_GA_meth[-1].setText(_translate("MainWindow", "Optimization based on "+self.list_operator[_idx-2]))
                 self.cB_GA_meth_DRG.append(False)
                 self.cB_GA_meth_SA.append(False)
                 self.cB_GA_meth_pts.append(False)
@@ -1878,8 +1884,10 @@ class Ui_MainWindow(object):
             self.cB_mut_op_2[-1].setChecked(d_GA_mut_op_2)
             self.cB_mut_op_3[-1].setChecked(d_GA_mut_op_3)
             self.cB_GA_meth[-1].setChecked(d_GA_meth)
-
-            self.list_operator.insert(idx-1,'GA')
+            
+            if condition_tab_removed:   _idx = idx+1
+            else: _idx = idx
+            self.list_operator.insert(_idx-1,'GA')
 
 
 
@@ -4264,11 +4272,11 @@ class Ui_MainWindow(object):
             if 'optim' in locals():
                 if optim:
                     if reduction_operator == 'NULL':
-                        self.tablet.setCurrentIndex(1)
+                        self.tablet.setCurrentIndex(0)
                         self.GA_clic()
                         if condition_tab_removed == False:
                             self.tablet.removeTab(1)
-                            condition_tab_removed = True
+                            condition_tab_removed = True                                                
                         self.tablet.setCurrentIndex(0)
                     else:
                         self.GA_clic()
