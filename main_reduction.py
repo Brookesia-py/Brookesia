@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -72,7 +72,7 @@ def run_reduction(filename):
         copyfile('_uncertainties/uncertainties.csv',mp+'/uncertainties.csv')
     os.chdir(conditions_list[0].main_path)
 
-    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.2\n\n',mp)
+    print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia 1.3\n\n',mp)
 
     try:
         #==============================================================================
@@ -144,14 +144,13 @@ def run_reduction(filename):
             for l in range(len(ref_results_list)):
                 ref_results_list[l].write_case_data('Reference','',l+1)
         os.chdir(conditions_list[0].main_path)
-        
+
     except:
         print_(traceback.format_exc(),mp)
     os.chdir(conditions_list[0].main_path)
-        
+
 
 if len(sys.argv)>1:
     filename = sys.argv[1]
     run_reduction(filename)
 
-#run_reduction('test_imp_all.inp')

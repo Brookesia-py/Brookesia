@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -29,13 +29,14 @@ import os
 import sys
 import pandas as pd
 
-def ref_computation(conditions, verbose=0):
-
+def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
+                                          # act_sp and act_r if previous red mech given
     mp = conditions.main_path
 
     # set language parameters (for xml cantera files)
     import locale as lc
     lc.setlocale(lc.LC_ALL, 'en_US.utf8')
+
     if 'free_flame' in conditions.config or 'burner_flame' in conditions.config:
 
         # Main variables
@@ -44,12 +45,12 @@ def ref_computation(conditions, verbose=0):
         tol_ts         = conditions.simul_param.tol_ts
         xmax           = conditions.simul_param.end_sim
 
-        if conditions.exp_data and 'free' in conditions.config:
-            initial_points = [0.0, 0.03, 0.3, 0.5, 0.7, 1.0]
+        if not conditions.exp_data:
+            initial_points = list(conditions.simul_param.pts_scatter)
             flam_initial_grid = np.array(initial_points)*xmax
         else:
             initial_points = list(conditions.simul_param.pts_scatter)
-            flam_initial_grid = initial_points
+            flam_initial_grid = np.array(initial_points)
 
         if conditions.import_data and not conditions.exp_data: refine_grid = False
         else:                                                  refine_grid = True
@@ -117,21 +118,47 @@ def ref_computation(conditions, verbose=0):
         if verbose >=2 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
         npoints = f.flame.n_points
-        conc = []
-        kf = []
-        kr = []
+        conc = [] ; kf = [] ; kr = [] ; r_rate = []
+
         for n in range(npoints):
             f.set_gas_state(n)
-            conc.append(gas.concentrations)
-            kf.append(gas.forward_rate_constants)
-            kr.append(gas.reverse_rate_constants)
+            if act_sp:
+                conc_n = []; sa_i = 0
+                for s_i in range(len(act_sp)):
+                    if act_sp[s_i]:
+                        conc_n.append(gas.concentrations[sa_i])
+                        sa_i += 1
+                    else:
+                        conc_n.append(0)
+                conc.append(conc_n)
+            else:
+                conc.append(gas.concentrations)
 
+            if act_r:
+                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                for r_i in range(len(act_r)):
+                    if act_r[r_i]:
+                        kf_r.append(gas.forward_rate_constants[ra_i])
+                        kr_r.append(gas.reverse_rate_constants[ra_i])
+                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                        ra_i += 1
+                    else:
+                        kf_r.append(0)
+                        kr_r.append(0)
+                        r_rate_r.append(0)
+                kf.append(kf_r)
+                kr.append(kr_r)
+                r_rate.append(r_rate_r)
+            else:
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+                r_rate.append(gas.net_rates_of_progress)
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.Sl = f.u[0]
-        results.f  = f
-
+        results.Sl      = f.u[0]
+        results.f       = f
+        results.r_rate  = r_rate
 
 
         conditions.simul_param.pts_scatter = np.array(f.flame.grid)
@@ -280,19 +307,48 @@ def ref_computation(conditions, verbose=0):
 
         # Save data
         npoints = f.flame.n_points
-        conc = []
-        kf = []
-        kr = []
+        conc = [] ; kf = [] ; kr = [] ; r_rate = []
         for n in range(npoints):
             f.set_gas_state(n)
-            conc.append(gas.concentrations)
-            kf.append(gas.forward_rate_constants)
-            kr.append(gas.reverse_rate_constants)
+
+            if act_sp:
+                conc_n = []; sa_i = 0
+                for s_i in range(len(act_sp)):
+                    if act_sp[s_i]:
+                        conc_n.append(gas.concentrations[sa_i])
+                        sa_i += 1
+                    else:
+                        conc_n.append(0)
+                conc.append(conc_n)
+            else:
+                conc.append(gas.concentrations)
+
+            if act_r:
+                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                for r_i in range(len(act_r)):
+                    if act_r[r_i]:
+                        kf_r.append(gas.forward_rate_constants[ra_i])
+                        kr_r.append(gas.reverse_rate_constants[ra_i])
+                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                        ra_i += 1
+                    else:
+                        kf_r.append(0)
+                        kr_r.append(0)
+                        r_rate_r.append(0)
+                kf.append(kf_r)
+                kr.append(kr_r)
+                r_rate.append(r_rate_r)
+            else:
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+                r_rate.append(gas.net_rates_of_progress)
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.K_max = f.strain_rate('max')
-        results.f = f
+        results.K_max   = f.strain_rate('max')
+        results.f       = f
+        results.r_rate  = r_rate
+
 
         conditions.simul_param.pts_scatter = np.array(f.flame.grid)
 
@@ -452,18 +508,50 @@ def ref_computation(conditions, verbose=0):
 
         # Save data
         npoints = f.flame.n_points
-        conc = []
-        kf = []
-        kr = []
+        conc = [] ; kf = [] ; kr = [] ; r_rate = []
+
         for n in range(npoints):
             f.set_gas_state(n)
-            conc.append(gas.concentrations)
-            kf.append(gas.forward_rate_constants)
-            kr.append(gas.reverse_rate_constants)
+
+            f.set_gas_state(n)
+
+            if act_sp:
+                conc_n = []; sa_i = 0
+                for s_i in range(len(act_sp)):
+                    if act_sp[s_i]:
+                        conc_n.append(gas.concentrations[sa_i])
+                        sa_i += 1
+                    else:
+                        conc_n.append(0)
+                conc.append(conc_n)
+            else:
+                conc.append(gas.concentrations)
+
+            if act_r:
+                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                for r_i in range(len(act_r)):
+                    if act_r[r_i]:
+                        kf_r.append(gas.forward_rate_constants[ra_i])
+                        kr_r.append(gas.reverse_rate_constants[ra_i])
+                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                        ra_i += 1
+                    else:
+                        kf_r.append(0)
+                        kr_r.append(0)
+                        r_rate_r.append(0)
+                kf.append(kf_r)
+                kr.append(kr_r)
+                r_rate.append(r_rate_r)
+            else:
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+                r_rate.append(gas.net_rates_of_progress)
+
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.f = f
+        results.f       = f
+        results.r_rate  = r_rate
 
         conditions.simul_param.pts_scatter = np.array(f.flame.grid)
 
@@ -489,201 +577,356 @@ def ref_computation(conditions, verbose=0):
 
 
 
-    elif 'reactor' in conditions.config:
-        gas  = conditions.composition.gas
+    elif 'reactor' in conditions.config or 'PFR' in conditions.config:
+
+        # import the gas model and set the initial conditions
+        gas = conditions.composition.gas
         init = conditions.state_var.T, conditions.state_var.P,conditions.composition.X
-        init_points = int(conditions.simul_param.tign_nPoints)     # max number of time step
-        dt          = conditions.simul_param.tign_dt          # time step
-        n_pts       = conditions.simul_param.n_pts
-        delta_npts  = conditions.simul_param.delta_npts
-        t_max_coeff = conditions.simul_param.t_max_coeff
-        Scal_ref    = conditions.simul_param.Scal_ref  # Scalar selected for the time vector computation
-        grad_curv_ratio = conditions.simul_param.grad_curv_ratio
-        tmax_react  = conditions.simul_param.t_max_react
-
-    #   Auto ignition time Detection
-             # Record the scalar evolution and check ignition
-             # with H2O variation (considered if variation >20%)
-        time1 = timer.time()
-        print_("  Computation...",mp)
         gas.TPX = init
-        if conditions.config == 'reactor_UV':
-            reactor = ct.IdealGasReactor(gas)
-        elif conditions.config == 'reactor_HP':
-            reactor = ct.IdealGasConstPressureReactor(gas)
-        sim = ct.ReactorNet([reactor])
-        sim.rtol = conditions.simul_param.tol_ts[0]
-        sim.atol = conditions.simul_param.tol_ts[1]
-        time_init = tmax_react
-        timeVec_ignit = []
-        for i in range(init_points):
-            timeVec_ignit.append(time_init)
-            time_init/=1.25
-        timeVec_ignit.reverse()
-        H2O = np.zeros(init_points-1, 'd')
-        X_Scal = np.zeros(init_points-1, 'd')
-        dH2O = np.zeros(init_points-2, 'd')
+
+        if 'PFR' in conditions.config:
+            length      = conditions.simul_param.end_sim    # *approximate* PFR length [m]
+            u_0         = conditions.simul_param.u_0        # inflow velocity [m/s]
+            area        = conditions.simul_param.area       # cross-sectional area [m**2]
+            n_steps     = conditions.simul_param.n_pts      # number of time steps considered for the simulation
+            mass_flow_rate1 = u_0 * gas.density * area
+
+        if 'PFR' in conditions.config and not conditions.simul_param.PFR_auto_time:
+            # Plug Flow reactor simulation:
+            # https://cantera.org/examples/python/reactors/pfr.py.html
+
+            #####################################################################
+            # Method 1: Lagrangian Particle Simulation
+            #####################################################################
+            # A Lagrangian particle is considered which travels through the PFR. Its
+            # state change is computed by upwind time stepping. The PFR result is produced
+            # by transforming the temporal resolution into spatial locations.
+            # The spatial discretization is therefore not provided a priori but is instead
+            # a result of the transformation.
+
+            tic_0 = timer.time()
+
+            T = [] ; P = [] ; conc = []; kf = [] ; kr = []
 
 
 
-        if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
-            X_Scal[0] = reactor.T
-        else:
-            X_Scal[0] = gas.X[gas.species_index(Scal_ref)]
-        try:
-            H2O[0] = gas.X[gas.species_index("H2O")]
-        except:
-            H2O[0] = 0
+            # create a new reactor
+            r1 = ct.IdealGasConstPressureReactor(gas)
+            # create a reactor network for performing time integration
+            sim = ct.ReactorNet([r1])
 
-        for n in range(1, init_points-1):
-#            timeVec_ignit[n] = timeVec_ignit[n-1] + dt
-            sim.advance(timeVec_ignit[n])
+            sim.rtol = conditions.simul_param.tol_ts[0]
+            sim.atol = conditions.simul_param.tol_ts[1]
 
-            if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
-                X_Scal[n] = reactor.T
-            else:
-                X_Scal[n] = gas.X[gas.species_index(Scal_ref)]
+            # approximate a time step to achieve a similar resolution as in the next method
+            t_total = length / u_0
+            dt = t_total / n_steps
+            # define time, space, and other information vectors
+            timeVec = (np.arange(n_steps) + 1) * dt
+            z1 = np.zeros_like(timeVec)
+            u1 = np.zeros_like(timeVec)
 
-            try:
-                H2O[n] = gas.X[gas.species_index("H2O")]
-                dH2O[n-1] = (H2O[n]-H2O[n-1]) *0.5
-            except:
-                H2O[n] = 0
-                dH2O[n-1] = np.abs(X_Scal[n]-X_Scal[n-1]) *0.5
-
-
-        idx_maxgrad = np.where(dH2O==max(dH2O)) #find max grad index
-        tign = timeVec_ignit[idx_maxgrad[0][0]]
-        if verbose >=4:
-            if H2O[0]*1.2>H2O[-1] or tign>0.97*timeVec_ignit[-1]:
-                print_("    WARNING : No ignition was detected in the first "+
-                      str(init_points*dt)+"s" +".",mp)
-            elif verbose>7:
-                print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'µs',mp)
-
-
-    # Computing the time vector according to the selected scalar variation
-        tmax = min(tmax_react,t_max_coeff*tign)
-
-
-        # Grad and curve vectors calculation
-        grad_vect_0 = [] ; curv_vect = []
-        # grad calculation
-        for i in range(len(X_Scal)-1):
-            grad_vect_0.append((X_Scal[i+1]-X_Scal[i])/(dt))
-        # curv calculation
-        for i in range(len(grad_vect_0)-1):
-            curv_vect.append((grad_vect_0[i+1]-grad_vect_0[i])/(2*dt))
-        # grad recomputed, for corresponding to the curv values
-        grad_vect = []
-        for i in range(len(X_Scal)-2):
-            grad_vect.append((X_Scal[i+2]-X_Scal[i])/(2*dt))
-
-        if verbose>7:
-            print_("grad and curve calculation done",mp)
-
-        time_stepping_calc=True; pt_coeff=2e5
-        coeff_dtmax = n_pts/10 ; coeff_dtmin = n_pts*2
-        time_stepping_calc_try=0
-        while time_stepping_calc:
-            # time stepping
-            timeVec = [0]
-            # first point => considering only grad_vect_0 (curve data not available)
-            timeVec.append(tmax/((grad_vect_0[0]/np.sum([grad_vect_0[0]]))*n_pts))
-            # Next points => considering only grad_vect_0 (curve data not available)
-            while timeVec[-1]<tmax:
-                idx = min((np.abs(timeVec_ignit-timeVec[-1])).argmin()-2,len(grad_vect)-1)
-                dt = (tmax/(n_pts*pt_coeff))/(abs((grad_vect[idx]/np.sum(np.abs([grad_vect])))*
-                     grad_curv_ratio+curv_vect[idx]/np.sum(np.abs([curv_vect]))*(1-grad_curv_ratio)))
-                if dt<(tign/coeff_dtmin):
-                    timeVec.append(timeVec[-1]+tign/200)
-                elif dt>(tign/coeff_dtmax):
-                    timeVec.append(timeVec[-1]+tign/5)
-                else:
-                    timeVec.append(timeVec[-1]+dt)
-
-            if len(timeVec)>n_pts-delta_npts and len(timeVec)<n_pts+delta_npts:
-                time_stepping_calc=False
-            else:
-                if verbose>4:
-                    print_("Bad number of time steps:"+str(len(timeVec))+". Recomputing time vector",mp)
-                pt_coeff=pt_coeff*(n_pts/len(timeVec))**2
-                time_stepping_calc=True
-                time_stepping_calc_try+=1
-                if time_stepping_calc_try>50:  time_stepping_calc=False
-                if pt_coeff<1e-5:
-                    print_("Warning : larger time steps imposed for the calculation",mp)
-                    pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
-                if pt_coeff>1e20:
-                    print_("Warning : smaller time steps imposed for the calculation",mp)
-                    pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
-        if verbose>3:
-            print_("    - time vector contains: "+str(len(timeVec))+" points",mp)
-
-
-
-    # Data computation
-        gas.TPX = init
-        if conditions.config == 'reactor_UV' :
-            reactor = ct.IdealGasReactor(gas)
-        elif conditions.config == 'reactor_HP':
-            reactor = ct.IdealGasConstPressureReactor(gas)
-        sim = ct.ReactorNet([reactor])
-        T = []
-        P = []
-        conc = []
-        kf = []
-        kr = []
-        heat_release = [0]
-        T.append(reactor.T)
-        P.append(reactor.thermo.P)
-        conc.append(reactor.thermo.concentrations.tolist())
-        kf.append(gas.forward_rate_constants)
-        kr.append(gas.reverse_rate_constants)
-        fuel = conditions.composition.fuel.split('/')[0].split('(')[0]
-        target_ign_idx = gas.species_index(fuel)
-        target_ign_ = []
-        grad_fuel = []
-        for n in range(1,len(timeVec)):
-            sim.advance(timeVec[n])
-            T.append(reactor.T)
-            P.append(reactor.thermo.P)
-            conc.append(reactor.thermo.concentrations.tolist())
-            target_ign_.append(gas.X[target_ign_idx])
+            # save data at t0
+            P.append(r1.thermo.P)
+            T.append(r1.T)
+            conc.append(r1.thermo.concentrations.tolist())
             kf.append(gas.forward_rate_constants)
             kr.append(gas.reverse_rate_constants)
-            # heat release calculation
-            hr="ok"
-            try:
-                heat_release.append(-np.dot(gas.net_rates_of_progress,\
-                                           gas.delta_enthalpy))
-            except:
-                if n==1:
-                    print_("warning: heat release calculation issues",mp)
-                    hr="no_heat_release"
-        # ignition time calculation
-           # 1- based on heat release (default)
-        if hr!= "no_heat_release":
-            ign_time_hr = timeVec[heat_release.index(max(heat_release))]
-        else: ign_time_hr=False
-        ign_time_hr = timeVec[heat_release.index(max(heat_release))]
-           # 2- based on fuel gradients (if heat relase calculation troubles)
-        for t in range(len(timeVec)-3):
-            grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(timeVec[t+2]-timeVec[t]))
-        ign_time_sp = timeVec[grad_fuel.index(max(grad_fuel))+2]
 
-        time2 = timer.time()
-        if verbose>3:
-            print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'µs',mp)
-            print_("      Time to compute reference data : "+"%5.2f" %(time2-time1)+'s',mp)
+            for n1, t_i in enumerate(timeVec):
+                # perform time integration
+                sim.advance(t_i)
+                # compute velocity and transform into space
+                u1[n1] = mass_flow_rate1 / area / r1.thermo.density
+                z1[n1] = z1[n1 - 1] + u1[n1] * dt
+                P.append(r1.thermo.P)
+                T.append(r1.T)
+                conc.append(r1.thermo.concentrations.tolist())
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+
+            tic_1 = timer.time()
+            #print('Simulation time: '+ "%5.1f" %(tic_1-tic_0) + ' s')
+            #####################################################################
+            timeVec = np.insert(timeVec,0,0)
+            z1      = np.insert(z1,0,0)
+
+
+        else:
+
+            init_points = int(conditions.simul_param.tign_nPoints)     # max number of time step
+            n_pts       = conditions.simul_param.n_pts
+            delta_npts  = conditions.simul_param.delta_npts
+            t_max_coeff = conditions.simul_param.t_max_coeff
+            Scal_ref    = conditions.simul_param.Scal_ref  # Scalar selected for the time vector computation
+            grad_curv_ratio = conditions.simul_param.grad_curv_ratio
+            tmax_react  = conditions.simul_param.t_max_react
+
+        #   Auto ignition time Detection
+                 # Record the scalar evolution and check ignition
+                 # with H2O variation (considered if variation >20%)
+            time1 = timer.time()
+            print_("  Computation...",mp)
+            gas.TPX = init
+            if conditions.config == 'reactor_UV':
+                reactor = ct.IdealGasReactor(gas)
+            elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
+                reactor = ct.IdealGasConstPressureReactor(gas)
+            sim = ct.ReactorNet([reactor])
+            sim.rtol = conditions.simul_param.tol_ts[0]
+            sim.atol = conditions.simul_param.tol_ts[1]
+            time_init = tmax_react
+            timeVec_ignit = []
+            for i in range(init_points):
+                timeVec_ignit.append(time_init)
+                time_init/=1.05
+            timeVec_ignit.reverse()
+            H2O = np.zeros(init_points-1, 'd')
+            X_Scal = np.zeros(init_points-1, 'd')
+            dH2O = np.zeros(init_points-2, 'd')
+
+
+            if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
+                X_Scal[0] = reactor.T
+            else:
+                X_Scal[0] = gas.X[gas.species_index(Scal_ref)]
+            try:
+                H2O[0] = gas.X[gas.species_index("H2O")]
+            except:
+                H2O[0] = 0
+
+            for n in range(1, init_points-1):
+    #            timeVec_ignit[n] = timeVec_ignit[n-1] + dt
+                sim.advance(timeVec_ignit[n])
+
+                if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
+                    X_Scal[n] = reactor.T
+                else:
+                    X_Scal[n] = gas.X[gas.species_index(Scal_ref)]
+
+                try:
+                    H2O[n] = gas.X[gas.species_index("H2O")]
+                    dH2O[n-1] = (H2O[n]-H2O[n-1]) *0.5
+                except:
+                    H2O[n] = 0
+                    dH2O[n-1] = np.abs(X_Scal[n]-X_Scal[n-1]) *0.5
+
+            idx_maxgrad = np.where(dH2O==max(dH2O)) #find max grad index
+            tign = timeVec_ignit[idx_maxgrad[0][0]]
+            if verbose >=4:
+                if H2O[0]*1.2>H2O[-1] or tign>0.97*timeVec_ignit[-1]:
+                    print_("    WARNING : No ignition was detected in the first "+
+                          str(tmax_react)+"s" +".",mp)
+                elif verbose>7:
+                    print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'µs',mp)
+
+
+        # Computing the time vector according to the selected scalar variation
+            tmax = min(tmax_react,t_max_coeff*tign)
+
+
+            # Grad and curve vectors calculation
+            grad_vect_0 = [] ; curv_vect = []
+            # grad calculation
+            for i in range(len(X_Scal)-1):
+                grad_vect_0.append((X_Scal[i+1]-X_Scal[i])/(timeVec_ignit[i+1]-timeVec_ignit[i]))
+            # curv calculation
+            for i in range(len(grad_vect_0)-1):
+                curv_vect.append((grad_vect_0[i+1]-grad_vect_0[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
+            # grad recomputed, for corresponding to the curv values
+            grad_vect = []
+            for i in range(len(X_Scal)-2):
+                grad_vect.append((X_Scal[i+2]-X_Scal[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
+
+            if verbose>7:
+                print_("grad and curve calculation done",mp)
+
+            time_stepping_calc=True; pt_coeff=2e5
+            coeff_dtmax = n_pts/10 ; coeff_dtmin = n_pts*2
+            time_stepping_calc_try=0
+            while time_stepping_calc:
+                # time stepping
+                timeVec = [0]
+                # first point => considering only grad_vect_0 (curve data not available)
+                timeVec.append(tmax/((grad_vect_0[0]/np.sum([grad_vect_0[0]]))*n_pts))
+                # Next points => considering only grad_vect_0 (curve data not available)
+                while timeVec[-1]<tmax:
+                    idx = min((np.abs(timeVec_ignit-timeVec[-1])).argmin()-2,len(grad_vect)-1)
+                    dt = (tmax/(n_pts*pt_coeff))/(abs((grad_vect[idx]/np.sum(np.abs([grad_vect])))*
+                         grad_curv_ratio+curv_vect[idx]/np.sum(np.abs([curv_vect]))*(1-grad_curv_ratio)))
+                    if dt<(tign/coeff_dtmin):
+                        timeVec.append(timeVec[-1]+tign/200)
+                    elif dt>(tign/coeff_dtmax):
+                        timeVec.append(timeVec[-1]+tign/5)
+                    else:
+                        timeVec.append(timeVec[-1]+dt)
+
+                if len(timeVec)>n_pts-delta_npts and len(timeVec)<n_pts+delta_npts:
+                    time_stepping_calc=False
+                else:
+                    if verbose>4:
+                        print_("Bad number of time steps:"+str(len(timeVec))+". Recomputing time vector",mp)
+                    pt_coeff=pt_coeff*(n_pts/len(timeVec))**2
+                    time_stepping_calc=True
+                    time_stepping_calc_try+=1
+                    if time_stepping_calc_try>50:  time_stepping_calc=False
+                    if pt_coeff<1e-5:
+                        print_("Warning : larger time steps imposed for the calculation",mp)
+                        pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
+                    if pt_coeff>1e20:
+                        print_("Warning : smaller time steps imposed for the calculation",mp)
+                        pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
+            if verbose>3:
+                print_("    - time vector contains: "+str(len(timeVec))+" points",mp)
+
+
+
+        # Data computation
+            gas.TPX = init
+            if conditions.config == 'reactor_UV' :
+                reactor = ct.IdealGasReactor(gas)
+            elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
+                reactor = ct.IdealGasConstPressureReactor(gas)
+            sim = ct.ReactorNet([reactor])
+            T = []
+            P = []
+            conc = [] ; kf = [] ; kr = [] ; r_rate = []
+            heat_release = [0]
+            T.append(reactor.T)
+            P.append(reactor.thermo.P)
+            if act_sp:
+                conc_n = []; sa_i = 0
+                for s_i in range(len(act_sp)):
+                    if act_sp[s_i]:
+                        conc_n.append(reactor.thermo.concentrations.tolist()[sa_i])
+                        sa_i += 1
+                    else:
+                        conc_n.append(0)
+                conc.append(conc_n)
+            else:
+                conc.append(reactor.thermo.concentrations.tolist())
+            if act_r:
+                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                for r_i in range(len(act_r)):
+                    if act_r[r_i]:
+                        kf_r.append(gas.forward_rate_constants[ra_i])
+                        kr_r.append(gas.reverse_rate_constants[ra_i])
+                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                        ra_i += 1
+                    else:
+                        kf_r.append(0)
+                        kr_r.append(0)
+                        r_rate_r.append(0)
+                kf.append(kf_r)
+                kr.append(kr_r)
+                r_rate.append(r_rate_r)
+            else:
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+                r_rate.append(gas.net_rates_of_progress)
+
+#            conc.append(reactor.thermo.concentrations.tolist())
+#            kf.append(gas.forward_rate_constants)
+#            kr.append(gas.reverse_rate_constants)
+#            r_rate.append(gas.net_rates_of_progress)
+            fuel = conditions.composition.fuel.split('/')[0].split('(')[0]
+            target_ign_idx = gas.species_index(fuel)
+            target_ign_ = []
+            grad_fuel = []
+            z1 = np.zeros_like(timeVec)
+            u1 = np.zeros_like(timeVec)
+
+            for n in range(1,len(timeVec)):
+                sim.advance(timeVec[n])
+                T.append(reactor.T)
+                P.append(reactor.thermo.P)
+
+                if act_sp:
+                    conc_n = []; sa_i = 0
+                    for s_i in range(len(act_sp)):
+                        if act_sp[s_i]:
+                            conc_n.append(reactor.thermo.concentrations.tolist()[sa_i])
+                            sa_i += 1
+                        else:
+                            conc_n.append(0)
+                    conc.append(conc_n)
+                else:
+                    conc.append(reactor.thermo.concentrations.tolist())
+                if act_r:
+                    kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                    for r_i in range(len(act_r)):
+                        if act_r[r_i]:
+                            kf_r.append(gas.forward_rate_constants[ra_i])
+                            kr_r.append(gas.reverse_rate_constants[ra_i])
+                            r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                            ra_i += 1
+                        else:
+                            kf_r.append(0)
+                            kr_r.append(0)
+                            r_rate_r.append(0)
+                    kf.append(kf_r)
+                    kr.append(kr_r)
+                    r_rate.append(r_rate_r)
+                else:
+                    kf.append(gas.forward_rate_constants)
+                    kr.append(gas.reverse_rate_constants)
+                    r_rate.append(gas.net_rates_of_progress)
+
+#                conc.append(reactor.thermo.concentrations.tolist())
+#                kf.append(gas.forward_rate_constants)
+#                kr.append(gas.reverse_rate_constants)
+#                r_rate.append(gas.net_rates_of_progress)
+
+                target_ign_.append(gas.X[target_ign_idx])
+
+                if 'PFR' in conditions.config:
+                    u1[n] = mass_flow_rate1 / area / reactor.thermo.density
+                    dt = timeVec[n]-timeVec[n-1]
+                    z1[n] = z1[n - 1] + u1[n] * dt
+
+                # heat release calculation
+                hr="ok"
+                try:
+                    heat_release.append(-np.dot(gas.net_rates_of_progress,\
+                                               gas.delta_enthalpy))
+                except:
+                    if n==1:
+                        print_("warning: heat release calculation issues",mp)
+                        hr="no_heat_release"
+            # ignition time calculation
+               # 1- based on heat release (default)
+            if hr!= "no_heat_release":
+                ign_time_hr = timeVec[heat_release.index(max(heat_release))]
+            else: ign_time_hr=False
+            ign_time_hr = timeVec[heat_release.index(max(heat_release))]
+               # 2- based on fuel gradients (if heat relase calculation troubles)
+            for t in range(len(timeVec)-3):
+                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(timeVec[t+2]-timeVec[t]))
+            ign_time_sp = timeVec[grad_fuel.index(max(grad_fuel))+2]
+            if 'PFR' in conditions.config:
+                ign_dist_sp = z1[grad_fuel.index(max(grad_fuel))+2]
+
+            time2 = timer.time()
+            if verbose>3:
+                if 'PFR' in conditions.config:
+                    print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
+                else:
+                    print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'µs',mp)
+                print_("      Time to compute reference data : "+"%5.2f" %(time2-time1)+'s',mp)
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(timeVec), list(T), \
                              list(P), list(conc), list(kf), list(kr))
-        results.ign_time_hr = ign_time_hr
-        results.ign_time_sp = ign_time_sp
+        results.r_rate = list(r_rate)
 
         conditions.simul_param.pts_scatter=np.array(timeVec)
+
+        if 'PFR' in conditions.config:
+            results.z1 = list(z1)
+        else:
+            results.ign_time_hr = ign_time_hr
+            results.ign_time_sp = ign_time_sp
+
 
 
     elif 'JSR' in conditions.config:
@@ -727,7 +970,7 @@ def ref_computation(conditions, verbose=0):
         # =============================================================================
         # Modeling data
         # =============================================================================
-        T = [] ; P = [] ; conc = []; kf = [] ; kr = []
+        T = [] ; P = [] ; conc = []; kf = [] ; kr = [] ; r_rate = []
 
         # Create a data frame to store values for the above points
         tempDependence = pd.DataFrame(columns=timeHistory.columns)
@@ -786,93 +1029,51 @@ def ref_computation(conditions, verbose=0):
             # results
             T.append(stirredReactor.T)
             P.append(stirredReactor.thermo.P)
-            conc.append(stirredReactor.thermo.concentrations.tolist())
-            kf.append(gas.forward_rate_constants)
-            kr.append(gas.reverse_rate_constants)
+            if act_sp:
+                conc_n = []; sa_i = 0
+                for s_i in range(len(act_sp)):
+                    if act_sp[s_i]:
+                        conc_n.append(stirredReactor.thermo.concentrations.tolist()[sa_i])
+                        sa_i += 1
+                    else:
+                        conc_n.append(0)
+                conc.append(conc_n)
+            else:
+                conc.append(stirredReactor.thermo.concentrations.tolist())
+            if act_r:
+                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+                for r_i in range(len(act_r)):
+                    if act_r[r_i]:
+                        kf_r.append(gas.forward_rate_constants[ra_i])
+                        kr_r.append(gas.reverse_rate_constants[ra_i])
+                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
+                        ra_i += 1
+                    else:
+                        kf_r.append(0)
+                        kr_r.append(0)
+                        r_rate_r.append(0)
+                kf.append(kf_r)
+                kr.append(kr_r)
+                r_rate.append(r_rate_r)
+            else:
+                kf.append(gas.forward_rate_constants)
+                kr.append(gas.reverse_rate_constants)
+                r_rate.append(gas.net_rates_of_progress)
+
+#            conc.append(stirredReactor.thermo.concentrations.tolist())
+#            kf.append(gas.forward_rate_constants)
+#            kr.append(gas.reverse_rate_constants)
+#            r_rate.append(gas.net_rates_of_progress)
 
         toc_sim = timer.time()
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(T_list), list(T), \
                              list(P), list(conc), list(kf), list(kr))
+        results.r_rate = r_rate
         conditions.simul_param.time_jsr_ref_lim = toc_sim-tic_sim
 
 
-    elif 'PFR' in conditions.config:
-
-        # Plug Flow reactor simulation:
-        # https://cantera.org/examples/python/reactors/pfr.py.html
-
-        #####################################################################
-        # Method 1: Lagrangian Particle Simulation
-        #####################################################################
-        # A Lagrangian particle is considered which travels through the PFR. Its
-        # state change is computed by upwind time stepping. The PFR result is produced
-        # by transforming the temporal resolution into spatial locations.
-        # The spatial discretization is therefore not provided a priori but is instead
-        # a result of the transformation.
-
-        tic_0 = timer.time()
-
-        T = [] ; P = [] ; conc = []; kf = [] ; kr = []
-
-        length      = conditions.simul_param.end_sim    # *approximate* PFR length [m]
-        u_0         = conditions.simul_param.u_0        # inflow velocity [m/s]
-        area        = conditions.simul_param.area       # cross-sectional area [m**2]
-        n_steps     = conditions.simul_param.n_pts      # number of time steps considered for the simulation
-
-        # import the gas model and set the initial conditions
-        gas = conditions.composition.gas
-        gas.TPX = conditions.state_var.T,conditions.state_var.P,conditions.composition.X
-
-        mass_flow_rate1 = u_0 * gas.density * area
-
-        # create a new reactor
-        r1 = ct.IdealGasConstPressureReactor(gas)
-        # create a reactor network for performing time integration
-        sim = ct.ReactorNet([r1])
-
-        sim.rtol = conditions.simul_param.tol_ts[0]
-        sim.atol = conditions.simul_param.tol_ts[1]
-
-        # approximate a time step to achieve a similar resolution as in the next method
-        t_total = length / u_0
-        dt = t_total / n_steps
-        # define time, space, and other information vectors
-        timeVec = (np.arange(n_steps) + 1) * dt
-        z1 = np.zeros_like(timeVec)
-        u1 = np.zeros_like(timeVec)
-
-        # save data at t0
-        P.append(r1.thermo.P)
-        T.append(r1.T)
-        conc.append(r1.thermo.concentrations.tolist())
-        kf.append(gas.forward_rate_constants)
-        kr.append(gas.reverse_rate_constants)
-
-        for n1, t_i in enumerate(timeVec):
-            # perform time integration
-            sim.advance(t_i)
-            # compute velocity and transform into space
-            u1[n1] = mass_flow_rate1 / area / r1.thermo.density
-            z1[n1] = z1[n1 - 1] + u1[n1] * dt
-            P.append(r1.thermo.P)
-            T.append(r1.T)
-            conc.append(r1.thermo.concentrations.tolist())
-            kf.append(gas.forward_rate_constants)
-            kr.append(gas.reverse_rate_constants)
-
-        tic_1 = timer.time()
-        #print('Simulation time: '+ "%5.1f" %(tic_1-tic_0) + ' s')
-        #####################################################################
-        timeVec = np.insert(timeVec,0,0)
-        z1      = np.insert(z1,0,0)
-
-        results = cdef.Sim_Results(conditions, gas, timeVec, list(T), \
-                             list(P), list(conc), list(kf), list(kr))
-        results.z1 = list(z1)
-
-        conditions.simul_param.pts_scatter=np.array(timeVec)
 
     return results,conditions
 
@@ -956,7 +1157,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         # ------------------     end of simulation     --------------------
 
         # saving spec concentrations at
-        conc = [] ; kf = [] ; kr = [] ; npoints = f.flame.n_points
+        conc=[] ; kf=[] ; kr=[] ; r_rate=[] ; npoints = f.flame.n_points
         for n in range(npoints):
             f.set_gas_state(n)
             # saving spec concentrations
@@ -969,26 +1170,27 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                     conc_x.append(0)
             conc.append(conc_x)
             # saving kf and kr values
-            kf_x=[];kr_x=[];r_red=0
+            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
             for r in range(len(act_r)):
                 if act_r[r]:
                         kf_x.append(gas_red.forward_rate_constants[r_red])
                         kr_x.append(gas_red.reverse_rate_constants[r_red])
+                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
                         r_red+=1
                 else:
-                    kf_x.append(0); kr_x.append(0)
-            kf.append(kf_x); kr.append(kr_x)
+                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+            kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
         results.Sl = f.u[0]
         results.f  = f
-
+        results.r_rate = r_rate
 
     if 'tp_flame' in conditions.config:
 
         # Main variables
-        gas_ref   = conditions.composition.gas
+        gas_ref   = conditions.composition.gas_ref
 
 
         f = ct.CounterflowTwinPremixedFlame(gas_red)
@@ -1036,7 +1238,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
 
 
         # saving spec concentrations at
-        conc = [] ; kf = [] ; kr = [] ; npoints = f.flame.n_points
+        conc=[] ; kf=[] ; kr=[] ; r_rate=[] ; npoints = f.flame.n_points
         for n in range(npoints):
             f.set_gas_state(n)
             # saving spec concentrations
@@ -1049,19 +1251,22 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                     conc_x.append(0)
             conc.append(conc_x)
             # saving kf and kr values
-            kf_x=[];kr_x=[];r_red=0
+            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
             for r in range(len(act_r)):
                 if act_r[r]:
                         kf_x.append(gas_red.forward_rate_constants[r_red])
                         kr_x.append(gas_red.reverse_rate_constants[r_red])
+                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
                         r_red+=1
                 else:
-                    kf_x.append(0); kr_x.append(0)
-            kf.append(kf_x); kr.append(kr_x)
+                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+            kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.f  = f
+        results.f       = f
+        results.r_rate  = r_rate
+
 
         os.chdir(conditions.main_path)
 
@@ -1071,7 +1276,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
     if 'diff_flame' in conditions.config or 'pp_flame' in conditions.config :
 
         # Main variables
-        gas_ref  = conditions.composition.gas
+        gas_ref  = conditions.composition.gas_ref
         width    = conditions.simul_param.end_sim
 
 
@@ -1136,7 +1341,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
 
 
         # saving spec concentrations at
-        conc = [] ; kf = [] ; kr = [] ; npoints = f.flame.n_points
+        conc = [] ; kf = [] ; kr = [] ; r_rate=[] ; npoints = f.flame.n_points
         for n in range(npoints):
             f.set_gas_state(n)
             # saving spec concentrations
@@ -1148,21 +1353,35 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 else:
                     conc_x.append(0)
             conc.append(conc_x)
+
             # saving kf and kr values
-            kf_x=[];kr_x=[];r_red=0
+            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
             for r in range(len(act_r)):
                 if act_r[r]:
                         kf_x.append(gas_red.forward_rate_constants[r_red])
                         kr_x.append(gas_red.reverse_rate_constants[r_red])
+                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
                         r_red+=1
                 else:
-                    kf_x.append(0); kr_x.append(0)
-            kf.append(kf_x); kr.append(kr_x)
+                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+            kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
+#
+#            # saving kf and kr values
+#            kf_x=[];kr_x=[];r_red=0
+#            for r in range(len(act_r)):
+#                if act_r[r]:
+#                        kf_x.append(gas_red.forward_rate_constants[r_red])
+#                        kr_x.append(gas_red.reverse_rate_constants[r_red])
+#                        r_red+=1
+#                else:
+#                    kf_x.append(0); kr_x.append(0)
+#            kf.append(kf_x); kr.append(kr_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.K_max = f.strain_rate('max')
-        results.f  = f
+        results.K_max   = f.strain_rate('max')
+        results.f       = f
+        results.r_rate  = r_rate
 
 
         if conditions.error_param.K_check and simul_success:
@@ -1270,23 +1489,43 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         os.chdir(conditions.main_path)
 
 
-    if 'reactor' in conditions.config:
+    if 'reactor' in conditions.config or 'PFR' in conditions.config:
 
         X_red = conditions.composition.X
         gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
-        gas_ref     = conditions.composition.gas
+        gas_ref     = conditions.composition.gas_ref
 
         timeVec = conditions.simul_param.pts_scatter
 
+        if 'PFR' in conditions.config:
+        # Plug Flow reactor simulation:
+        # https://cantera.org/examples/python/reactors/pfr.py.html
+        #
+        # A Lagrangian particle is considered which travels through the PFR. Its
+        # state change is computed by upwind time stepping. The PFR result is produced
+        # by transforming the temporal resolution into spatial locations.
+        # The spatial discretization is therefore not provided a priori but is instead
+        # a result of the transformation.
+            length      = conditions.simul_param.end_sim    # *approximate* PFR length [m]
+            u_0         = conditions.simul_param.u_0        # inflow velocity [m/s]
+            area        = conditions.simul_param.area       # cross-sectional area [m**2]
+            n_steps     = conditions.simul_param.n_pts      # number of time steps considered for the simulation
+            mass_flow_rate1 = u_0 * gas_red.density * area
+
+
         if conditions.config == 'reactor_UV' :
             reactor = ct.IdealGasReactor(gas_red)
-        elif conditions.config == 'reactor_HP':
+        elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
             reactor = ct.IdealGasConstPressureReactor(gas_red)
+
         sim = ct.ReactorNet([reactor])
+        sim.rtol = conditions.simul_param.tol_ts[0]
+        sim.atol = conditions.simul_param.tol_ts[1]
 
 
-        T = [] ; P = [] ; conc = [] ; kf = [] ; kr = []
-    #    gradT = [0]
+        T = [] ; P = [] ; conc = [] ; kf = [] ; kr = [] ; r_rate = []
+
+        # saving data at t=0
         heat_release = [0]
         T.append(reactor.T)
         P.append(reactor.thermo.P)
@@ -1300,32 +1539,37 @@ def red_computation(conditions, gas_red, act_sp,act_r):
             else:
                 conc_t.append(0)
         conc.append(conc_t)
+
         # saving kf and kr values at t=0
-        kf_t=[];kr_t=[];r_red=0
+        kf_t=[];kr_t=[];r_rate_t=[];r_red=0
         for r in range(len(act_r)):
             if act_r[r]:
                     kf_t.append(gas_red.forward_rate_constants[r_red])
                     kr_t.append(gas_red.reverse_rate_constants[r_red])
+                    r_rate_t.append(gas_red.net_rates_of_progress[r_red])
                     r_red+=1
             else:
-                kf_t.append(0); kr_t.append(0)
-        kf.append(kf_t); kr.append(kr_t)
+                kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+        kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
 
-
-        fuel = conditions.composition.fuel.split('/')[0].split('(')[0]
+        # definition of fuel for ignition delay detection
+        fuel = X_red.split(':')[0]
         target_ign_idx = gas_red.species_index(fuel)
         target_ign_ = []
         grad_fuel = []
+        if 'PFR' in conditions.config:
+            # define space and velocity vectors
+            z1 = np.zeros_like(timeVec)
+            u1 = np.zeros_like(timeVec)
+
         for n in range(1,len(timeVec)):
             time = timeVec[n]
-
 
             # supress console output during the simulation
             if verbose<9:
                 old_stdout = sys.stdout ; old_stderr = sys.stderr
                 with open(os.devnull, "w") as devnull:
                     sys.stdout = devnull ; sys.stderr = devnull
-
             try:
                 sim.advance(time)
                 simul_success = True
@@ -1337,6 +1581,13 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
                 if verbose >= 3:
                     print("\n     WARNING: No solution found\n",mp)
+
+            # compute velocity and transform into space
+            if 'PFR' in conditions.config:
+                u1[n] = mass_flow_rate1 / area / reactor.thermo.density
+                dt = timeVec[n]-timeVec[n-1]
+                z1[n] = z1[n - 1] + u1[n] * dt
+
 
             T.append(reactor.T)
             P.append(reactor.thermo.P)
@@ -1352,15 +1603,27 @@ def red_computation(conditions, gas_red, act_sp,act_r):
             target_ign_.append(gas_red.X[target_ign_idx])
 
             # saving kf and kr values
-            kf_t=[];kr_t=[];r_red=0
+            kf_t=[];kr_t=[];r_rate_t=[];r_red=0
             for r in range(len(act_r)):
                 if act_r[r]:
                         kf_t.append(gas_red.forward_rate_constants[r_red])
                         kr_t.append(gas_red.reverse_rate_constants[r_red])
+                        r_rate_t.append(gas_red.net_rates_of_progress[r_red])
                         r_red+=1
                 else:
-                    kf_t.append(0); kr_t.append(0)
-            kf.append(kf_t); kr.append(kr_t)
+                    kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+            kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+
+#            # saving kf and kr values
+#            kf_t=[];kr_t=[];r_red=0
+#            for r in range(len(act_r)):
+#                if act_r[r]:
+#                        kf_t.append(gas_red.forward_rate_constants[r_red])
+#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
+#                        r_red+=1
+#                else:
+#                    kf_t.append(0); kr_t.append(0)
+#            kf.append(kf_t); kr.append(kr_t)
             # heat release calculation
             hr="ok"
             try:
@@ -1370,6 +1633,12 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 if n==1:
                     print_("warning: heat release calculation issues",mp)
                     hr="no_heat_release"
+
+        # define time and position at the beginning (-> 0):
+        if 'PFR' in conditions.config:
+            timeVec = np.insert(timeVec,0,0)
+            z1      = np.insert(z1,0,0)
+
 
         # ignition time calculation
            # 1- based on heat release (default)
@@ -1386,8 +1655,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                              list(P), list(conc), list(kf), list(kr))
         results.ign_time_hr = ign_time_hr
         results.ign_time_sp = ign_time_sp
-
-
+        results.r_rate      = list(r_rate)
 
 
     elif 'JSR' in conditions.config:
@@ -1398,7 +1666,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         # =============================================================================
         X_red = conditions.composition.X
 
-        gas_ref  = conditions.composition.gas
+        gas_ref  = conditions.composition.gas_ref
         T_list = list(conditions.simul_param.pts_scatter)
         gas_red.TPX = T_list[0], conditions.state_var.P,X_red
         # Reactor parameters
@@ -1432,7 +1700,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         # =============================================================================
         # Modeling data
         # =============================================================================
-        T = [] ; P = [] ; conc = []; kf = [] ; kr = []
+        T = [] ; P = [] ; conc = []; kf = [] ; kr = [] ; r_rate = []
 
         # Create a data frame to store values for the above points
         tempDependence = pd.DataFrame(columns=timeHistory.columns)
@@ -1514,154 +1782,183 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 else:
                     conc_T.append(0)
             conc.append(conc_T)
+
             # saving kf and kr values
-            kf_t=[];kr_t=[];r_red=0
+            kf_t=[];kr_t=[];r_rate_t=[];r_red=0
             for r in range(len(act_r)):
                 if act_r[r]:
                         kf_t.append(gas_red.forward_rate_constants[r_red])
                         kr_t.append(gas_red.reverse_rate_constants[r_red])
+                        r_rate_t.append(gas_red.net_rates_of_progress[r_red])
                         r_red+=1
                 else:
-                    kf_t.append(0); kr_t.append(0)
-            kf.append(kf_t); kr.append(kr_t)
+                    kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+            kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+
+#            # saving kf and kr values
+#            kf_t=[];kr_t=[];r_red=0
+#            for r in range(len(act_r)):
+#                if act_r[r]:
+#                        kf_t.append(gas_red.forward_rate_constants[r_red])
+#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
+#                        r_red+=1
+#                else:
+#                    kf_t.append(0); kr_t.append(0)
+#            kf.append(kf_t); kr.append(kr_t)
 
         results = cdef.Sim_Results(conditions, gas_red, list(T_list), list(T), \
                              list(P), list(conc), list(kf), list(kr))
+        results.r_rate      = list(r_rate)
 
 
-    elif 'PFR' in conditions.config:
-
-        # Plug Flow reactor simulation:
-        # https://cantera.org/examples/python/reactors/pfr.py.html
-
-        #####################################################################
-        # Method 1: Lagrangian Particle Simulation
-        #####################################################################
-        # A Lagrangian particle is considered which travels through the PFR. Its
-        # state change is computed by upwind time stepping. The PFR result is produced
-        # by transforming the temporal resolution into spatial locations.
-        # The spatial discretization is therefore not provided a priori but is instead
-        # a result of the transformation.
-
-        tic_0 = timer.time()
-
-        T = [] ; P = [] ; conc = []; kf = [] ; kr = []
-
-        length      = conditions.simul_param.end_sim    # 1.5e-7  # *approximate* PFR length [m]
-        u_0         = conditions.simul_param.u_0        # .006  # inflow velocity [m/s]
-        area        = conditions.simul_param.area       # 1.e-4  # cross-sectional area [m**2]
-        n_steps     = conditions.simul_param.n_pts      #2000 # number of time steps considered for the simulation
-
-        X_red = conditions.composition.X
-        gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
-        gas_ref     = conditions.composition.gas
-
-        timeVec = conditions.simul_param.pts_scatter
-
-
-        mass_flow_rate1 = u_0 * gas_red.density * area
-
-        # create a new reactor
-        r1 = ct.IdealGasConstPressureReactor(gas_red)
-        # create a reactor network for performing time integration
-        sim = ct.ReactorNet([r1])
-
-        sim.rtol = conditions.simul_param.tol_ts[0]
-        sim.atol = conditions.simul_param.tol_ts[1]
-
-
-        # approximate a time step to achieve a similar resolution as in the next method
-        t_total = length / u_0
-        dt = t_total / n_steps
-        # define time, space, and other information vectors
-        z1 = np.zeros_like(timeVec)
-        u1 = np.zeros_like(timeVec)
-
-
-
-        # saving data at t=0
-        T.append(r1.T)
-        P.append(r1.thermo.P)
-        # conc
-        conc_t=[]
-        for sp in range(len(act_sp)):
-            if act_sp[sp]:
-                sp_ind=gas_red.species_index(gas_ref.species_name(sp))
-                conc_t.append(r1.thermo.concentrations[sp_ind])
-            else:
-                conc_t.append(0)
-        conc.append(conc_t)
-        # reaction rate coefficients
-        kf_t=[];kr_t=[];r_red=0
-        for r in range(len(act_r)):
-            if act_r[r]:
-                    kf_t.append(gas_red.forward_rate_constants[r_red])
-                    kr_t.append(gas_red.reverse_rate_constants[r_red])
-                    r_red+=1
-            else:
-                kf_t.append(0); kr_t.append(0)
-        kf.append(kf_t); kr.append(kr_t)
-
-
-        for n1, t_i in enumerate(timeVec):
-
-            # perform time integration
-
-            # supress console output during the simulation
-            if verbose<9:
-                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                with open(os.devnull, "w") as devnull:
-                    sys.stdout = devnull ; sys.stderr = devnull
-            try:
-                sim.advance(t_i)
-                simul_success = True
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            except:
-                simul_success = False
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                if verbose >= 3:
-                    print("\n     WARNING: No solution found\n",mp)
-
-            # compute velocity and transform into space
-            u1[n1] = mass_flow_rate1 / area / r1.thermo.density
-            z1[n1] = z1[n1 - 1] + u1[n1] * dt
-#            states1.append(r1.thermo.state)
-
-            # save simulation data
-            T.append(r1.T)
-            P.append(r1.thermo.P)
-            #conc
-            conc_t=[]
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
-                    conc_t.append(r1.thermo.concentrations[sp_ind])
-                else:
-                    conc_t.append(0)
-            conc.append(conc_t)
-            # reaction rate coefficients
-            kf_t=[];kr_t=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_t.append(gas_red.forward_rate_constants[r_red])
-                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-                        r_red+=1
-                else:
-                    kf_t.append(0); kr_t.append(0)
-            kf.append(kf_t); kr.append(kr_t)
-
-
-        tic_1 = timer.time()
-        timeVec = np.insert(timeVec,0,0)
-        z1      = np.insert(z1,0,0)
-
-
-        results = cdef.Sim_Results(conditions, gas_red, timeVec, list(T),\
-                             list(P), list(conc), list(kf), list(kr))
-        results.z1 = list(z1)
-        conditions.simul_param.pts_scatter=np.array(timeVec)
+#    elif 'PFR' in conditions.config:
+#
+#        # Plug Flow reactor simulation:
+#        # https://cantera.org/examples/python/reactors/pfr.py.html
+#
+#        #####################################################################
+#        # Method 1: Lagrangian Particle Simulation
+#        #####################################################################
+#        # A Lagrangian particle is considered which travels through the PFR. Its
+#        # state change is computed by upwind time stepping. The PFR result is produced
+#        # by transforming the temporal resolution into spatial locations.
+#        # The spatial discretization is therefore not provided a priori but is instead
+#        # a result of the transformation.
+#
+#        tic_0 = timer.time()
+#
+#        T = [] ; P = [] ; conc = []; kf = [] ; kr = [] ; r_rate = []
+#
+#        length      = conditions.simul_param.end_sim    # 1.5e-7  # *approximate* PFR length [m]
+#        u_0         = conditions.simul_param.u_0        # .006  # inflow velocity [m/s]
+#        area        = conditions.simul_param.area       # 1.e-4  # cross-sectional area [m**2]
+#        n_steps     = conditions.simul_param.n_pts      #2000 # number of time steps considered for the simulation
+#
+#        X_red = conditions.composition.X
+#        gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
+#        gas_ref     = conditions.composition.gas
+#
+#        timeVec = conditions.simul_param.pts_scatter
+#
+#
+#        mass_flow_rate1 = u_0 * gas_red.density * area
+#
+#        # create a new reactor
+#        r1 = ct.IdealGasConstPressureReactor(gas_red)
+#        # create a reactor network for performing time integration
+#        sim = ct.ReactorNet([r1])
+#
+#        sim.rtol = conditions.simul_param.tol_ts[0]
+#        sim.atol = conditions.simul_param.tol_ts[1]
+#
+#
+#        # approximate a time step to achieve a similar resolution as in the next method
+#        t_total = length / u_0
+#        dt = t_total / n_steps
+#        # define time, space, and other information vectors
+#        z1 = np.zeros_like(timeVec)
+#        u1 = np.zeros_like(timeVec)
+#
+#
+#
+#        # saving data at t=0
+#        T.append(r1.T)
+#        P.append(r1.thermo.P)
+#        # conc
+#        conc_t=[]
+#        for sp in range(len(act_sp)):
+#            if act_sp[sp]:
+#                sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+#                conc_t.append(r1.thermo.concentrations[sp_ind])
+#            else:
+#                conc_t.append(0)
+#        conc.append(conc_t)
+#
+#
+#        # saving kf and kr values
+#        kf_t=[];kr_t=[];r_rate_t=[];r_red=0
+#        for r in range(len(act_r)):
+#            if act_r[r]:
+#                    kf_t.append(gas_red.forward_rate_constants[r_red])
+#                    kr_t.append(gas_red.reverse_rate_constants[r_red])
+#                    r_rate_t.append(gas_red.net_rates_of_progress[r_red])
+#                    r_red+=1
+#            else:
+#                kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+#        kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+##        # reaction rate coefficients
+##        kf_t=[];kr_t=[];r_red=0
+##        for r in range(len(act_r)):
+##            if act_r[r]:
+##                    kf_t.append(gas_red.forward_rate_constants[r_red])
+##                    kr_t.append(gas_red.reverse_rate_constants[r_red])
+##                    r_red+=1
+##            else:
+##                kf_t.append(0); kr_t.append(0)
+##        kf.append(kf_t); kr.append(kr_t)
+#
+#
+#        for n1, t_i in enumerate(timeVec):
+#
+#            # perform time integration
+#
+#            # supress console output during the simulation
+#            if verbose<9:
+#                old_stdout = sys.stdout ; old_stderr = sys.stderr
+#                with open(os.devnull, "w") as devnull:
+#                    sys.stdout = devnull ; sys.stderr = devnull
+#            try:
+#                sim.advance(t_i)
+#                simul_success = True
+#                # restore console output
+#                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+#            except:
+#                simul_success = False
+#                # restore console output
+#                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+#                if verbose >= 3:
+#                    print("\n     WARNING: No solution found\n",mp)
+#
+#            # compute velocity and transform into space
+#            u1[n1] = mass_flow_rate1 / area / r1.thermo.density
+#            z1[n1] = z1[n1 - 1] + u1[n1] * dt
+##            states1.append(r1.thermo.state)
+#
+#            # save simulation data
+#            T.append(r1.T)
+#            P.append(r1.thermo.P)
+#            #conc
+#            conc_t=[]
+#            for sp in range(len(act_sp)):
+#                if act_sp[sp] and simul_success:
+#                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+#                    conc_t.append(r1.thermo.concentrations[sp_ind])
+#                else:
+#                    conc_t.append(0)
+#            conc.append(conc_t)
+#
+#
+#            # reaction rate coefficients
+#            kf_t=[];kr_t=[];r_red=0
+#            for r in range(len(act_r)):
+#                if act_r[r]:
+#                        kf_t.append(gas_red.forward_rate_constants[r_red])
+#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
+#                        r_red+=1
+#                else:
+#                    kf_t.append(0); kr_t.append(0)
+#            kf.append(kf_t); kr.append(kr_t)
+#
+#
+#        tic_1 = timer.time()
+#        timeVec = np.insert(timeVec,0,0)
+#        z1      = np.insert(z1,0,0)
+#
+#
+#        results = cdef.Sim_Results(conditions, gas_red, timeVec, list(T),\
+#                             list(P), list(conc), list(kf), list(kr))
+#        results.z1 = list(z1)
+#        conditions.simul_param.pts_scatter=np.array(timeVec)
 
 
     return results

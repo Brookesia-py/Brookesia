@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -66,7 +66,7 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     if verbose >= 1 :
         print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
     best_ind = copy.deepcopy(ref_ind)
-    best_ind.mech.write_new_mech("optim_mech.cti")
+#    best_ind.mech.write_new_mech("optim_mech.cti")
 
     # Population creation, composed of:
     # 1- selected individuals
@@ -116,13 +116,14 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
         print_("\n      time for optimization: "+str(round(time_2-time_1))+'s',mp)
 
 
-
     new_filename = str(red_data_list[0].op+1) + 'opt_' + conditions_list[0].mech_ext
-    
+
     os.chdir(conditions_list[0].main_path)
     if not os.path.exists('Red_mech'):  os.mkdir('Red_mech')
-    os.chdir('Red_mech')    
+    os.chdir('Red_mech')
     best_ind.mech.write_new_mech(new_filename)
+    if conditions_list[0].simul_param.write_ck:
+        best_ind.mech.write_chemkin_mech(new_filename)
     os.chdir(conditions_list[0].main_path)
 
     Opt_results_list, errors_list, fitness = \
@@ -377,7 +378,7 @@ class Chromosome:
 
     def shift_flame_data(self,conditions_list,optim_param,ref_results_list):
         verbose = conditions_list[0].simul_param.verbose
-        
+
         os.chdir(conditions_list[0].main_path+'/GA')
         filename = 'temp.cti'
         self.mech.write_new_mech(filename)
@@ -390,6 +391,7 @@ class Chromosome:
             old_stdout = sys.stdout ; old_stderr = sys.stderr
             with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
 
+        ct.suppress_thermo_warnings()
         gas = ct.Solution(filename)
 
         # restore console output
@@ -460,6 +462,7 @@ class Chromosome:
 
         for i in range(len(conditions_list)):
             conditions   = conditions_list[i]
+            ct.suppress_thermo_warnings()
             conditions.composition.gas = ct.Solution(filename)
             if 'reactor' in conditions.config:
                 opt_results, conditions = comp.ref_computation(conditions)
@@ -499,7 +502,7 @@ class Chromosome:
 
 
     def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0):
-        
+
         verbose = conditions_list[0].simul_param.verbose
         os.chdir(conditions_list[0].main_path+'/GA')
         filename = 'temp_'+str(n_par)+'.cti'
@@ -513,6 +516,7 @@ class Chromosome:
             old_stdout = sys.stdout ; old_stderr = sys.stderr
             with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
 
+        ct.suppress_thermo_warnings()
         gas = ct.Solution(filename)
 
         # restore console output
@@ -583,7 +587,7 @@ class Chromosome:
 
         os.chdir(conditions_list[0].main_path+'/GA')
         self.mech.write_new_mech(filename)
-        
+
         # --------------------------------------------------------------------------------
         # interpretation of the new mech
 
@@ -592,6 +596,7 @@ class Chromosome:
             old_stdout = sys.stdout ; old_stderr = sys.stderr
             with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
 
+        ct.suppress_thermo_warnings()
         gas = ct.Solution(filename)
 
         # restore console output
@@ -614,7 +619,7 @@ class Chromosome:
             Sl_check = conditions_list[i].error_param.Sl_check
             ig_check = conditions_list[i].error_param.ig_check
             K_check  = conditions_list[i].error_param.K_check
-            
+
             Opt_results_list.append(comp.red_computation(conditions, \
                        gas,self.mech.spec.activ_m,self.mech.react.activ_m))
             os.chdir(conditions_list[0].main_path+'/GA')
@@ -636,7 +641,7 @@ class Chromosome:
             if ('diff_flame' in conditions.config or 'pp_flame' in conditions.config) and K_check and errors_list[-1].qoi_K:
                 qoi_tot.append(errors_list[-1].qoi_K)
                 pond+=optim_param.coeff_K
-                    
+
         if 'no data' in qoi_tot:  qoi_tot.remove('no data')
         if conditions.error_param.error_type_fit == 'mean':
              self.fitness = 1/np.mean(qoi_tot)
@@ -686,7 +691,7 @@ class Population:
         # compare the current best population ind to the previous best ind
         if self.population[best_idx].fitness > best_ind.fitness:
             best_ind = copy.deepcopy(self.population[best_idx])
-            best_ind.mech.write_new_mech("optim_mech.cti")
+#            best_ind.mech.write_new_mech("optim_mech.cti")
             if verbose >= 3:
                 print_("New best_ind: "+"%.3f" %(best_ind.fitness),mp)
             new_best_ind = True
@@ -741,6 +746,7 @@ class Population:
         # supress console output during the interpretation
         old_stdout = sys.stdout ; old_stderr = sys.stderr
         with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
+        ct.suppress_thermo_warnings()
         gas = ct.Solution(mech)
         # restore console output
         sys.stdout = old_stdout ; sys.stderr = old_stderr
@@ -830,7 +836,7 @@ class Population:
 #        pool.close()
 
         # Parallelisation 3 ---------------------------------------------------
-        if os.name == 'nt': multiprocessing.get_context('spawn')            
+        if os.name == 'nt': multiprocessing.get_context('spawn')
         with multiprocessing.Pool(num_cores) as p:
             fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
 
@@ -909,7 +915,7 @@ class Population:
 #        else:
 #        # byposs parallelisation for debugging -------------------------------
         # Fitness calculation
-        if os.name == 'nt': multiprocessing.get_context('spawn')            
+        if os.name == 'nt': multiprocessing.get_context('spawn')
         with multiprocessing.Pool(num_cores) as p:
             fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
 

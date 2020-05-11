@@ -2,25 +2,25 @@
 Reference mechanism;C3_Gong_1-red_4cases.cti;;;;;;;;;;;;;
 Case nb: 1;;;;;;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl(m/s)
-free_flame;C2H6;O2;N2;0.6;[O2/N2,3.76];C2H6:0.6,O2:3.5,N2:13.16;101325;300;0.0001;1E-08;1E-05;1E-08;Mix;0.139007747173309
+free_flame;C2H6;O2;N2;0.6;[O2/N2,3.76];C2H6:0.6,O2:3.5,N2:13.16;101325;300;1E-05;1E-08;1E-06;1E-08;Mix;0.139007747173309
 * Step: Reference;;;;;;;;;;;;;;
 z cm;T(K);;;;;;;;;;;;;
 0;False;;;;;;;;;;;;;
 Case nb: 2;;;;;;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl(m/s)
-free_flame;C2H6;O2;N2;0.65;[O2/N2,3.76];C2H6:0.65,O2:3.5,N2:13.16;101325;300;0.0001;1E-08;1E-05;1E-08;Mix;0.17168915271759
+free_flame;C2H6;O2;N2;0.65;[O2/N2,3.76];C2H6:0.65,O2:3.5,N2:13.16;101325;300;1E-05;1E-08;1E-06;1E-08;Mix;0.17168915271759
 * Step: Reference;;;;;;;;;;;;;;
 z cm;T(K);;;;;;;;;;;;;
 0;False;;;;;;;;;;;;;
 Case nb: 3;;;;;;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl(m/s)
-free_flame;C2H6;O2;N2;0.7;[O2/N2,3.76];C2H6:0.7,O2:3.5,N2:13.16;101325;300;0.0001;1E-08;1E-05;1E-08;Mix;0.214706567128499
+free_flame;C2H6;O2;N2;0.7;[O2/N2,3.76];C2H6:0.7,O2:3.5,N2:13.16;101325;300;1E-05;1E-08;1E-06;1E-08;Mix;0.214706567128499
 * Step: Reference;;;;;;;;;;;;;;
 z cm;T(K);;;;;;;;;;;;;
 0;False;;;;;;;;;;;;;
 Case nb: 4;;;;;;;;;;;;;;
 config;fuel;oxidant;diluent;phi;diluent_ratio;mixt;P(Pa);Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;Sl(m/s)
-free_flame;C2H6;O2;N2;0.75;[O2/N2,3.76];C2H6:0.75,O2:3.5,N2:13.16;101325;300;0.0001;1E-08;1E-05;1E-08;Mix;0.248995423316956
+free_flame;C2H6;O2;N2;0.75;[O2/N2,3.76];C2H6:0.75,O2:3.5,N2:13.16;101325;300;1E-05;1E-08;1E-06;1E-08;Mix;0.248995423316956
 * Step: Reference;;;;;;;;;;;;;;
 z cm;T(K);;;;;;;;;;;;;
 0;False;;;;;;;;;;;;;

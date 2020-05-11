@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -26,6 +26,7 @@
 
 d_verbose               = 4
 d_show_plots            = True
+d_chemkin_f             = True
 
 d_T_check               = True
 d_Sl_check              = True
@@ -54,7 +55,7 @@ d_phi_incr              = '0.5'
 d_T_min_r               = '1400'
 d_T_max_r               = '1800'
 d_T_incr_r              = '200'
-d_tol_ts_r              = '1e-12,1e-6'         # abs/rel
+d_tol_ts_r              = '1e-06,1e-12'         # rel/abs
 d_n_pts_r               = 250
 d_delta_npts            = 20
 d_t_max_coeff           = 5
@@ -67,7 +68,7 @@ d_tign_dt               = '1e-9'
 d_T_min_jsr             = '600'
 d_T_max_jsr             = '1200'
 d_T_incr_jsr            = '10'
-d_tol_ts_jsr            = '1e-15,1e-8'         # abs/rel
+d_tol_ts_jsr            = '1e-10,1e-15'         # rel/abs
 d_t_max                 = 0.2
 d_diluent_ratio_jsr     = '0.99'
 
@@ -75,7 +76,7 @@ d_diluent_ratio_jsr     = '0.99'
 d_T_min_pfr             = '1600'
 d_T_max_pfr             = '1600'
 d_T_incr_pfr            = '200'
-d_tol_ts_pfr            = '1e-15,1e-8'         # abs/rel
+d_tol_ts_pfr            = '1e-10,1e-15'         # rel/abs
 d_length_pfr            = 1.5e-5               # m
 d_u_0_pfr               = 0.006                # m/s
 d_n_pts_pfr             = 2000
@@ -90,8 +91,8 @@ d_slope_ff              = 0.05
 d_curve_ff              = 0.05
 d_prune_ff              = 0.01
 d_n_pts_ff              = 250
-d_tol_ts_ff             = '1e-8,1e-5'      # abs/rel
-d_tol_ss_ff             = '1e-8,1e-6'      # abs/rel
+d_tol_ts_ff             = '1e-05,1e-08'      # rel/abs
+d_tol_ss_ff             = '1e-06,1e-08'      # rel/abs
 d_transport_model       = 'Mix'
 d_xmax                  = '.02'
 d_pts_scatter           = '0.0, 0.03, 0.3, 0.5, 0.7, 1.0'
@@ -163,12 +164,14 @@ d_GA_fit                = 'mean'     #  mean / max
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 import cantera as ct
+ct.suppress_thermo_warnings()
 import copy
 import numpy as np
 import __packages.GeneralFunctions as genf
 import __packages.Class_def as cdef
 import main_reduction as mred
 import os
+import sys
 import time as timer
 
 # set language parameters (for xml cantera files)
@@ -179,16 +182,37 @@ lc.setlocale(lc.LC_ALL, 'en_US.utf8')
 # tab_flag
 global condition_tab_removed
 condition_tab_removed = False
-
+#
+## Screen dimensions
+#app = QtWidgets.QApplication(sys.argv)
+#
+#screen = app.primaryScreen()
+#_width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
+##screen_resolution = app.desktop().screenGeometry()
+#_width, _height = cdef.get_screen_size()
+##width, height = screen_resolution.width(), screen_resolution.height()
+##size = screen.size()
+#sz_w = _width/1366
+#sz_h = _height/768
+#sz_w=1 ; sz_h=1
+#del _width ; del _height
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        global sz_w
+        global sz_h
+        _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
+        _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
+        sz_w = _width/1366
+        sz_h = _height/768
+
+
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(790, 671)
+        MainWindow.resize(790*sz_w, 671*sz_h)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.tablet = QtWidgets.QTabWidget(self.centralwidget)
-        self.tablet.setGeometry(QtCore.QRect(10, 20, 771, 610))
+        self.tablet.setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 771*sz_w, 610*sz_h))
         self.tablet.setUsesScrollButtons(False)
         self.tablet.setTabsClosable(False)
         self.tablet.setMovable(False)
@@ -205,42 +229,42 @@ class Ui_MainWindow(object):
         self.Main_param.setObjectName("Main_param")
 
         self.label_folder_name = QtWidgets.QLabel(self.Main_param)
-        self.label_folder_name.setGeometry(QtCore.QRect(400, 110, 81, 18))
+        self.label_folder_name.setGeometry(QtCore.QRect(400*sz_w, 110*sz_h, 81*sz_w, 18*sz_h))
         self.label_folder_name.setObjectName("label_folder_name")
         self.Text_folder_name = QtWidgets.QPlainTextEdit(self.Main_param)
-        self.Text_folder_name.setGeometry(QtCore.QRect(580, 100, 150, 31))
+        self.Text_folder_name.setGeometry(QtCore.QRect(580*sz_w, 100*sz_h, 150*sz_w, 31*sz_h))
         self.Text_folder_name.setObjectName("Text_folder_name")
 
         self.Text_file_name = QtWidgets.QPlainTextEdit(self.Main_param)
-        self.Text_file_name.setGeometry(QtCore.QRect(580, 55, 150, 31))
+        self.Text_file_name.setGeometry(QtCore.QRect(580*sz_w, 55*sz_h, 150*sz_w, 31*sz_h))
         self.Text_file_name.setObjectName("Text_file_name")
 
         self.pB_load = QtWidgets.QPushButton(self.Main_param)
-        self.pB_load.setGeometry(QtCore.QRect(400, 10, 171, 34))
+        self.pB_load.setGeometry(QtCore.QRect(400*sz_w, 10*sz_h, 171*sz_w, 34*sz_h))
         self.pB_load.setObjectName("pB_load")
 
         self.pB_save = QtWidgets.QPushButton(self.Main_param)
-        self.pB_save.setGeometry(QtCore.QRect(400, 50, 171, 34))
+        self.pB_save.setGeometry(QtCore.QRect(400*sz_w, 50*sz_h, 171*sz_w, 34*sz_h))
         self.pB_save.setObjectName("pB_save")
 
         self.pB_Reference_mechanism = QtWidgets.QPushButton(self.Main_param)
-        self.pB_Reference_mechanism.setGeometry(QtCore.QRect(10, 10, 151, 34))
+        self.pB_Reference_mechanism.setGeometry(QtCore.QRect(10*sz_w, 10*sz_h, 151*sz_w, 34*sz_h))
         self.pB_Reference_mechanism.setObjectName("pB_Reference_mechanism")
         self.pB_Reduced_mechanism = QtWidgets.QPushButton(self.Main_param)
-        self.pB_Reduced_mechanism.setGeometry(QtCore.QRect(10, 50, 151, 34))
+        self.pB_Reduced_mechanism.setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 151*sz_w, 34*sz_h))
         self.pB_Reduced_mechanism.setObjectName("pB_Reduced_mechanism")
         self.pB_External_data = QtWidgets.QPushButton(self.Main_param)
-        self.pB_External_data.setGeometry(QtCore.QRect(-1000, 90, 151, 34))
+        self.pB_External_data.setGeometry(QtCore.QRect(-1000*sz_w, 90*sz_h, 151*sz_w, 34*sz_h))
         self.pB_External_data.setObjectName("pB_External_data")
 
         self.label_reference_mechanism = QtWidgets.QLabel(self.Main_param)
-        self.label_reference_mechanism.setGeometry(QtCore.QRect(180, 20, 350, 18))
+        self.label_reference_mechanism.setGeometry(QtCore.QRect(180*sz_w, 20*sz_h, 350*sz_w, 18*sz_h))
         font = QtGui.QFont()
         font.setItalic(True)
         self.label_reference_mechanism.setFont(font)
         self.label_reference_mechanism.setObjectName("label_reference_mechanism")
         self.label_reduced_mechanism = QtWidgets.QLabel(self.Main_param)
-        self.label_reduced_mechanism.setGeometry(QtCore.QRect(180, 60, 350, 18))
+        self.label_reduced_mechanism.setGeometry(QtCore.QRect(180*sz_w, 60*sz_h, 350*sz_w, 18*sz_h))
         font = QtGui.QFont()
         font.setItalic(True)
         self.label_reduced_mechanism.setFont(font)
@@ -248,7 +272,7 @@ class Ui_MainWindow(object):
         self.reduced_mechanism = False
 
         self.label_External_data = QtWidgets.QLabel(self.Main_param)
-        self.label_External_data.setGeometry(QtCore.QRect(-1800, 100, 350, 18))
+        self.label_External_data.setGeometry(QtCore.QRect(-1800*sz_w, 100*sz_h, 350*sz_w, 18*sz_h))
         font = QtGui.QFont()
         font.setItalic(True)
         self.label_External_data.setFont(font)
@@ -256,132 +280,132 @@ class Ui_MainWindow(object):
         self.external_results = False
 
         self.Gb_MP_reduction = QtWidgets.QGroupBox(self.Main_param)
-        self.Gb_MP_reduction.setGeometry(QtCore.QRect(10, 160, 520, 131))
+        self.Gb_MP_reduction.setGeometry(QtCore.QRect(10*sz_w, 160*sz_h, 520*sz_w, 131*sz_h))
         self.Gb_MP_reduction.setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_MP_reduction.setObjectName("Gb_MP_reduction")
         # label
         self.label_Ref_method_r = QtWidgets.QLabel(self.Gb_MP_reduction)
-        self.label_Ref_method_r.setGeometry(QtCore.QRect(10, 90, 131, 18))
+        self.label_Ref_method_r.setGeometry(QtCore.QRect(10*sz_w, 90*sz_h, 131*sz_w, 18*sz_h))
         self.label_Ref_method_r.setObjectName("label_Ref_method_r")
         # DRG_sp
         self.pB_DRG_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRG_sp.setGeometry(QtCore.QRect(140, 40, 88, 34))
+        self.pB_DRG_sp.setGeometry(QtCore.QRect(140*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRG_sp.setObjectName("pB_DRG_sp")
         # DRGEP_sp
         self.pB_DRGEP_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRGEP_sp.setGeometry(QtCore.QRect(230, 40, 88, 34))
+        self.pB_DRGEP_sp.setGeometry(QtCore.QRect(230*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRGEP_sp.setObjectName("pB_DRGEP_sp")
         # SAR_sp
         self.pB_SAR_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SAR_sp.setGeometry(QtCore.QRect(330, 40, 88, 34))
+        self.pB_SAR_sp.setGeometry(QtCore.QRect(330*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SAR_sp.setObjectName("pB_SAR_sp")
         # SARGEP_sp
         self.pB_SARGEP_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SARGEP_sp.setGeometry(QtCore.QRect(420, 40, 88, 34))
+        self.pB_SARGEP_sp.setGeometry(QtCore.QRect(420*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SARGEP_sp.setObjectName("pB_SARGEP_sp")
         # label
         self.label_Red_method_sp = QtWidgets.QLabel(self.Gb_MP_reduction)
-        self.label_Red_method_sp.setGeometry(QtCore.QRect(10, 50, 131, 18))
+        self.label_Red_method_sp.setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 131*sz_w, 18*sz_h))
         self.label_Red_method_sp.setObjectName("label_Red_method_sp")
         self.tablet.addTab(self.Main_param, "")
         # DRG_r
         self.pB_DRG_r = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRG_r.setGeometry(QtCore.QRect(140, 80, 88, 34))
+        self.pB_DRG_r.setGeometry(QtCore.QRect(140*sz_w, 80*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRG_r.setObjectName("pB_DRG_r")
         # SAR_r
         self.pB_SAR_r = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SAR_r.setGeometry(QtCore.QRect(230, 80, 88, 34))
+        self.pB_SAR_r.setGeometry(QtCore.QRect(230*sz_w, 80*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SAR_r.setObjectName("pB_SAR_r")
 
 
         self.Gb_MP_error = QtWidgets.QGroupBox(self.Main_param)
-        self.Gb_MP_error.setGeometry(QtCore.QRect(540, 160, 181, 131))
+        self.Gb_MP_error.setGeometry(QtCore.QRect(540*sz_w, 160*sz_h, 181*sz_w, 131*sz_h))
         self.Gb_MP_error.setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_MP_error.setObjectName("Gb_MP_error")
 
         self.Gb_MP_qoi = QtWidgets.QFrame(self.Gb_MP_error)
-        self.Gb_MP_qoi.setGeometry(QtCore.QRect(10, 30, 161, 40))
+        self.Gb_MP_qoi.setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 161*sz_w, 40*sz_h))
         self.Gb_MP_qoi.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.Gb_MP_qoi.setFrameShadow(QtWidgets.QFrame.Raised)
         self.Gb_MP_qoi.setObjectName("Gb_MP_qoi")
 
         self.rB_MP_qoi_1 = QtWidgets.QRadioButton(self.Gb_MP_qoi)
-        self.rB_MP_qoi_1.setGeometry(QtCore.QRect(15, 10, 60, 18))
+        self.rB_MP_qoi_1.setGeometry(QtCore.QRect(15*sz_w, 10*sz_h, 60*sz_w, 18*sz_h))
         self.rB_MP_qoi_1.setObjectName("rB_MP_qoi_1")
         self.rB_MP_qoi_2 = QtWidgets.QRadioButton(self.Gb_MP_qoi)
-        self.rB_MP_qoi_2.setGeometry(QtCore.QRect(85, 10, 60, 18))
+        self.rB_MP_qoi_2.setGeometry(QtCore.QRect(85*sz_w, 10*sz_h, 60*sz_w, 18*sz_h))
         self.rB_MP_qoi_2.setObjectName("rB_MP_qoi_2")
 
         self.Gb_MP_errmean = QtWidgets.QFrame(self.Gb_MP_error)
-        self.Gb_MP_errmean.setGeometry(QtCore.QRect(10, 80, 161, 40))
+        self.Gb_MP_errmean.setGeometry(QtCore.QRect(10*sz_w, 80*sz_h, 161*sz_w, 40*sz_h))
         self.Gb_MP_errmean.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.Gb_MP_errmean.setFrameShadow(QtWidgets.QFrame.Raised)
         self.Gb_MP_errmean.setObjectName("Gb_MP_errmean")
 
         self.rB_MP_errmean_1 = QtWidgets.QRadioButton(self.Gb_MP_errmean)
-        self.rB_MP_errmean_1.setGeometry(QtCore.QRect(15, 10, 60, 18))
+        self.rB_MP_errmean_1.setGeometry(QtCore.QRect(15*sz_w, 10*sz_h, 60*sz_w, 18*sz_h))
         self.rB_MP_errmean_1.setObjectName("rB_MP_errmean_1")
         self.rB_MP_errmean_2 = QtWidgets.QRadioButton(self.Gb_MP_errmean)
-        self.rB_MP_errmean_2.setGeometry(QtCore.QRect(85, 10, 60, 18))
+        self.rB_MP_errmean_2.setGeometry(QtCore.QRect(85*sz_w, 10*sz_h, 60*sz_w, 18*sz_h))
         self.rB_MP_errmean_2.setObjectName("rB_MP_errmean_2")
 
         self.Gb_MP_targets = QtWidgets.QGroupBox(self.Main_param)
-        self.Gb_MP_targets.setGeometry(QtCore.QRect(10, 300, 711, 212))
+        self.Gb_MP_targets.setGeometry(QtCore.QRect(10*sz_w, 300*sz_h, 711*sz_w, 212*sz_h))
         self.Gb_MP_targets.setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_MP_targets.setObjectName("Gb_MP_targets")
 
         self.label_MP_target = QtWidgets.QLabel(self.Gb_MP_targets)
-        self.label_MP_target.setGeometry(QtCore.QRect(165, 30, 81, 30))
+        self.label_MP_target.setGeometry(QtCore.QRect(165*sz_w, 30*sz_h, 81*sz_w, 30*sz_h))
         self.label_MP_target.setObjectName("label_MP_target")
         self.text_MP_T = QtWidgets.QPlainTextEdit(self.Gb_MP_targets)
-        self.text_MP_T.setGeometry(QtCore.QRect(170, 65, 50, 31))
+        self.text_MP_T.setGeometry(QtCore.QRect(170*sz_w, 65*sz_h, 50*sz_w, 31*sz_h))
         self.text_MP_T.setObjectName("text_MP_T")
         self.text_MP_ig = QtWidgets.QPlainTextEdit(self.Gb_MP_targets)
-        self.text_MP_ig.setGeometry(QtCore.QRect(170, 100, 50, 31))
+        self.text_MP_ig.setGeometry(QtCore.QRect(170*sz_w, 100*sz_h, 50*sz_w, 31*sz_h))
         self.text_MP_ig.setObjectName("text_MP_ig")
         self.text_MP_Sl = QtWidgets.QPlainTextEdit(self.Gb_MP_targets)
-        self.text_MP_Sl.setGeometry(QtCore.QRect(170, 135, 50, 31))
+        self.text_MP_Sl.setGeometry(QtCore.QRect(170*sz_w, 135*sz_h, 50*sz_w, 31*sz_h))
         self.text_MP_Sl.setObjectName("text_MP_Sl")
         self.text_MP_K = QtWidgets.QPlainTextEdit(self.Gb_MP_targets)
-        self.text_MP_K.setGeometry(QtCore.QRect(170, 170, 50, 31))
+        self.text_MP_K.setGeometry(QtCore.QRect(170*sz_w, 170*sz_h, 50*sz_w, 31*sz_h))
         self.text_MP_K.setObjectName("text_MP_K")
         self.cB_tsp_T = QtWidgets.QCheckBox(self.Gb_MP_targets)
-        self.cB_tsp_T.setGeometry(QtCore.QRect(10, 70, 181, 22))
+        self.cB_tsp_T.setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 181*sz_w, 22*sz_h))
         self.cB_tsp_T.setObjectName("cB_tsp_T")
         self.cB_tsp_T.setChecked(d_T_check)
         self.cB_tsp_igt = QtWidgets.QCheckBox(self.Gb_MP_targets)
-        self.cB_tsp_igt.setGeometry(QtCore.QRect(10, 105, 181, 22))
+        self.cB_tsp_igt.setGeometry(QtCore.QRect(10*sz_w, 105*sz_h, 181*sz_w, 22*sz_h))
         self.cB_tsp_igt.setObjectName("cB_tsp_igt")
         self.cB_tsp_igt.setChecked(d_ig_check)
         self.cB_tsp_Sl = QtWidgets.QCheckBox(self.Gb_MP_targets)
-        self.cB_tsp_Sl.setGeometry(QtCore.QRect(10, 140, 181, 22))
+        self.cB_tsp_Sl.setGeometry(QtCore.QRect(10*sz_w, 140*sz_h, 181*sz_w, 22*sz_h))
         self.cB_tsp_Sl.setObjectName("cB_tsp_Sl")
         self.cB_tsp_Sl.setChecked(d_Sl_check)
         self.cB_tsp_K = QtWidgets.QCheckBox(self.Gb_MP_targets)
-        self.cB_tsp_K.setGeometry(QtCore.QRect(10, 175, 181, 22))
+        self.cB_tsp_K.setGeometry(QtCore.QRect(10*sz_w, 175*sz_h, 181*sz_w, 22*sz_h))
         self.cB_tsp_K.setObjectName("cB_tsp_K")
         self.cB_tsp_K.setChecked(d_K_check)
         self.list_spec = QtWidgets.QListWidget(self.Gb_MP_targets)
         self.list_spec.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
-        self.list_spec.setGeometry(QtCore.QRect(250, 30, 142, 170))
+        self.list_spec.setGeometry(QtCore.QRect(250*sz_w, 30*sz_h, 142*sz_w, 170*sz_h))
         self.list_spec.setObjectName("list_spec")
         self.list_target = QtWidgets.QListWidget(self.Gb_MP_targets)
         self.list_target.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
-        self.list_target.setGeometry(QtCore.QRect(560, 30, 142, 170))
+        self.list_target.setGeometry(QtCore.QRect(560*sz_w, 30*sz_h, 142*sz_w, 170*sz_h))
         self.list_target.setObjectName("list_target")
 
         self.pB_MP_add_spec = QtWidgets.QPushButton(self.Gb_MP_targets)
-        self.pB_MP_add_spec.setGeometry(QtCore.QRect(415, 60, 120, 30))
+        self.pB_MP_add_spec.setGeometry(QtCore.QRect(415*sz_w, 60*sz_h, 120*sz_w, 30*sz_h))
         self.pB_MP_add_spec.setObjectName("pB_MP_add_spec")
         self.pB_MP_rem_spec = QtWidgets.QPushButton(self.Gb_MP_targets)
-        self.pB_MP_rem_spec.setGeometry(QtCore.QRect(415, 110, 120, 30))
+        self.pB_MP_rem_spec.setGeometry(QtCore.QRect(415*sz_w, 110*sz_h, 120*sz_w, 30*sz_h))
         self.pB_MP_rem_spec.setObjectName("pB_MP_rem_spec")
 
         self.label_verbose = QtWidgets.QLabel(self.Main_param)
-        self.label_verbose.setGeometry(QtCore.QRect(30, 536, 71, 18))
+        self.label_verbose.setGeometry(QtCore.QRect(30*sz_w, 536*sz_h, 71*sz_w, 18*sz_h))
         self.label_verbose.setObjectName("label_verbose")
         self.MP_verbose = QtWidgets.QDoubleSpinBox(self.Main_param)
-        self.MP_verbose.setGeometry(QtCore.QRect(90, 530, 51, 32))
+        self.MP_verbose.setGeometry(QtCore.QRect(90*sz_w, 530*sz_h, 51*sz_w, 32*sz_h))
         self.MP_verbose.setDecimals(0)
         self.MP_verbose.setMaximum(10.0)
         self.MP_verbose.setProperty("value", d_verbose)
@@ -389,12 +413,18 @@ class Ui_MainWindow(object):
 
 
         self.cB_show_plots = QtWidgets.QCheckBox(self.Main_param)
-        self.cB_show_plots.setGeometry(QtCore.QRect(270, 533, 250, 22))
+        self.cB_show_plots.setGeometry(QtCore.QRect(170*sz_w, 533*sz_h, 250*sz_w, 22*sz_h))
         self.cB_show_plots.setObjectName("cB_show_plots")
         self.cB_show_plots.setChecked(d_show_plots)
 
+        self.cB_chemkin_f = QtWidgets.QCheckBox(self.Main_param)
+        self.cB_chemkin_f.setGeometry(QtCore.QRect(370*sz_w, 533*sz_h, 250*sz_w, 22*sz_h))
+        self.cB_chemkin_f.setObjectName("cB_chemkin_f")
+        self.cB_chemkin_f.setChecked(d_chemkin_f)
+
+
         self.pB_run = QtWidgets.QPushButton(self.Main_param)
-        self.pB_run.setGeometry(QtCore.QRect(520, 520, 200, 50))
+        self.pB_run.setGeometry(QtCore.QRect(520*sz_w, 520*sz_h, 200*sz_w, 50*sz_h))
         self.pB_run.setObjectName("pB_run")
 
 
@@ -413,13 +443,13 @@ class Ui_MainWindow(object):
         self.Conditions = QtWidgets.QWidget()
         self.Conditions.setObjectName("Conditions")
         self.scrollArea = QtWidgets.QScrollArea(self.Conditions)
-        self.scrollArea.setGeometry(QtCore.QRect(0, 0, 761, 541))
+        self.scrollArea.setGeometry(QtCore.QRect(0, 0, 761*sz_w, 541*sz_h))
         self.scrollArea.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.scrollArea.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.scrollArea.setWidgetResizable(False)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 2200, 500))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 2200*sz_w, 500*sz_h))
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
 
 
@@ -772,7 +802,7 @@ class Ui_MainWindow(object):
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 790, 30))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 790*sz_w, 30*sz_h))
         self.menubar.setObjectName("menubar")
         self.menuKinetic_mechanism_optimization_tool = QtWidgets.QMenu(self.menubar)
         self.menuKinetic_mechanism_optimization_tool.setObjectName("menuKinetic_mechanism_optimization_tool")
@@ -849,6 +879,7 @@ class Ui_MainWindow(object):
 
 
         self.cB_show_plots.setText(_translate("MainWindow", "Show plots during reduction"))
+        self.cB_chemkin_f.setText(_translate("MainWindow", "Write Chemkin file"))
         self.pB_run.setText(_translate("MainWindow", "RUN"))
         self.tablet.setTabText(self.tablet.indexOf(self.Main_param), _translate("MainWindow", "Main parameters"))
 
@@ -894,6 +925,8 @@ class Ui_MainWindow(object):
 
 
     def get_mech(self, mech_type):
+        global sz_w
+        global sz_h
         A=Files_windows()
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
@@ -921,11 +954,13 @@ class Ui_MainWindow(object):
             self.reduced_mechanism = fileName
 
         # appearance of "import external data" option
-        self.pB_External_data.setGeometry(QtCore.QRect(10, 90, 151, 34))
-        self.label_External_data.setGeometry(QtCore.QRect(180, 100, 350, 18))
+        self.pB_External_data.setGeometry(QtCore.QRect(10*sz_w, 90*sz_h, 151*sz_w, 34*sz_h))
+        self.label_External_data.setGeometry(QtCore.QRect(180*sz_w, 100*sz_h, 350*sz_w, 18*sz_h))
 
 
     def get_ext_res(self):
+        global sz_w
+        global sz_h
         A=Files_windows()
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
@@ -944,13 +979,13 @@ class Ui_MainWindow(object):
                 self.title = 'PyQt5 input dialogs - pythonspot.com'
                 self.left = 10
                 self.top = 10
-                self.width = 640
-                self.height = 480
+                self.width = 640*sz_w
+                self.height = 480*sz_h
                 self.initUI()
             def initUI(self):
                 self.setWindowTitle(self.title)
                 self.setGeometry(self.left, self.top, self.width, self.height)
-                self.getChoice()
+#                self.getChoice()
                 self.getChoice_2()
 
                 self.show()
@@ -986,6 +1021,8 @@ class Ui_MainWindow(object):
             condition_tab_removed = True
 
     def remove_tab(self,_option):
+        global sz_w
+        global sz_h
         idx = self.tablet.currentIndex()
         if condition_tab_removed:   _idx = idx + 1
         else:                       _idx = idx
@@ -997,13 +1034,15 @@ class Ui_MainWindow(object):
         if next_operator == 'GA':
             self.tablet.removeTab(idx+1)
             del self.list_operator[_idx-1]
-            
-        self.tablet.removeTab(idx)            
+
+        self.tablet.removeTab(idx)
         del self.list_operator[_idx-2]
 
 
 
     def add_target_spec(self, selected_items):
+        global sz_w
+        global sz_h
         # get the current target species
         c_tg = []
         for tg in range(self.list_target.count()):
@@ -1020,6 +1059,8 @@ class Ui_MainWindow(object):
         self.update_error_table()
 
     def rem_target_spec(self, selected_items):
+        global sz_w
+        global sz_h
         for sp2rem in range(len(selected_items)):
             idx = self.list_target.indexFromItem(selected_items[-(sp2rem+1)]).row()
             self.list_target.takeItem(idx)
@@ -1027,49 +1068,51 @@ class Ui_MainWindow(object):
 
 
     def DRG_clic(self,_option):
+        global sz_w
+        global sz_h
         self.DRG.append(QtWidgets.QWidget())
 
         self.DRG[-1].setObjectName("DRG")
         self.pB_remove_DRG.append(QtWidgets.QPushButton(self.DRG[-1]))
-        self.pB_remove_DRG[-1].setGeometry(QtCore.QRect(670, 20, 80, 70))
+        self.pB_remove_DRG[-1].setGeometry(QtCore.QRect(670*sz_w, 20*sz_h, 80*sz_w, 70*sz_h))
         self.pB_remove_DRG[-1].setObjectName("pB_remove_DRG")
         self.frame_3.append(QtWidgets.QFrame(self.DRG[-1]))
-        self.frame_3[-1].setGeometry(QtCore.QRect(40, 30, 201, 91))
+        self.frame_3[-1].setGeometry(QtCore.QRect(40*sz_w, 30*sz_h, 201*sz_w, 91*sz_h))
         self.frame_3[-1].setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_3[-1].setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_3[-1].setObjectName("frame_3")
         self.label_DRG_espi.append(QtWidgets.QLabel(self.frame_3[-1]))
-        self.label_DRG_espi[-1].setGeometry(QtCore.QRect(10, 20, 131, 18))
+        self.label_DRG_espi[-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 131*sz_w, 18*sz_h))
         self.label_DRG_espi[-1].setObjectName("label_DRG_espi")
         self.num_DRG_eps.append(QtWidgets.QDoubleSpinBox(self.frame_3[-1]))
-        self.num_DRG_eps[-1].setGeometry(QtCore.QRect(130, 10, 61, 32))
-        self.num_DRG_eps[-1].setDecimals(2)
+        self.num_DRG_eps[-1].setGeometry(QtCore.QRect(110*sz_w, 10*sz_h, 81*sz_w, 32*sz_h))
+        self.num_DRG_eps[-1].setDecimals(4)
         self.num_DRG_eps[-1].setMaximum(10.0)
         self.num_DRG_eps[-1].setSingleStep(0.01)
         self.num_DRG_eps[-1].setObjectName("num_DRG_eps")
         self.label_DRG_deps.append(QtWidgets.QLabel(self.frame_3[-1]))
-        self.label_DRG_deps[-1].setGeometry(QtCore.QRect(10, 60, 131, 18))
+        self.label_DRG_deps[-1].setGeometry(QtCore.QRect(10*sz_w, 60*sz_h, 131*sz_w, 18*sz_h))
         self.label_DRG_deps[-1].setObjectName("label_DRG_deps")
         self.num_DRG_deps.append(QtWidgets.QDoubleSpinBox(self.frame_3[-1]))
-        self.num_DRG_deps[-1].setGeometry(QtCore.QRect(130, 50, 61, 32))
-        self.num_DRG_deps[-1].setDecimals(2)
+        self.num_DRG_deps[-1].setGeometry(QtCore.QRect(110*sz_w, 50*sz_h, 81*sz_w, 32*sz_h))
+        self.num_DRG_deps[-1].setDecimals(4)
         self.num_DRG_deps[-1].setMaximum(2.0)
         self.num_DRG_deps[-1].setObjectName("num_DRG_deps")
         self.label_Red_method_sp_4.append(QtWidgets.QLabel(self.DRG[-1]))
-        self.label_Red_method_sp_4[-1].setGeometry(QtCore.QRect(350, 60, 191, 18))
+        self.label_Red_method_sp_4[-1].setGeometry(QtCore.QRect(350*sz_w, 60*sz_h, 191*sz_w, 18*sz_h))
         self.label_Red_method_sp_4[-1].setObjectName("label_Red_method_sp_4")
         self.num_DRG_pt_num.append(QtWidgets.QDoubleSpinBox(self.DRG[-1]))
-        self.num_DRG_pt_num[-1].setGeometry(QtCore.QRect(550, 50, 61, 32))
+        self.num_DRG_pt_num[-1].setGeometry(QtCore.QRect(550*sz_w, 50*sz_h, 61*sz_w, 32*sz_h))
         self.num_DRG_pt_num[-1].setDecimals(0)
         self.num_DRG_pt_num[-1].setMaximum(500.0)
         self.num_DRG_pt_num[-1].setSingleStep(5.0)
         self.num_DRG_pt_num[-1].setObjectName("num_DRG_pt_num")
         self.groupBox_3.append(QtWidgets.QGroupBox(self.DRG[-1]))
-        self.groupBox_3[-1].setGeometry(QtCore.QRect(40, 130, 261, 301))
+        self.groupBox_3[-1].setGeometry(QtCore.QRect(40*sz_w, 130*sz_h, 261*sz_w, 301*sz_h))
         self.groupBox_3[-1].setAlignment(QtCore.Qt.AlignCenter)
         self.groupBox_3[-1].setObjectName("groupBox_3")
         self.tableWidget_DRG.append(QtWidgets.QTableWidget(self.groupBox_3[-1]))
-        self.tableWidget_DRG[-1].setGeometry(QtCore.QRect(10, 30, 241, 221))
+        self.tableWidget_DRG[-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 241*sz_w, 221*sz_h))
         self.tableWidget_DRG[-1].setObjectName("tableWidget_DRG")
 
         self.num_DRG_eps[-1].setProperty("value", d_DRG_eps)
@@ -1079,7 +1122,7 @@ class Ui_MainWindow(object):
         self.update_error_table()
 
         self.num_DRG_tgt_error.append(QtWidgets.QDoubleSpinBox(self.groupBox_3[-1]))
-        self.num_DRG_tgt_error[-1].setGeometry(QtCore.QRect(40, 260, 61, 32))
+        self.num_DRG_tgt_error[-1].setGeometry(QtCore.QRect(40*sz_w, 260*sz_h, 61*sz_w, 32*sz_h))
         self.num_DRG_tgt_error[-1].setDecimals(0)
         self.num_DRG_tgt_error[-1].setMaximum(100.0)
         self.num_DRG_tgt_error[-1].setSingleStep(5.0)
@@ -1087,15 +1130,15 @@ class Ui_MainWindow(object):
         self.num_DRG_tgt_error[-1].setProperty("value", d_DRG_tgt_error)
 
         self.pB_DRG_apply2all.append(QtWidgets.QPushButton(self.groupBox_3[-1]))
-        self.pB_DRG_apply2all[-1].setGeometry(QtCore.QRect(140, 260, 88, 34))
+        self.pB_DRG_apply2all[-1].setGeometry(QtCore.QRect(140*sz_w, 260*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRG_apply2all[-1].setObjectName("pB_DRG_apply2all")
         self.pB_GA_drg.append(QtWidgets.QPushButton(self.DRG[-1]))
-        self.pB_GA_drg[-1].setGeometry(QtCore.QRect(460, 330, 88, 34))
+        self.pB_GA_drg[-1].setGeometry(QtCore.QRect(460*sz_w, 330*sz_h, 88*sz_w, 34*sz_h))
         self.pB_GA_drg[-1].setObjectName("pB_GA_drg")
         self.pB_GA_drg[-1].clicked.connect(self.GA_clic)
         # inter-species interaction
         self.cB_ISI_drg.append(QtWidgets.QCheckBox(self.DRG[-1]))
-        self.cB_ISI_drg[-1].setGeometry(QtCore.QRect(430, 250, 181, 22))
+        self.cB_ISI_drg[-1].setGeometry(QtCore.QRect(430*sz_w, 250*sz_h, 181*sz_w, 22*sz_h))
         self.cB_ISI_drg[-1].setObjectName("cB_ISI_drg")
 
         self.tablet.addTab(self.DRG[-1], "")
@@ -1125,47 +1168,49 @@ class Ui_MainWindow(object):
         self.cB_ISI_drg[-1].setChecked(d_DRG_ISI)
 
     def SA_clic(self,_option):
+        global sz_w
+        global sz_h
         self.SA.append(QtWidgets.QWidget())
 
         _translate = QtCore.QCoreApplication.translate
 
         self.SA[-1].setObjectName("SA")
         self.frame_4.append(QtWidgets.QFrame(self.SA[-1]))
-        self.frame_4[-1].setGeometry(QtCore.QRect(40, 30, 201, 91))
+        self.frame_4[-1].setGeometry(QtCore.QRect(40*sz_w, 30*sz_h, 201*sz_w, 91*sz_h))
         self.frame_4[-1].setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_4[-1].setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_4[-1].setObjectName("frame_4")
         self.label_SA_espi_2.append(QtWidgets.QLabel(self.frame_4[-1]))
-        self.label_SA_espi_2[-1].setGeometry(QtCore.QRect(10, 20, 131, 18))
+        self.label_SA_espi_2[-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 131*sz_w, 18*sz_h))
         self.label_SA_espi_2[-1].setObjectName("label_SA_espi_2")
         self.label_SA_espi_2[-1].setText(_translate("MainWindow", "Initial epsilon"))
         self.num_SA_eps.append(QtWidgets.QDoubleSpinBox(self.frame_4[-1]))
-        self.num_SA_eps[-1].setGeometry(QtCore.QRect(130, 10, 61, 32))
-        self.num_SA_eps[-1].setDecimals(2)
+        self.num_SA_eps[-1].setGeometry(QtCore.QRect(110*sz_w, 10*sz_h, 81*sz_w, 32*sz_h))
+        self.num_SA_eps[-1].setDecimals(4)
         self.num_SA_eps[-1].setMaximum(10.0)
         self.num_SA_eps[-1].setSingleStep(0.01)
         self.num_SA_eps[-1].setObjectName("num_SA_eps")
         self.label_SA_deps_2.append(QtWidgets.QLabel(self.frame_4[-1]))
-        self.label_SA_deps_2[-1].setGeometry(QtCore.QRect(10, 60, 131, 18))
+        self.label_SA_deps_2[-1].setGeometry(QtCore.QRect(10*sz_w, 60*sz_h, 131*sz_w, 18*sz_h))
         self.label_SA_deps_2[-1].setObjectName("label_SA_deps_2")
         self.label_SA_deps_2[-1].setText(_translate("MainWindow", "Delta epsilon"))
         self.num_SA_deps.append(QtWidgets.QDoubleSpinBox(self.frame_4[-1]))
-        self.num_SA_deps[-1].setGeometry(QtCore.QRect(130, 50, 61, 32))
-        self.num_SA_deps[-1].setDecimals(2)
+        self.num_SA_deps[-1].setGeometry(QtCore.QRect(110*sz_w, 50*sz_h, 81*sz_w, 32*sz_h))
+        self.num_SA_deps[-1].setDecimals(4)
         self.num_SA_deps[-1].setMaximum(2.0)
         self.num_SA_deps[-1].setObjectName("num_SA_deps")
         self.label_SA.append(QtWidgets.QLabel(self.SA[-1]))
-        self.label_SA[-1].setGeometry(QtCore.QRect(350, 60, 191, 18))
+        self.label_SA[-1].setGeometry(QtCore.QRect(350*sz_w, 60*sz_h, 191*sz_w, 18*sz_h))
         self.label_SA[-1].setObjectName("label_SA")
         self.label_SA[-1].setText(_translate("MainWindow", "SA calculation point number"))
         self.num_SA_pt_num.append(QtWidgets.QDoubleSpinBox(self.SA[-1]))
-        self.num_SA_pt_num[-1].setGeometry(QtCore.QRect(550, 50, 61, 32))
+        self.num_SA_pt_num[-1].setGeometry(QtCore.QRect(550*sz_w, 50*sz_h, 61*sz_w, 32*sz_h))
         self.num_SA_pt_num[-1].setDecimals(0)
         self.num_SA_pt_num[-1].setMaximum(500.0)
         self.num_SA_pt_num[-1].setSingleStep(5.0)
         self.num_SA_pt_num[-1].setObjectName("num_SA_pt_num")
         self.pB_remove_SA.append(QtWidgets.QPushButton(self.SA[-1]))
-        self.pB_remove_SA[-1].setGeometry(QtCore.QRect(670, 20, 80, 70))
+        self.pB_remove_SA[-1].setGeometry(QtCore.QRect(670*sz_w, 20*sz_h, 80*sz_w, 70*sz_h))
         self.pB_remove_SA[-1].setObjectName("pB_remove_SA")
         self.pB_remove_SA[-1].setText(_translate("MainWindow", "Remove"))
 
@@ -1174,66 +1219,66 @@ class Ui_MainWindow(object):
         self.num_SA_pt_num[-1].setProperty("value", d_SA_pt_num)
 
         self.Gb_SA2.append(QtWidgets.QGroupBox(self.SA[-1]))
-        self.Gb_SA2[-1].setGeometry(QtCore.QRect(40, 130, 241, 301))
+        self.Gb_SA2[-1].setGeometry(QtCore.QRect(40*sz_w, 130*sz_h, 241*sz_w, 301*sz_h))
         self.Gb_SA2[-1].setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_SA2[-1].setObjectName("Gb_SA2")
         self.Gb_SA2[-1].setTitle(_translate("MainWindow", "Errors"))
         self.tableWidget_SA.append(QtWidgets.QTableWidget(self.Gb_SA2[-1]))
-        self.tableWidget_SA[-1].setGeometry(QtCore.QRect(10, 30, 241, 221))
+        self.tableWidget_SA[-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 241*sz_w, 221*sz_h))
         self.tableWidget_SA[-1].setObjectName("tableWidget_SA")
         self.update_error_table()
         self.num_SA_tgt_error.append(QtWidgets.QDoubleSpinBox(self.Gb_SA2[-1]))
-        self.num_SA_tgt_error[-1].setGeometry(QtCore.QRect(40, 260, 61, 32))
+        self.num_SA_tgt_error[-1].setGeometry(QtCore.QRect(40*sz_w, 260*sz_h, 61*sz_w, 32*sz_h))
         self.num_SA_tgt_error[-1].setDecimals(0)
         self.num_SA_tgt_error[-1].setMaximum(100.0)
         self.num_SA_tgt_error[-1].setSingleStep(5.0)
         self.num_SA_tgt_error[-1].setObjectName("num_SA_tgt_error")
         self.pB_SA_apply2all.append(QtWidgets.QPushButton(self.Gb_SA2[-1]))
-        self.pB_SA_apply2all[-1].setGeometry(QtCore.QRect(140, 260, 88, 34))
+        self.pB_SA_apply2all[-1].setGeometry(QtCore.QRect(140*sz_w, 260*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SA_apply2all[-1].setObjectName("pB_SA_apply2all")
         self.pB_SA_apply2all[-1].setText(_translate("MainWindow", "Apply to all"))
 
         self.num_SA_tgt_error[-1].setProperty("value", d_SA_tgt_error)
 
         self.Gb_SA3.append(QtWidgets.QGroupBox(self.SA[-1]))
-        self.Gb_SA3[-1].setGeometry(QtCore.QRect(310, 130, 431, 171))
+        self.Gb_SA3[-1].setGeometry(QtCore.QRect(310*sz_w, 130*sz_h, 431*sz_w, 171*sz_h))
         self.Gb_SA3[-1].setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_SA3[-1].setObjectName("Gb_SA3")
         self.Gb_SA3[-1].setTitle(_translate("MainWindow", "Sensitivity tolerances"))
 
         self.rB_SA_tol_1.append(QtWidgets.QRadioButton(self.Gb_SA3[-1]))
-        self.rB_SA_tol_1[-1].setGeometry(QtCore.QRect(20, 70, 231, 18))
+        self.rB_SA_tol_1[-1].setGeometry(QtCore.QRect(20*sz_w, 70*sz_h, 231*sz_w, 18*sz_h))
         self.rB_SA_tol_1[-1].setObjectName("rB_SA_tol_1")
         self.rB_SA_tol_1[-1].setText(_translate("MainWindow", "same as simulation"))
         self.rB_SA_tol_2.append(QtWidgets.QRadioButton(self.Gb_SA3[-1]))
-        self.rB_SA_tol_2[-1].setGeometry(QtCore.QRect(20, 110, 231, 18))
+        self.rB_SA_tol_2[-1].setGeometry(QtCore.QRect(20*sz_w, 110*sz_h, 231*sz_w, 18*sz_h))
         self.rB_SA_tol_2[-1].setObjectName("rB_SA_tol_2")
         self.rB_SA_tol_2[-1].setText(_translate("MainWindow", "define specific tolerances"))
 
         self.label_Red_method_sp_8.append(QtWidgets.QLabel(self.Gb_SA3[-1]))
-        self.label_Red_method_sp_8[-1].setGeometry(QtCore.QRect(2300, 70, 131, 18))
+        self.label_Red_method_sp_8[-1].setGeometry(QtCore.QRect(2300*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
         self.label_Red_method_sp_8[-1].setObjectName("label_Red_method_sp_8")
         self.label_Red_method_sp_8[-1].setText(_translate("MainWindow", "relative tolerance"))
         self.num_SA_tol_1.append(QtWidgets.QPlainTextEdit(self.Gb_SA3[-1]))
-        self.num_SA_tol_1[-1].setGeometry(QtCore.QRect(3500, 60, 61, 32))
+        self.num_SA_tol_1[-1].setGeometry(QtCore.QRect(3500*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
         self.num_SA_tol_1[-1].setObjectName("num_SA_tol_1")
         self.label_Red_method_sp_9.append(QtWidgets.QLabel(self.Gb_SA3[-1]))
-        self.label_Red_method_sp_9[-1].setGeometry(QtCore.QRect(2300, 110, 131, 18))
+        self.label_Red_method_sp_9[-1].setGeometry(QtCore.QRect(2300*sz_w, 110*sz_h, 131*sz_w, 18*sz_h))
         self.label_Red_method_sp_9[-1].setObjectName("label_Red_method_sp_9")
         self.label_Red_method_sp_9[-1].setText(_translate("MainWindow", "absolute tolerance"))
         self.num_SA_tol_2.append(QtWidgets.QPlainTextEdit(self.Gb_SA3[-1]))
-        self.num_SA_tol_2[-1].setGeometry(QtCore.QRect(3500, 100, 61, 32))
+        self.num_SA_tol_2[-1].setGeometry(QtCore.QRect(3500*sz_w, 100*sz_h, 61*sz_w, 32*sz_h))
         self.num_SA_tol_2[-1].setObjectName("num_SA_tol_2")
 
         self.num_SA_tol_1[-1].setPlainText(_translate("MainWindow", d_SA_tol_1))
         self.num_SA_tol_2[-1].setPlainText(_translate("MainWindow", d_SA_tol_2))
 
         self.cB_ISI_sa.append(QtWidgets.QCheckBox(self.SA[-1]))
-        self.cB_ISI_sa[-1].setGeometry(QtCore.QRect(430, 330, 181, 22))
+        self.cB_ISI_sa[-1].setGeometry(QtCore.QRect(430*sz_w, 330*sz_h, 181*sz_w, 22*sz_h))
         self.cB_ISI_sa[-1].setObjectName("cB_ISI_sa")
         self.cB_ISI_sa[-1].setText(_translate("MainWindow", "Inter-species interactions"))
         self.pB_GA_sa.append(QtWidgets.QPushButton(self.SA[-1]))
-        self.pB_GA_sa[-1].setGeometry(QtCore.QRect(460, 380, 88, 34))
+        self.pB_GA_sa[-1].setGeometry(QtCore.QRect(460*sz_w, 380*sz_h, 88*sz_w, 34*sz_h))
         self.pB_GA_sa[-1].setObjectName("pB_GA_sa")
         self.pB_GA_sa[-1].clicked.connect(self.GA_clic)
         self.pB_GA_sa[-1].setText(_translate("MainWindow", "Optimization"))
@@ -1260,23 +1305,27 @@ class Ui_MainWindow(object):
         self.cB_ISI_sa[-1].setChecked(d_SA_ISI)
 
     def SA_tol_appear(self,option):
+        global sz_w
+        global sz_h
         idx = self.tablet.currentIndex()
         idx_op=0
         for i in range(idx-2):
             if 'SA' in self.list_operator[i] or 'DSRG' in self.list_operator[i]:
                 idx_op+=1
         if option == 'in':
-            self.label_Red_method_sp_8[idx_op].setGeometry(QtCore.QRect(230, 70, 131, 18))
-            self.num_SA_tol_1[idx_op].setGeometry(QtCore.QRect(350, 60, 61, 32))
-            self.label_Red_method_sp_9[idx_op].setGeometry(QtCore.QRect(230, 110, 131, 18))
-            self.num_SA_tol_2[idx_op].setGeometry(QtCore.QRect(350, 100, 61, 32))
+            self.label_Red_method_sp_8[idx_op].setGeometry(QtCore.QRect(230*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
+            self.num_SA_tol_1[idx_op].setGeometry(QtCore.QRect(350*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
+            self.label_Red_method_sp_9[idx_op].setGeometry(QtCore.QRect(230*sz_w, 110*sz_h, 131*sz_w, 18*sz_h))
+            self.num_SA_tol_2[idx_op].setGeometry(QtCore.QRect(350*sz_w, 100*sz_h, 61*sz_w, 32*sz_h))
         else:
-            self.label_Red_method_sp_8[idx_op].setGeometry(QtCore.QRect(2300, 70, 131, 18))
-            self.num_SA_tol_1[idx_op].setGeometry(QtCore.QRect(3500, 60, 61, 32))
-            self.label_Red_method_sp_9[idx_op].setGeometry(QtCore.QRect(2300, 110, 131, 18))
-            self.num_SA_tol_2[idx_op].setGeometry(QtCore.QRect(3500, 100, 61, 32))
+            self.label_Red_method_sp_8[idx_op].setGeometry(QtCore.QRect(2300*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
+            self.num_SA_tol_1[idx_op].setGeometry(QtCore.QRect(3500*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
+            self.label_Red_method_sp_9[idx_op].setGeometry(QtCore.QRect(2300*sz_w, 110*sz_h, 131*sz_w, 18*sz_h))
+            self.num_SA_tol_2[idx_op].setGeometry(QtCore.QRect(3500*sz_w, 100*sz_h, 61*sz_w, 32*sz_h))
 
     def update_error_table(self):
+        global sz_w
+        global sz_h
         tspc = []
         for tg in range(self.list_target.count()):
             tspc.append(self.list_target.item(tg).text())
@@ -1355,6 +1404,8 @@ class Ui_MainWindow(object):
                     item.setText(_translate("MainWindow", txt[r]))
 
     def change_error_table(self):
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
         idx = self.tablet.currentIndex()
         operator = self.list_operator[idx-2]
@@ -1385,6 +1436,8 @@ class Ui_MainWindow(object):
                 item.setText(_translate("MainWindow", txt))
 
     def mdot_incr_calc(self,num_case):
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
         try:
@@ -1417,12 +1470,18 @@ class Ui_MainWindow(object):
         self.df_mdot3_2[num_case].setText(_translate("MainWindow", str(incr_3)))
 
     def GA_clic(self):
+        global sz_w
+        global sz_h
         idx = self.tablet.currentIndex()
         add_GA = True
         if condition_tab_removed:   _idx = idx + 1
         else:                       _idx = idx
         if idx == 0: idx = 1
-        
+
+        if not self.reference_mechanism:
+            add_GA = False
+            print('Warning: Select a reference mechanism first')
+
         if len(self.list_operator)>=max(1,_idx):
             if self.list_operator[_idx-1]=='GA':
                 add_GA = False
@@ -1437,24 +1496,24 @@ class Ui_MainWindow(object):
 
             # gen / ind number
             self.AG_group_gen_ind.append(QtWidgets.QFrame(self.GA[-1]))
-            self.AG_group_gen_ind[-1].setGeometry(QtCore.QRect(20, 20, 290, 91))
+            self.AG_group_gen_ind[-1].setGeometry(QtCore.QRect(20*sz_w, 20*sz_h, 290*sz_w, 91*sz_h))
             self.AG_group_gen_ind[-1].setFrameShape(QtWidgets.QFrame.StyledPanel)
             self.AG_group_gen_ind[-1].setFrameShadow(QtWidgets.QFrame.Raised)
             self.AG_group_gen_ind[-1].setObjectName("AG_group_gen_ind")
             self.label_SA_espi_3.append(QtWidgets.QLabel(self.AG_group_gen_ind[-1]))
-            self.label_SA_espi_3[-1].setGeometry(QtCore.QRect(20, 20, 131, 18))
+            self.label_SA_espi_3[-1].setGeometry(QtCore.QRect(20*sz_w, 20*sz_h, 131*sz_w, 18*sz_h))
             self.label_SA_espi_3[-1].setObjectName("label_SA_espi_3")
             self.num_GA_gen.append(QtWidgets.QDoubleSpinBox(self.AG_group_gen_ind[-1]))
-            self.num_GA_gen[-1].setGeometry(QtCore.QRect(180, 10, 61, 32))
+            self.num_GA_gen[-1].setGeometry(QtCore.QRect(180*sz_w, 10*sz_h, 61*sz_w, 32*sz_h))
             self.num_GA_gen[-1].setDecimals(0)
             self.num_GA_gen[-1].setMaximum(500.0)
             self.num_GA_gen[-1].setSingleStep(5.0)
             self.num_GA_gen[-1].setObjectName("num_GA_gen")
             self.label_SA_deps_3.append(QtWidgets.QLabel(self.AG_group_gen_ind[-1]))
-            self.label_SA_deps_3[-1].setGeometry(QtCore.QRect(20, 60, 131, 18))
+            self.label_SA_deps_3[-1].setGeometry(QtCore.QRect(20*sz_w, 60*sz_h, 131*sz_w, 18*sz_h))
             self.label_SA_deps_3[-1].setObjectName("label_SA_deps_3")
             self.num_GA_ind.append(QtWidgets.QDoubleSpinBox(self.AG_group_gen_ind[-1]))
-            self.num_GA_ind[-1].setGeometry(QtCore.QRect(180, 50, 61, 32))
+            self.num_GA_ind[-1].setGeometry(QtCore.QRect(180*sz_w, 50*sz_h, 61*sz_w, 32*sz_h))
             self.num_GA_ind[-1].setDecimals(0)
             self.num_GA_ind[-1].setMaximum(500.0)
             self.num_GA_ind[-1].setSingleStep(5.0)
@@ -1468,25 +1527,25 @@ class Ui_MainWindow(object):
             # -------------------
             # Sub mech Selection
             self.label_scroll_subM.append(QtWidgets.QLabel(self.GA[-1]))
-            self.label_scroll_subM[-1].setGeometry(QtCore.QRect(80, 120, 200, 18))
+            self.label_scroll_subM[-1].setGeometry(QtCore.QRect(80*sz_w, 120*sz_h, 200*sz_w, 18*sz_h))
             self.label_scroll_subM[-1].setObjectName("label_scroll_subM")
             self.label_scroll_subM[-1].setText(_translate("MainWindow", "Sub-mechanism selection"))
 
 
             self.scrollArea_subM.append(QtWidgets.QScrollArea(self.GA[-1]))
-            self.scrollArea_subM[-1].setGeometry(QtCore.QRect(20,140, 290, 101))
+            self.scrollArea_subM[-1].setGeometry(QtCore.QRect(20*sz_w,140*sz_h, 290*sz_w, 101*sz_h))
             self.scrollArea_subM[-1].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
             self.scrollArea_subM[-1].setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
             self.scrollArea_subM[-1].setWidgetResizable(False)
             self.scrollArea_subM[-1].setObjectName("scrollAreasubM")
             self.scrollArea_subM_contents.append(QtWidgets.QWidget())
-            self.scrollArea_subM_contents[-1].setGeometry(QtCore.QRect(0, 0, 265, 101))
+            self.scrollArea_subM_contents[-1].setGeometry(QtCore.QRect(0, 0, 265*sz_w, 101*sz_h))
             self.scrollArea_subM_contents[-1].setObjectName("scrollArea_subM_contents")
             self.scrollArea_subM[-1].setWidget(self.scrollArea_subM_contents[-1])
 
     #        self.scrollArea_subM.setWidget(self.GA_groupsubM)
             self.GA_label_subM.append(QtWidgets.QLabel(self.scrollArea_subM_contents[-1]))
-            self.GA_label_subM[-1].setGeometry(QtCore.QRect(10, 65, 191, 18))
+            self.GA_label_subM[-1].setGeometry(QtCore.QRect(10*sz_w, 65*sz_h, 191*sz_w, 18*sz_h))
             self.GA_label_subM[-1].setObjectName("label_Red_method_sp_5")
 
 
@@ -1494,7 +1553,7 @@ class Ui_MainWindow(object):
 
             # column 1: H2 CO
             self.cB_sub_H.append(QtWidgets.QCheckBox(self.scrollArea_subM_contents[-1]))
-            self.cB_sub_H[-1].setGeometry(QtCore.QRect(10, 10, 50, 22))
+            self.cB_sub_H[-1].setGeometry(QtCore.QRect(10*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
             self.cB_sub_H[-1].setObjectName("cB_sub_H")
             self.cB_sub_H[-1].setText(_translate("MainWindow", "H2"))
             self.cB_sub_H[-1].setChecked(True)
@@ -1503,11 +1562,11 @@ class Ui_MainWindow(object):
             self.cB_sub_CO[-1].setObjectName("cB_sub_CO")
             self.cB_sub_CO[-1].setText(_translate("MainWindow", "CO"))
             if True in self.mech_data.react.subm_CO:
-                self.cB_sub_CO[-1].setGeometry(QtCore.QRect(10, 35, 50, 22))
+                self.cB_sub_CO[-1].setGeometry(QtCore.QRect(10*sz_w, 35*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_CO[-1].setChecked(True)
 
             else:
-                self.cB_sub_CO[-1].setGeometry(QtCore.QRect(-100, 30, 50, 22))
+                self.cB_sub_CO[-1].setGeometry(QtCore.QRect(-100*sz_w, 30*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_CO[-1].setChecked(True)
 
 
@@ -1521,11 +1580,11 @@ class Ui_MainWindow(object):
             self.cB_sub_N[-1].setObjectName("cB_sub_N")
             self.cB_sub_N[-1].setText(_translate("MainWindow", "N"))
             if max(self.mech_data.react.subm_N)>0:
-                self.cB_sub_N[-1].setGeometry(QtCore.QRect(80, 10, 50, 22))
+                self.cB_sub_N[-1].setGeometry(QtCore.QRect(80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_N[-1].setChecked(True)
                 mv_y +=2
             else:
-                self.cB_sub_N[-1].setGeometry(QtCore.QRect(-80, 10, 50, 22))
+                self.cB_sub_N[-1].setGeometry(QtCore.QRect(-80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_N[-1].setChecked(False)
 
             # S
@@ -1533,11 +1592,11 @@ class Ui_MainWindow(object):
             self.cB_sub_S[-1].setObjectName("cB_sub_S")
             self.cB_sub_S[-1].setText(_translate("MainWindow", "S"))
             if max(self.mech_data.react.subm_S)>0:
-                self.cB_sub_S[-1].setGeometry(QtCore.QRect(80, 10+mv_y, 50, 22))
+                self.cB_sub_S[-1].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_S[-1].setChecked(True)
                 mv_y +=25
             else :
-                self.cB_sub_S[-1].setGeometry(QtCore.QRect(-80, 10+mv_y, 50, 22))
+                self.cB_sub_S[-1].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_S[-1].setChecked(False)
 
             # Si
@@ -1545,10 +1604,10 @@ class Ui_MainWindow(object):
             self.cB_sub_Si[-1].setObjectName("cB_sub_Si")
             self.cB_sub_Si[-1].setText(_translate("MainWindow", "Si"))
             if max(self.mech_data.react.subm_Si)>0:
-                self.cB_sub_Si[-1].setGeometry(QtCore.QRect(80, 10+mv_y, 50, 22))
+                self.cB_sub_Si[-1].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_Si[-1].setChecked(True)
             else:
-                self.cB_sub_Si[-1].setGeometry(QtCore.QRect(-80, 10+mv_y, 50, 22))
+                self.cB_sub_Si[-1].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_Si[-1].setChecked(False)
 
 
@@ -1557,49 +1616,49 @@ class Ui_MainWindow(object):
             max_subm_C = max(self.mech_data.react.subm_C)
             for sC in range(max_subm_C):
                 self.cB_sub_C[-1].append(QtWidgets.QCheckBox(self.scrollArea_subM_contents[-1]))
-                self.cB_sub_C[-1][-1].setGeometry(QtCore.QRect(150, 10+25*sC, 50, 22))
+                self.cB_sub_C[-1][-1].setGeometry(QtCore.QRect(150*sz_w, (10+25*sC)*sz_h, 50*sz_w, 22*sz_h))
                 self.cB_sub_C[-1][-1].setObjectName("cB_sub_C"+str(sC))
                 self.cB_sub_C[-1][-1].setText(_translate("MainWindow", "C"+str(sC+1)))
                 self.cB_sub_C[-1][-1].setChecked(True)
             if max_subm_C>3:
                 self.scrollArea_subM[-1].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-                self.scrollArea_subM_contents[-1].setGeometry(QtCore.QRect(0, 0, 250, (max_subm_C+1)*28))#(sC+1)*28))
+                self.scrollArea_subM_contents[-1].setGeometry(QtCore.QRect(0, 0, 250*sz_w, (max_subm_C+1)*28*sz_h))#(sC+1)*28))
 
             # -------------------
             # Arrhenius
             self.AG_group_Arrh.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.AG_group_Arrh[-1].setGeometry(QtCore.QRect(20, 250, 290, 91))
+            self.AG_group_Arrh[-1].setGeometry(QtCore.QRect(20*sz_w, 250*sz_h, 290*sz_w, 91*sz_h))
             self.AG_group_Arrh[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.AG_group_Arrh[-1].setObjectName("AG_group_Arrh")
             self.AG_group_Arrh[-1].setTitle(_translate("MainWindow", "Arrhenius parameters maximal variation (%)"))
             self.num_GA_A.append(QtWidgets.QDoubleSpinBox(self.AG_group_Arrh[-1]))
-            self.num_GA_A[-1].setGeometry(QtCore.QRect(30, 40, 50, 32))
+            self.num_GA_A[-1].setGeometry(QtCore.QRect(30*sz_w, 40*sz_h, 50*sz_w, 32*sz_h))
             self.num_GA_A[-1].setDecimals(0)
             self.num_GA_A[-1].setMaximum(500.0)
             self.num_GA_A[-1].setSingleStep(5.0)
             self.num_GA_A[-1].setObjectName("num_GA_A")
             self.num_GA_n.append(QtWidgets.QDoubleSpinBox(self.AG_group_Arrh[-1]))
-            self.num_GA_n[-1].setGeometry(QtCore.QRect(115, 40, 50, 32))
+            self.num_GA_n[-1].setGeometry(QtCore.QRect(115*sz_w, 40*sz_h, 50*sz_w, 32*sz_h))
             self.num_GA_n[-1].setDecimals(0)
             self.num_GA_n[-1].setMaximum(500.0)
             self.num_GA_n[-1].setSingleStep(5.0)
             self.num_GA_n[-1].setObjectName("num_GA_n")
             self.num_GA_Ea.append(QtWidgets.QDoubleSpinBox(self.AG_group_Arrh[-1]))
-            self.num_GA_Ea[-1].setGeometry(QtCore.QRect(205, 40, 50, 32))
+            self.num_GA_Ea[-1].setGeometry(QtCore.QRect(205*sz_w, 40*sz_h, 50*sz_w, 32*sz_h))
             self.num_GA_Ea[-1].setDecimals(0)
             self.num_GA_Ea[-1].setMaximum(500.0)
             self.num_GA_Ea[-1].setSingleStep(5.0)
             self.num_GA_Ea[-1].setObjectName("num_GA_Ea")
             self.label_SA_Arrh_1.append(QtWidgets.QLabel(self.AG_group_Arrh[-1]))
-            self.label_SA_Arrh_1[-1].setGeometry(QtCore.QRect(15, 50, 21, 18))
+            self.label_SA_Arrh_1[-1].setGeometry(QtCore.QRect(15*sz_w, 50*sz_h, 21*sz_w, 18*sz_h))
             self.label_SA_Arrh_1[-1].setObjectName("label_SA_Arrh_1")
             self.label_SA_Arrh_1[-1].setText(_translate("MainWindow", "A"))
             self.label_SA_Arrh_2.append(QtWidgets.QLabel(self.AG_group_Arrh[-1]))
-            self.label_SA_Arrh_2[-1].setGeometry(QtCore.QRect(100, 50, 21, 18))
+            self.label_SA_Arrh_2[-1].setGeometry(QtCore.QRect(100*sz_w, 50*sz_h, 21*sz_w, 18*sz_h))
             self.label_SA_Arrh_2[-1].setObjectName("label_SA_Arrh_2")
             self.label_SA_Arrh_2[-1].setText(_translate("MainWindow", "n"))
             self.label_SA_Arrh_3.append(QtWidgets.QLabel(self.AG_group_Arrh[-1]))
-            self.label_SA_Arrh_3[-1].setGeometry(QtCore.QRect(180, 50, 21, 18))
+            self.label_SA_Arrh_3[-1].setGeometry(QtCore.QRect(180*sz_w, 50*sz_h, 21*sz_w, 18*sz_h))
             self.label_SA_Arrh_3[-1].setObjectName("label_SA_Arrh_3")
             self.label_SA_Arrh_3[-1].setText(_translate("MainWindow", "Ea"))
 
@@ -1611,17 +1670,17 @@ class Ui_MainWindow(object):
             # -------------------
             # Optimization on method
             self.GA_group5.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.GA_group5[-1].setGeometry(QtCore.QRect(20, 355, 290, 101))
+            self.GA_group5[-1].setGeometry(QtCore.QRect(20*sz_w, 355*sz_h, 290*sz_w, 101*sz_h))
             self.GA_group5[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_group5[-1].setObjectName("GA_group5")
             self.cB_GA_meth.append(QtWidgets.QCheckBox(self.GA_group5[-1]))
-            self.cB_GA_meth[-1].setGeometry(QtCore.QRect(10, 30, 231, 22))
+            self.cB_GA_meth[-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
             self.cB_GA_meth[-1].setObjectName("checkBox_2")
             self.GA_label_51.append(QtWidgets.QLabel(self.GA_group5[-1]))
-            self.GA_label_51[-1].setGeometry(QtCore.QRect(10, 65, 200, 18))
+            self.GA_label_51[-1].setGeometry(QtCore.QRect(10*sz_w, 65*sz_h, 200*sz_w, 18*sz_h))
             self.GA_label_51[-1].setObjectName("label_Red_method_sp_5")
             self.num_GA_meth_fract.append(QtWidgets.QDoubleSpinBox(self.GA_group5[-1]))
-            self.num_GA_meth_fract[-1].setGeometry(QtCore.QRect(215, 60, 61, 32))
+            self.num_GA_meth_fract[-1].setGeometry(QtCore.QRect(215*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
             self.num_GA_meth_fract[-1].setDecimals(0)
             self.num_GA_meth_fract[-1].setMaximum(100.0)
             self.num_GA_meth_fract[-1].setSingleStep(5.0)
@@ -1631,12 +1690,12 @@ class Ui_MainWindow(object):
             # -------------------
             # Selection
             self.GA_Box_Selection.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.GA_Box_Selection[-1].setGeometry(QtCore.QRect(330, 20, 321, 100))
+            self.GA_Box_Selection[-1].setGeometry(QtCore.QRect(330*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
             self.GA_Box_Selection[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_Selection[-1].setObjectName("GA_Box_Selection")
             self.GA_Box_Selection[-1].setTitle(_translate("MainWindow", "Selection operator"))
             self.Box_GA_Selection.append(QtWidgets.QComboBox(self.GA_Box_Selection[-1]))
-            self.Box_GA_Selection[-1].setGeometry(QtCore.QRect(25, 30, 221, 25))
+            self.Box_GA_Selection[-1].setGeometry(QtCore.QRect(25*sz_w, 30*sz_h, 221*sz_w, 25*sz_h))
             self.Box_GA_Selection[-1].setObjectName("Box_GA_Selection")
             self.Box_GA_Selection[-1].addItem("")
             self.Box_GA_Selection[-1].addItem("")
@@ -1648,10 +1707,10 @@ class Ui_MainWindow(object):
             self.Box_GA_Selection[-1].setItemText(3, _translate("MainWindow", "Elitism"))
 #            self.Box_GA_Selection[-1].setItemText(4, _translate("MainWindow", "Tournament"))
             self.txt_GA_sel_opt.append(QtWidgets.QPlainTextEdit(self.GA_Box_Selection[-1]))
-            self.txt_GA_sel_opt[-1].setGeometry(QtCore.QRect(145, 60, 101, 31))
+            self.txt_GA_sel_opt[-1].setGeometry(QtCore.QRect(145*sz_w, 60*sz_h, 101*sz_w, 31*sz_h))
             self.txt_GA_sel_opt[-1].setObjectName("txt_GA_sel_opt")
             self.label_GA_sel_opt.append(QtWidgets.QLabel(self.GA_Box_Selection[-1]))
-            self.label_GA_sel_opt[-1].setGeometry(QtCore.QRect(25, 70, 131, 18))
+            self.label_GA_sel_opt[-1].setGeometry(QtCore.QRect(25*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
             self.label_GA_sel_opt[-1].setObjectName("label_GA_sel_opt")
             self.label_GA_sel_opt[-1].setText(_translate("MainWindow", "Selection option"))
 
@@ -1660,89 +1719,89 @@ class Ui_MainWindow(object):
             # -------------------
             # Xover
             self.GA_Box_Xover.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.GA_Box_Xover[-1].setGeometry(QtCore.QRect(330, 130, 420, 190)) #321
+            self.GA_Box_Xover[-1].setGeometry(QtCore.QRect(330*sz_w, 130*sz_h, 420*sz_w, 190*sz_h)) #321
             self.GA_Box_Xover[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_Xover[-1].setObjectName("GA_Box_Xover")
             self.GA_Box_Xover[-1].setTitle(_translate("MainWindow", "Cross-over operator"))
 
             self.cB_Xover_op_1.append(QtWidgets.QCheckBox(self.GA_Box_Xover[-1]))
-            self.cB_Xover_op_1[-1].setGeometry(QtCore.QRect(20, 60, 131, 22))
+            self.cB_Xover_op_1[-1].setGeometry(QtCore.QRect(20*sz_w, 60*sz_h, 131*sz_w, 22*sz_h))
             self.cB_Xover_op_1[-1].setObjectName("cB_Xover_op_1")
             self.cB_Xover_op_1[-1].setText(_translate("MainWindow", "Simple Xover"))
             self.cB_Xover_op_2.append(QtWidgets.QCheckBox(self.GA_Box_Xover[-1]))
-            self.cB_Xover_op_2[-1].setGeometry(QtCore.QRect(20, 90, 121, 22))
+            self.cB_Xover_op_2[-1].setGeometry(QtCore.QRect(20*sz_w, 90*sz_h, 121*sz_w, 22*sz_h))
             self.cB_Xover_op_2[-1].setObjectName("cB_Xover_op_2")
             self.cB_Xover_op_2[-1].setText(_translate("MainWindow", "Multiple Xover"))
             self.cB_Xover_op_3.append(QtWidgets.QCheckBox(self.GA_Box_Xover[-1]))
-            self.cB_Xover_op_3[-1].setGeometry(QtCore.QRect(20, 120, 121, 22))
+            self.cB_Xover_op_3[-1].setGeometry(QtCore.QRect(20*sz_w, 120*sz_h, 121*sz_w, 22*sz_h))
             self.cB_Xover_op_3[-1].setObjectName("cB_Xover_op_3")
             self.cB_Xover_op_3[-1].setText(_translate("MainWindow", "Arith Xover"))
             self.cB_Xover_op_4.append(QtWidgets.QCheckBox(self.GA_Box_Xover[-1]))
-            self.cB_Xover_op_4[-1].setGeometry(QtCore.QRect(20, 150, 151, 22))
+            self.cB_Xover_op_4[-1].setGeometry(QtCore.QRect(20*sz_w, 150*sz_h, 151*sz_w, 22*sz_h))
             self.cB_Xover_op_4[-1].setObjectName("cB_Xover_op_4")
             self.cB_Xover_op_4[-1].setText(_translate("MainWindow", "Heuristic Xover"))
             self.txt_GA_Xover_int_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_int_1[-1].setGeometry(QtCore.QRect(220, 50, 71, 31))
+            self.txt_GA_Xover_int_1[-1].setGeometry(QtCore.QRect(220*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_int_1[-1].setObjectName("txt_GA_Xover_int_1")
             self.txt_GA_Xover_int_1[-1].setPlainText(_translate("MainWindow", d_GA_Xover_int_1))
             self.txt_GA_Xover_int_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_int_2[-1].setGeometry(QtCore.QRect(220, 80, 71, 31))
+            self.txt_GA_Xover_int_2[-1].setGeometry(QtCore.QRect(220*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_int_2[-1].setObjectName("txt_GA_Xover_int_2")
             self.txt_GA_Xover_int_2[-1].setPlainText(_translate("MainWindow", d_GA_Xover_int_2))
             self.txt_GA_Xover_int_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_int_3[-1].setGeometry(QtCore.QRect(220, 110, 71, 31))
+            self.txt_GA_Xover_int_3[-1].setGeometry(QtCore.QRect(220*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_int_3[-1].setObjectName("txt_GA_Xover_int_3")
             self.txt_GA_Xover_int_3[-1].setPlainText(_translate("MainWindow", d_GA_Xover_int_3))
             self.txt_GA_Xover_int_4.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_int_4[-1].setGeometry(QtCore.QRect(220, 140, 71, 31))
+            self.txt_GA_Xover_int_4[-1].setGeometry(QtCore.QRect(220*sz_w, 140*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_int_4[-1].setObjectName("txt_GA_Xover_int_4")
             self.txt_GA_Xover_int_4[-1].setPlainText(_translate("MainWindow", d_GA_Xover_int_4))
             self.txt_GA_Xover_opt_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_1[-1].setGeometry(QtCore.QRect(310, 50, 71, 31))
+            self.txt_GA_Xover_opt_1[-1].setGeometry(QtCore.QRect(310*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_1[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_1))
             self.txt_GA_Xover_opt_1[-1].setObjectName("txt_GA_Xover_opt_1")
             self.txt_GA_Xover_opt_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_2[-1].setGeometry(QtCore.QRect(310, 80, 71, 31))
+            self.txt_GA_Xover_opt_2[-1].setGeometry(QtCore.QRect(310*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_2[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_2))
             self.txt_GA_Xover_opt_2[-1].setObjectName("txt_GA_Xover_opt_2")
             self.txt_GA_Xover_opt_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_3[-1].setGeometry(QtCore.QRect(310, 110, 71, 31))
+            self.txt_GA_Xover_opt_3[-1].setGeometry(QtCore.QRect(310*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_3[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_3))
             self.txt_GA_Xover_opt_3[-1].setObjectName("txt_GA_Xover_opt_3")
             self.txt_GA_Xover_opt_4.append(QtWidgets.QPlainTextEdit(self.GA_Box_Xover[-1]))
-            self.txt_GA_Xover_opt_4[-1].setGeometry(QtCore.QRect(310, 140, 71, 31))
+            self.txt_GA_Xover_opt_4[-1].setGeometry(QtCore.QRect(310*sz_w, 140*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_4[-1].setPlainText(_translate("MainWindow", d_GA_Xover_opt_4))
             self.txt_GA_Xover_opt_4[-1].setObjectName("txt_GA_Xover_opt_4")
             self.label_GA_Xover_int.append(QtWidgets.QLabel(self.GA_Box_Xover[-1]))
-            self.label_GA_Xover_int[-1].setGeometry(QtCore.QRect(220, 30, 81, 18))
+            self.label_GA_Xover_int[-1].setGeometry(QtCore.QRect(220*sz_w, 30*sz_h, 81*sz_w, 18*sz_h))
             self.label_GA_Xover_int[-1].setObjectName("label_GA_Xover_int")
             self.label_GA_Xover_int[-1].setText(_translate("MainWindow", "Intensity(%)"))
             self.label_GA_Xover_opt.append(QtWidgets.QLabel(self.GA_Box_Xover[-1]))
-            self.label_GA_Xover_opt[-1].setGeometry(QtCore.QRect(320, 30, 71, 18))
+            self.label_GA_Xover_opt[-1].setGeometry(QtCore.QRect(320*sz_w, 30*sz_h, 71*sz_w, 18*sz_h))
             self.label_GA_Xover_opt[-1].setObjectName("label_GA_Xover_opt")
             self.label_GA_Xover_opt[-1].setText(_translate("MainWindow", "Options"))
             self.pB_GA_remove.append(QtWidgets.QPushButton(self.GA[-1]))
-            self.pB_GA_remove[-1].setGeometry(QtCore.QRect(670, 20, 80, 70))
+            self.pB_GA_remove[-1].setGeometry(QtCore.QRect(670*sz_w, 20*sz_h, 80*sz_w, 70*sz_h))
             self.pB_GA_remove[-1].setObjectName("pB_GA_remove")
 
             # -------------------
             # Mutation
             self.GA_Box_mut.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.GA_Box_mut[-1].setGeometry(QtCore.QRect(330, 330, 420, 220))
+            self.GA_Box_mut[-1].setGeometry(QtCore.QRect(330*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
             self.GA_Box_mut[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_mut[-1].setObjectName("GA_Box_mut")
             self.GA_Box_mut[-1].setTitle(_translate("MainWindow", "Mutation operator"))
 
             self.cB_mut_op_1.append(QtWidgets.QCheckBox(self.GA_Box_mut[-1]))
-            self.cB_mut_op_1[-1].setGeometry(QtCore.QRect(20, 60, 141, 22))
+            self.cB_mut_op_1[-1].setGeometry(QtCore.QRect(20*sz_w, 60*sz_h, 141*sz_w, 22*sz_h))
             self.cB_mut_op_1[-1].setObjectName("cB_mut_op_1")
             self.cB_mut_op_1[-1].setText(_translate("MainWindow", "Uniform mutation"))
             self.cB_mut_op_2.append(QtWidgets.QCheckBox(self.GA_Box_mut[-1]))
-            self.cB_mut_op_2[-1].setGeometry(QtCore.QRect(20, 90, 171, 22))
+            self.cB_mut_op_2[-1].setGeometry(QtCore.QRect(20*sz_w, 90*sz_h, 171*sz_w, 22*sz_h))
             self.cB_mut_op_2[-1].setObjectName("cB_mut_op_2")
             self.cB_mut_op_2[-1].setText(_translate("MainWindow", "Non-uniform mutation"))
             self.cB_mut_op_3.append(QtWidgets.QCheckBox(self.GA_Box_mut[-1]))
-            self.cB_mut_op_3[-1].setGeometry(QtCore.QRect(20, 120, 171, 22))
+            self.cB_mut_op_3[-1].setGeometry(QtCore.QRect(20*sz_w, 120*sz_h, 171*sz_w, 22*sz_h))
             self.cB_mut_op_3[-1].setObjectName("cB_mut_op_3")
             self.cB_mut_op_3[-1].setText(_translate("MainWindow", "Boundary mutation"))
 #            self.cB_mut_op_4.append(QtWidgets.QCheckBox(self.GA_Box_mut[-1]))
@@ -1752,15 +1811,15 @@ class Ui_MainWindow(object):
 
 
             self.txt_GA_mut_int_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_int_1[-1].setGeometry(QtCore.QRect(220, 50, 71, 31))
+            self.txt_GA_mut_int_1[-1].setGeometry(QtCore.QRect(220*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_int_1[-1].setObjectName("txt_GA_mut_int_1")
             self.txt_GA_mut_int_1[-1].setPlainText(_translate("MainWindow", d_GA_mut_int_1))
             self.txt_GA_mut_int_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_int_2[-1].setGeometry(QtCore.QRect(220, 80, 71, 31))
+            self.txt_GA_mut_int_2[-1].setGeometry(QtCore.QRect(220*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_int_2[-1].setObjectName("txt_GA_mut_int_2")
             self.txt_GA_mut_int_2[-1].setPlainText(_translate("MainWindow", d_GA_mut_int_2))
             self.txt_GA_mut_int_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_int_3[-1].setGeometry(QtCore.QRect(220, 110, 71, 31))
+            self.txt_GA_mut_int_3[-1].setGeometry(QtCore.QRect(220*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_int_3[-1].setObjectName("txt_GA_mut_int_3")
             self.txt_GA_mut_int_3[-1].setPlainText(_translate("MainWindow", d_GA_mut_int_3))
 #            self.txt_GA_mut_int_4[-1].setPlainText(_translate("MainWindow", "25"))
@@ -1768,13 +1827,13 @@ class Ui_MainWindow(object):
 #            self.txt_GA_mut_int_4[-1].setGeometry(QtCore.QRect(250, 150, 71, 31))
 #            self.txt_GA_mut_int_4[-1].setObjectName("txt_GA_mut_int_4")
             self.txt_GA_mut_opt_1.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_opt_1[-1].setGeometry(QtCore.QRect(310, 50, 71, 31))
+            self.txt_GA_mut_opt_1[-1].setGeometry(QtCore.QRect(310*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_1[-1].setObjectName("txt_GA_mut_opt_1")
             self.txt_GA_mut_opt_2.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_opt_2[-1].setGeometry(QtCore.QRect(310, 80, 71, 31))
+            self.txt_GA_mut_opt_2[-1].setGeometry(QtCore.QRect(310*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_2[-1].setObjectName("txt_GA_mut_opt_2")
             self.txt_GA_mut_opt_3.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
-            self.txt_GA_mut_opt_3[-1].setGeometry(QtCore.QRect(310, 110, 71, 31))
+            self.txt_GA_mut_opt_3[-1].setGeometry(QtCore.QRect(310*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_3[-1].setObjectName("txt_GA_mut_opt_3")
 #            self.txt_GA_mut_opt_4.append(QtWidgets.QPlainTextEdit(self.GA_Box_mut[-1]))
 #            self.txt_GA_mut_opt_4[-1].setGeometry(QtCore.QRect(350, 150, 71, 31))
@@ -1786,25 +1845,25 @@ class Ui_MainWindow(object):
 #            self.txt_GA_mut_opt_4[-1].setPlainText("")
 
             self.label_GA_mut_int.append(QtWidgets.QLabel(self.GA_Box_mut[-1]))
-            self.label_GA_mut_int[-1].setGeometry(QtCore.QRect(320, 30, 71, 18))
+            self.label_GA_mut_int[-1].setGeometry(QtCore.QRect(320*sz_w, 30*sz_h, 71*sz_w, 18*sz_h))
             self.label_GA_mut_int[-1].setObjectName("label_GA_mut_int")
             self.label_GA_mut_int[-1].setText(_translate("MainWindow", "Options"))
             self.label_GA_mut_opt.append(QtWidgets.QLabel(self.GA_Box_mut[-1]))
-            self.label_GA_mut_opt[-1].setGeometry(QtCore.QRect(210, 30, 81, 18))
+            self.label_GA_mut_opt[-1].setGeometry(QtCore.QRect(210*sz_w, 30*sz_h, 81*sz_w, 18*sz_h))
             self.label_GA_mut_opt[-1].setObjectName("label_GA_mut_opt")
             self.label_GA_mut_opt[-1].setText(_translate("MainWindow", "Intensity(%)"))
 
             self.GA_mut_frame.append(QtWidgets.QFrame(self.GA_Box_mut[-1]))
-            self.GA_mut_frame[-1].setGeometry(QtCore.QRect(80, 155, 250, 50))
+            self.GA_mut_frame[-1].setGeometry(QtCore.QRect(80*sz_w, 155*sz_h, 250*sz_w, 50*sz_h))
             self.GA_mut_frame[-1].setFrameShape(QtWidgets.QFrame.StyledPanel)
             self.GA_mut_frame[-1].setFrameShadow(QtWidgets.QFrame.Raised)
             self.GA_mut_frame[-1].setObjectName("GA_mut_frame")
             self.label_GA_mut_prob.append(QtWidgets.QLabel(self.GA_mut_frame[-1]))
-            self.label_GA_mut_prob[-1].setGeometry(QtCore.QRect(30, 10, 111, 30))
+            self.label_GA_mut_prob[-1].setGeometry(QtCore.QRect(30*sz_w, 10*sz_h, 111*sz_w, 30*sz_h))
             self.label_GA_mut_prob[-1].setObjectName("label_GA_mut_prob")
             self.label_GA_mut_prob[-1].setText(_translate("MainWindow", "Gene Mutation\n   probability"))
             self.num_GA_mut_prob.append(QtWidgets.QDoubleSpinBox(self.GA_mut_frame[-1]))
-            self.num_GA_mut_prob[-1].setGeometry(QtCore.QRect(180, 10, 61, 32))
+            self.num_GA_mut_prob[-1].setGeometry(QtCore.QRect(180*sz_w, 10*sz_h, 61*sz_w, 32*sz_h))
             self.num_GA_mut_prob[-1].setDecimals(0)
             self.num_GA_mut_prob[-1].setMaximum(100.0)
             self.num_GA_mut_prob[-1].setSingleStep(5.0)
@@ -1814,17 +1873,17 @@ class Ui_MainWindow(object):
             # -------------------
             # Fitness
             self.Gb_GA_fitness.append(QtWidgets.QGroupBox(self.GA[-1]))
-            self.Gb_GA_fitness[-1].setGeometry(QtCore.QRect(20, 470, 290, 80))
+            self.Gb_GA_fitness[-1].setGeometry(QtCore.QRect(20*sz_w, 470*sz_h, 290*sz_w, 80*sz_h))
             self.Gb_GA_fitness[-1].setAlignment(QtCore.Qt.AlignCenter)
             self.Gb_GA_fitness[-1].setObjectName("Gb_GA_fitness")
             self.Gb_GA_fitness[-1].setTitle(_translate("MainWindow", "Fitness calculation"))
 
             self.rB_GA_fit_1.append(QtWidgets.QRadioButton(self.Gb_GA_fitness[-1]))
-            self.rB_GA_fit_1[-1].setGeometry(QtCore.QRect(10, 0, 230, 80))
+            self.rB_GA_fit_1[-1].setGeometry(QtCore.QRect(10*sz_w, 0, 230*sz_w, 80*sz_h))
             self.rB_GA_fit_1[-1].setObjectName("rB_GA_fit_1")
             self.rB_GA_fit_1[-1].setText(_translate("MainWindow", "average among all conditions"))
             self.rB_GA_fit_2.append(QtWidgets.QRadioButton(self.Gb_GA_fitness[-1]))
-            self.rB_GA_fit_2[-1].setGeometry(QtCore.QRect(10, 20, 230, 80))
+            self.rB_GA_fit_2[-1].setGeometry(QtCore.QRect(10, 20*sz_h, 230, 80*sz_h))
             self.rB_GA_fit_2[-1].setObjectName("rB_GA_fit_2")
             self.rB_GA_fit_2[-1].setText(_translate("MainWindow", "maximum among all conditions"))
             if d_GA_fit == 'mean':  self.rB_GA_fit_1[-1].setChecked(True)
@@ -1844,25 +1903,25 @@ class Ui_MainWindow(object):
                 self.cB_GA_meth_pts.append(False)
                 self.GA_label_meth_pts.append(False)
             else:
-                self.cB_GA_meth[-1].setGeometry(QtCore.QRect(-110, 30, 231, 22))
+                self.cB_GA_meth[-1].setGeometry(QtCore.QRect(-110*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
 
                 self.cB_GA_meth_DRG.append(QtWidgets.QRadioButton(self.GA_group5[-1]))
-                self.cB_GA_meth_DRG[-1].setGeometry(QtCore.QRect(10, 30, 231, 22))
+                self.cB_GA_meth_DRG[-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
                 self.cB_GA_meth_DRG[-1].setObjectName("cB_GA_meth_DRG")
                 self.cB_GA_meth_DRG[-1].setText(_translate("MainWindow", "DRG"))
 
                 self.cB_GA_meth_SA.append(QtWidgets.QRadioButton(self.GA_group5[-1]))
-                self.cB_GA_meth_SA[-1].setGeometry(QtCore.QRect(70, 30, 231, 22))
+                self.cB_GA_meth_SA[-1].setGeometry(QtCore.QRect(70*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
                 self.cB_GA_meth_SA[-1].setObjectName("cB_GA_meth_SA")
                 self.cB_GA_meth_SA[-1].setText(_translate("MainWindow", "SA "))
 
                 self.GA_label_meth_pts.append(QtWidgets.QLabel(self.GA_group5[-1]))
-                self.GA_label_meth_pts[-1].setGeometry(QtCore.QRect(150, 30, 90, 18))
+                self.GA_label_meth_pts[-1].setGeometry(QtCore.QRect(150*sz_w, 30*sz_h, 90*sz_w, 18*sz_h))
                 self.GA_label_meth_pts[-1].setObjectName("label_Red_method_sp_5")
                 self.GA_label_meth_pts[-1].setText(_translate("MainWindow", "points: "))
 
                 self.cB_GA_meth_pts.append(QtWidgets.QDoubleSpinBox(self.GA_group5[-1]))
-                self.cB_GA_meth_pts[-1].setGeometry(QtCore.QRect(215, 25, 61, 32))
+                self.cB_GA_meth_pts[-1].setGeometry(QtCore.QRect(215*sz_w, 25*sz_h, 61*sz_w, 32*sz_h))
                 self.cB_GA_meth_pts[-1].setDecimals(0)
                 self.cB_GA_meth_pts[-1].setMaximum(100.0)
                 self.cB_GA_meth_pts[-1].setSingleStep(1.0)
@@ -1884,7 +1943,7 @@ class Ui_MainWindow(object):
             self.cB_mut_op_2[-1].setChecked(d_GA_mut_op_2)
             self.cB_mut_op_3[-1].setChecked(d_GA_mut_op_3)
             self.cB_GA_meth[-1].setChecked(d_GA_meth)
-            
+
             if condition_tab_removed:   _idx = idx+1
             else: _idx = idx
             self.list_operator.insert(_idx-1,'GA')
@@ -1892,31 +1951,33 @@ class Ui_MainWindow(object):
 
 
     def add_cases(self):
+        global sz_w
+        global sz_h
         self.GCases.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.GCases[-1].setGeometry(QtCore.QRect(10, 10+(len(self.GCases)-1)*181, 171, 171))
+        self.GCases[-1].setGeometry(QtCore.QRect(10*sz_w, (10+(len(self.GCases)-1)*181)*sz_h, 171*sz_w, 171*sz_h))
         self.GCases[-1].setObjectName("GCases")
         self.num_case.append(len(self.GCases))
         self.rB_reactor_UV.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_reactor_UV[-1].setGeometry(QtCore.QRect(10, 25, 105, 22))
+        self.rB_reactor_UV[-1].setGeometry(QtCore.QRect(10*sz_w, 25*sz_h, 105*sz_w, 22*sz_h))
         self.rB_reactor_UV[-1].setObjectName("rB_reactor_UV")
         self.rB_reactor_HP.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_reactor_HP[-1].setGeometry(QtCore.QRect(10, 43, 105, 22))
+        self.rB_reactor_HP[-1].setGeometry(QtCore.QRect(10*sz_w, 43*sz_h, 105*sz_w, 22*sz_h))
         self.rB_reactor_HP[-1].setObjectName("rB_reactor_HP")
         self.rB_JSR.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_JSR[-1].setGeometry(QtCore.QRect(10, 61, 105, 22))
+        self.rB_JSR[-1].setGeometry(QtCore.QRect(10*sz_w, 61*sz_h, 105*sz_w, 22*sz_h))
         self.rB_JSR[-1].setObjectName("rB_JSR")
         self.rB_PFR.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_PFR[-1].setGeometry(QtCore.QRect(10, 79, 151, 22))
+        self.rB_PFR[-1].setGeometry(QtCore.QRect(10*sz_w, 79*sz_h, 151*sz_w, 22*sz_h))
         self.rB_PFR[-1].setObjectName("rB_PFR")
         self.rB_fflame.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_fflame[-1].setGeometry(QtCore.QRect(10, 97, 105, 22))
+        self.rB_fflame[-1].setGeometry(QtCore.QRect(10*sz_w, 97*sz_h, 105*sz_w, 22*sz_h))
         self.rB_fflame[-1].setObjectName("rB_fflame")
         self.rB_cfflame.append(QtWidgets.QRadioButton(self.GCases[-1]))
-        self.rB_cfflame[-1].setGeometry(QtCore.QRect(10, 115, 151, 22))
+        self.rB_cfflame[-1].setGeometry(QtCore.QRect(10*sz_w, 115*sz_h, 151*sz_w, 22*sz_h))
         self.rB_cfflame[-1].setObjectName("rB_cfflame")
 
         self.pushButton.append(QtWidgets.QPushButton(self.GCases[-1]))
-        self.pushButton[-1].setGeometry(QtCore.QRect(40, 140, 88, 21))
+        self.pushButton[-1].setGeometry(QtCore.QRect(40*sz_w, 140*sz_h, 88*sz_w, 21*sz_h))
         self.pushButton[-1].setObjectName("pushButton")
 
         _translate = QtCore.QCoreApplication.translate
@@ -1933,6 +1994,8 @@ class Ui_MainWindow(object):
 
 
     def add_conditions(self,num_case):
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
         self.tablet.setCurrentIndex(0)
@@ -1955,45 +2018,45 @@ class Ui_MainWindow(object):
                 self.txt8.append(QtWidgets.QLabel(self.Condition_Gb[-1]))
 
                 self.eqmin.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.eqmin[-1].setGeometry(QtCore.QRect(320, 60, 60, 31))
+                self.eqmin[-1].setGeometry(QtCore.QRect(320*sz_w, 60*sz_h, 60*sz_w, 31*sz_h))
                 self.eqmin[-1].setObjectName("eqmin")
                 self.eqmin[-1].setPlainText(_translate("MainWindow", d_phi_min))
                 self.eqmax.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.eqmax[-1].setGeometry(QtCore.QRect(380, 60, 60, 31))
+                self.eqmax[-1].setGeometry(QtCore.QRect(380*sz_w, 60*sz_h, 60*sz_w, 31*sz_h))
                 self.eqmax[-1].setObjectName("eqmax")
                 self.eqmax[-1].setPlainText(_translate("MainWindow", d_phi_max))
                 self.eqincr.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.eqincr[-1].setGeometry(QtCore.QRect(450, 60, 60, 31))
+                self.eqincr[-1].setGeometry(QtCore.QRect(450*sz_w, 60*sz_h, 60*sz_w, 31*sz_h))
                 self.eqincr[-1].setObjectName("eqincr")
                 self.eqincr[-1].setPlainText(_translate("MainWindow", d_phi_incr))
 
                 self.Tmin.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Tmin[-1].setGeometry(QtCore.QRect(320, 120, 60, 31))
+                self.Tmin[-1].setGeometry(QtCore.QRect(320*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
                 self.Tmin[-1].setObjectName("Tmin")
                 self.Tmin[-1].setPlainText(_translate("MainWindow", "1500"))
                 self.Tmax.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Tmax[-1].setGeometry(QtCore.QRect(380, 120, 60, 31))
+                self.Tmax[-1].setGeometry(QtCore.QRect(380*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
                 self.Tmax[-1].setObjectName("Tmax")
                 self.Tmax[-1].setPlainText(_translate("MainWindow", "1700"))
                 self.Tincr.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Tincr[-1].setGeometry(QtCore.QRect(450, 120, 60, 31))
+                self.Tincr[-1].setGeometry(QtCore.QRect(450*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
                 self.Tincr[-1].setObjectName("Tincr")
                 self.Tincr[-1].setPlainText(_translate("MainWindow", "200"))
 
                 font = QtGui.QFont()
                 font.setPointSize(8)
                 self.Pmin.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Pmin[-1].setGeometry(QtCore.QRect(320, 90, 60, 31))
+                self.Pmin[-1].setGeometry(QtCore.QRect(320*sz_w, 90*sz_h, 60*sz_w, 31*sz_h))
                 self.Pmin[-1].setObjectName("Pmin")
                 self.Pmin[-1].setPlainText(_translate("MainWindow", d_P_min))
                 self.Pmin[-1].setFont(font)
                 self.Pmax.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Pmax[-1].setGeometry(QtCore.QRect(380, 90, 60, 31))
+                self.Pmax[-1].setGeometry(QtCore.QRect(380*sz_w, 90*sz_h, 60*sz_w, 31*sz_h))
                 self.Pmax[-1].setObjectName("Pmax")
                 self.Pmax[-1].setFont(font)
                 self.Pmax[-1].setPlainText(_translate("MainWindow", d_P_max))
                 self.Pincr.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
-                self.Pincr[-1].setGeometry(QtCore.QRect(450, 90, 60, 31))
+                self.Pincr[-1].setGeometry(QtCore.QRect(450*sz_w, 90*sz_h, 60*sz_w, 31*sz_h))
                 self.Pincr[-1].setObjectName("Pincr")
                 self.Pincr[-1].setFont(font)
                 self.Pincr[-1].setPlainText(_translate("MainWindow", d_P_incr))
@@ -2031,9 +2094,9 @@ class Ui_MainWindow(object):
                 self.rB_cff_diff[-1].setText(_translate("MainWindow", "Diffusion flame"))
                 self.rB_cff_pp[-1].setText(_translate("MainWindow", "Partiall&y-premixed\nflame"))
                 self.rB_cff_tp[-1].setText(_translate("MainWindow", "Premixed flame"))
-                self.rB_cff_diff[-1].setGeometry(QtCore.QRect(10, 20, 141, 22))
-                self.rB_cff_pp[-1].setGeometry(QtCore.QRect(10, 70, 141, 41))
-                self.rB_cff_tp[-1].setGeometry(QtCore.QRect(10, 120, 141, 22))
+                self.rB_cff_diff[-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 141*sz_w, 22*sz_h))
+                self.rB_cff_pp[-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 141*sz_w, 41*sz_h))
+                self.rB_cff_tp[-1].setGeometry(QtCore.QRect(10*sz_w, 120*sz_h, 141*sz_w, 22*sz_h))
                 self.rB_cff_diff[-1].toggled.connect(lambda: self.add_cf_diff_options(num_case))
                 self.rB_cff_pp[-1].toggled.connect(lambda: self.add_cf_pprem_options(num_case))
                 self.rB_cff_tp[-1].toggled.connect(lambda: self.add_cf_tprem_options(num_case))
@@ -2054,15 +2117,15 @@ class Ui_MainWindow(object):
                 self.txt10_5[-1].setObjectName("txt10_5")
                 self.txt9_4[-1].setObjectName("txt9_4")
                 self.txt8_4[-1].setObjectName("txt8_4")
-                self.df_P_Gb[-1].setGeometry(QtCore.QRect(5, 20, 111, 141))
-                self.txt6_2[-1].setGeometry(QtCore.QRect(30, 10, 61, 18))
-                self.df_Pmin[-1].setGeometry(QtCore.QRect(50, 30, 51, 31))
-                self.df_Pmax[-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
-                self.df_Pincr[-1].setGeometry(QtCore.QRect(50, 100, 51, 31))
-                self.txt10_5[-1].setGeometry(QtCore.QRect(10, 110, 31, 18))
-                self.txt9_4[-1].setGeometry(QtCore.QRect(10, 70, 31, 18))
-                self.txt8_4[-1].setGeometry(QtCore.QRect(10, 40, 31, 18))
-                self.txt6_2[-1].setText(_translate("MainWindow", "Pressure"))
+                self.df_P_Gb[-1].setGeometry(QtCore.QRect(5*sz_w, 20*sz_h, 111*sz_w, 141*sz_h))
+                self.txt6_2[-1].setGeometry(QtCore.QRect(30*sz_w, 10*sz_h, 61*sz_w, 18*sz_h))
+                self.df_Pmin[-1].setGeometry(QtCore.QRect(50*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+                self.df_Pmax[-1].setGeometry(QtCore.QRect(50*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+                self.df_Pincr[-1].setGeometry(QtCore.QRect(50*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
+                self.txt10_5[-1].setGeometry(QtCore.QRect(10*sz_w, 110*sz_h, 31*sz_w, 18*sz_h))
+                self.txt9_4[-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 31*sz_w, 18*sz_h))
+                self.txt8_4[-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+                self.txt6_2[-1].setText(_translate("MainWindow", "Pressure (Pa)"))
                 self.txt10_5[-1].setText(_translate("MainWindow", "incr"))
                 self.txt9_4[-1].setText(_translate("MainWindow", "max"))
                 self.txt8_4[-1].setText(_translate("MainWindow", "min"))
@@ -2072,7 +2135,7 @@ class Ui_MainWindow(object):
 
                 # Lines
                 self.line.append(QtWidgets.QFrame(self.Conditions_diff_flame[-1]))
-                self.line[-1].setGeometry(QtCore.QRect(110, 23, 20, 141))
+                self.line[-1].setGeometry(QtCore.QRect(110*sz_w, 23*sz_h, 20*sz_w, 141*sz_h))
                 self.line[-1].setFrameShape(QtWidgets.QFrame.VLine)
                 self.line[-1].setFrameShadow(QtWidgets.QFrame.Sunken)
                 self.line[-1].setObjectName("line")
@@ -2228,114 +2291,114 @@ class Ui_MainWindow(object):
 
 
 
-            self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(180, 10+(num_case-1)*181, 521, 171))
+            self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(180*sz_w, (10+(num_case-1)*181)*sz_h, 521*sz_w, 171*sz_h))
             self.Condition_Gb[num_case-1].setObjectName("groupBox")
-            self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(18000, 10+(num_case-1)*181, 1311, 171))
-            self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(18000, 10+(num_case-1)*181, 171, 171))
+            self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(18000*sz_w, (10+(num_case-1)*181)*sz_h, 1311*sz_w, 171*sz_h))
+            self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(18000*sz_w, (10+(num_case-1)*181)*sz_h, 171*sz_w, 171*sz_h))
 
 
             if self.rB_reactor_UV[num_case-1].isChecked(): # reactor(U,V)
-                self.Gr[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 731, 171))
+                self.Gr[num_case-1].setGeometry(QtCore.QRect(700*sz_w, (10+(num_case-1)*181)*sz_h, 731*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_r))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_r))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow", d_T_incr_r))
-                self.tol_ts_abs_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[0]))
-                self.tol_ts_rel_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[1]))
+                self.tol_ts_abs_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[1]))
+                self.tol_ts_rel_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[0]))
 
             elif self.rB_reactor_HP[num_case-1].isChecked(): # reactor(H,P)
-                self.Gr[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 731, 171))
+                self.Gr[num_case-1].setGeometry(QtCore.QRect(700*sz_w, (10+(num_case-1)*181)*sz_h, 731*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_r))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_r))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow", d_T_incr_r))
-                self.tol_ts_abs_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[0]))
-                self.tol_ts_rel_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[1]))
+                self.tol_ts_abs_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[1]))
+                self.tol_ts_rel_r[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_r.split(',')[0]))
 
             elif self.rB_JSR[num_case-1].isChecked(): # jsr
-                self.GJSR[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 311, 171))
+                self.GJSR[num_case-1].setGeometry(QtCore.QRect(700*sz_w, (10+(num_case-1)*181)*sz_h, 311*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_jsr))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_jsr))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow",  d_T_incr_jsr))
-                self.tol_ts_abs_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[0]))
-                self.tol_ts_rel_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[1]))
+                self.tol_ts_abs_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[1]))
+                self.tol_ts_rel_jsr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_jsr.split(',')[0]))
 
             elif self.rB_PFR[num_case-1].isChecked(): # jsr
-                self.Gpfr[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 460, 171))
+                self.Gpfr[num_case-1].setGeometry(QtCore.QRect(700*sz_w, (10+(num_case-1)*181)*sz_h, 460*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_pfr))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_pfr))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow",  d_T_incr_pfr))
-                self.tol_ts_abs_pfr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_pfr.split(',')[0]))
-                self.tol_ts_rel_pfr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_pfr.split(',')[1]))
+                self.tol_ts_abs_pfr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_pfr.split(',')[1]))
+                self.tol_ts_rel_pfr[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_pfr.split(',')[0]))
 
             elif self.rB_fflame[num_case-1].isChecked(): # flat flame
-                self.Gf[num_case-1].setGeometry(QtCore.QRect(700, 10+(num_case-1)*181, 670, 171))
+                self.Gf[num_case-1].setGeometry(QtCore.QRect(700*sz_w, (10+(num_case-1)*181)*sz_h, 670*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_ff))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_ff))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow", d_T_incr_ff))
-                self.tol_ts_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[0]))
-                self.tol_ts_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[1]))
-                self.tol_ss_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[0]))
-                self.tol_ss_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[1]))
-                self.txtf8[num_case-1].setText(_translate("MainWindow", "xmax"))
+                self.tol_ts_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[1]))
+                self.tol_ts_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[0]))
+                self.tol_ss_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[1]))
+                self.tol_ss_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[0]))
+                self.txtf8[num_case-1].setText(_translate("MainWindow", "xmax (m)"))
 
 
             elif self.rB_cfflame[num_case-1].isChecked(): # counterflow flame
-                self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(10000, 10+(num_case-1)*181, 521, 171))
-                self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(180, 10+(num_case-1)*181, 171, 171))
+                self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(10000*sz_w, (10+(num_case-1)*181)*sz_h, 521*sz_w, 171*sz_h))
+                self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(180*sz_w, (10+(num_case-1)*181)*sz_h, 171*sz_w, 171*sz_h))
                 self.Tmin[num_case-1].setPlainText(_translate("MainWindow", d_T_min_ff))
                 self.Tmax[num_case-1].setPlainText(_translate("MainWindow", d_T_max_ff))
                 self.Tincr[num_case-1].setPlainText(_translate("MainWindow", d_T_incr_ff))
-                self.tol_ts_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[0]))
-                self.tol_ts_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[1]))
-                self.tol_ss_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[0]))
-                self.tol_ss_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[1]))
-                self.txtf8[num_case-1].setText(_translate("MainWindow", "width"))
+                self.tol_ts_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[1]))
+                self.tol_ts_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ts_ff.split(',')[0]))
+                self.tol_ss_abs_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[1]))
+                self.tol_ss_rel_f[num_case-1].setPlainText(_translate("MainWindow", d_tol_ss_ff.split(',')[0]))
+                self.txtf8[num_case-1].setText(_translate("MainWindow", "width (m)"))
 
 
 
 
             if num_case>=2:
-                self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 2200, 15+181*(num_case+1)))
+                self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 2200*sz_w, (15+181*(num_case+1))*sz_h))
 
 
             # properties of main conditions parameters
             self.condition_activated[num_case-1]=True
-            self.txt8[num_case-1].setGeometry(QtCore.QRect(325, 40, 31, 18))
+            self.txt8[num_case-1].setGeometry(QtCore.QRect(325*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
             self.txt8[num_case-1].setObjectName("txt8")
-            self.txt2[num_case-1].setGeometry(QtCore.QRect(10, 80, 61, 18))
+            self.txt2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 80*sz_h, 61*sz_w, 18*sz_h))
             self.txt2[num_case-1].setObjectName("txt2")
-            self.txt7[num_case-1].setGeometry(QtCore.QRect(200, 130, 131, 18))
+            self.txt7[num_case-1].setGeometry(QtCore.QRect(200*sz_w, 130*sz_h, 131*sz_w, 18*sz_h))
             self.txt7[num_case-1].setObjectName("txt7")
-            self.fuel_1[num_case-1].setGeometry(QtCore.QRect(100, 40, 91, 31))
+            self.fuel_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 40*sz_h, 91*sz_w, 31*sz_h))
             self.fuel_1[num_case-1].setObjectName("fuel_1")
-            self.Diluent_1[num_case-1].setGeometry(QtCore.QRect(100, 100, 91, 31))
+            self.Diluent_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 100*sz_h, 91*sz_w, 31*sz_h))
             self.Diluent_1[num_case-1].setObjectName("Diluent_1")
-            self.txt9[num_case-1].setGeometry(QtCore.QRect(390, 40, 31, 18))
+            self.txt9[num_case-1].setGeometry(QtCore.QRect(390*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
             self.txt9[num_case-1].setObjectName("txt9")
-            self.txt6[num_case-1].setGeometry(QtCore.QRect(200, 100, 131, 18))
+            self.txt6[num_case-1].setGeometry(QtCore.QRect(200*sz_w, 100*sz_h, 131*sz_w, 18*sz_h))
             self.txt6[num_case-1].setObjectName("txt6")
-            self.txt10[num_case-1].setGeometry(QtCore.QRect(465, 40, 31, 18))
+            self.txt10[num_case-1].setGeometry(QtCore.QRect(465*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
             self.txt10[num_case-1].setObjectName("txt10")
-            self.txt1[num_case-1].setGeometry(QtCore.QRect(10, 50, 41, 18))
+            self.txt1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 41*sz_w, 18*sz_h))
             self.txt1[num_case-1].setObjectName("txt1")
-            self.txt5[num_case-1].setGeometry(QtCore.QRect(200, 70, 131, 18))
+            self.txt5[num_case-1].setGeometry(QtCore.QRect(200*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
             self.txt5[num_case-1].setObjectName("txt5")
-            self.Diluent_2[num_case-1].setGeometry(QtCore.QRect(100, 130, 91, 31))
+            self.Diluent_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 130*sz_h, 91*sz_w, 31*sz_h))
             self.Diluent_2[num_case-1].setObjectName("Diluent_2")
-            self.txt4[num_case-1].setGeometry(QtCore.QRect(10, 140, 91, 18))
+            self.txt4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 140*sz_h, 91*sz_w, 18*sz_h))
             self.txt4[num_case-1].setObjectName("txt4")
-            self.txt3[num_case-1].setGeometry(QtCore.QRect(10, 110, 61, 18))
+            self.txt3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 110*sz_h, 61*sz_w, 18*sz_h))
             self.txt3[num_case-1].setObjectName("txt3")
-            self.oxidant_1[num_case-1].setGeometry(QtCore.QRect(100, 70, 91, 31))
+            self.oxidant_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 70*sz_h, 91*sz_w, 31*sz_h))
             self.oxidant_1[num_case-1].setObjectName("oxidant_1")
 
             self.Condition_Gb[num_case-1].setTitle(_translate("MainWindow", "Conditions"))
             self.txt8[num_case-1].setText(_translate("MainWindow", "min"))
             self.txt2[num_case-1].setText(_translate("MainWindow", "Oxidant"))
-            self.txt7[num_case-1].setText(_translate("MainWindow", "Temperature"))
+            self.txt7[num_case-1].setText(_translate("MainWindow", "Temperature (K)"))
             self.fuel_1[num_case-1].setPlainText(_translate("MainWindow", d_fuel))
             self.Diluent_1[num_case-1].setPlainText(_translate("MainWindow", d_diluent))
             self.txt9[num_case-1].setText(_translate("MainWindow", "max"))
-            self.txt6[num_case-1].setText(_translate("MainWindow", "Pressure"))
+            self.txt6[num_case-1].setText(_translate("MainWindow", "Pressure (Pa)"))
             self.txt10[num_case-1].setText(_translate("MainWindow", "incr"))
 
             self.txt1[num_case-1].setText(_translate("MainWindow", "Fuel"))
@@ -2347,7 +2410,7 @@ class Ui_MainWindow(object):
             self.oxidant_1[num_case-1].setPlainText(_translate("MainWindow", d_oxidant))
 
             self.pushButton.append(QtWidgets.QPushButton(self.GCases[num_case-1]))
-            self.pushButton[-1].setGeometry(QtCore.QRect(40, 140, 88, 21))
+            self.pushButton[-1].setGeometry(QtCore.QRect(40*sz_w, 140*sz_h, 88*sz_w, 21*sz_h))
             self.pushButton[-1].setObjectName("pushButton")
             self.pushButton[-1].setText(_translate("MainWindow", "remove"))
             self.pushButton[-1].clicked.connect(lambda: self.remove_conditions(num_case))
@@ -2359,18 +2422,20 @@ class Ui_MainWindow(object):
 
 
     def remove_conditions(self, num_case):
+        global sz_w
+        global sz_h
         self.tablet.setCurrentIndex(0)
-        self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(180, 10000, 521, 171))
-        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(2000, 10000, 670, 171))
-        self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(2000, 10000, 670, 171))
-        self.Gr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 731, 171))
-        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
-        self.Gpfr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
-        self.Gf[num_case-1].setGeometry(QtCore.QRect(20000, 10, 670, 171))
+        self.Condition_Gb[num_case-1].setGeometry(QtCore.QRect(180*sz_w, 10000*sz_h, 521*sz_w, 171*sz_h))
+        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(2000*sz_w, 10000*sz_h, 670*sz_w, 171*sz_h))
+        self.Conditions_diff_flame_select[num_case-1].setGeometry(QtCore.QRect(2000*sz_w, 10000*sz_h, 670*sz_w, 171*sz_h))
+        self.Gr[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 731*sz_w, 171*sz_h))
+        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 311*sz_w, 171*sz_h))
+        self.Gpfr[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 311*sz_w, 171*sz_h))
+        self.Gf[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 670*sz_w, 171*sz_h))
         self.condition_activated[num_case-1] = False
 
         self.pushButton.append(QtWidgets.QPushButton(self.GCases[num_case-1]))
-        self.pushButton[-1].setGeometry(QtCore.QRect(40, 140, 88, 21))
+        self.pushButton[-1].setGeometry(QtCore.QRect(40*sz_w, 140*sz_h, 88*sz_w, 21*sz_h))
         self.pushButton[-1].setObjectName("pushButton")
 
         _translate = QtCore.QCoreApplication.translate
@@ -2380,79 +2445,81 @@ class Ui_MainWindow(object):
 
 
     def add_flame_options(self, num_case):
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
         # Options for flat flames
         self.Gf.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.Gf[num_case-1].setGeometry(QtCore.QRect(20000, 10, 670, 171))
+        self.Gf[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 670*sz_w, 171*sz_h))
         self.Gf[num_case-1].setObjectName("Gf")
         self.Gf1.append(QtWidgets.QGroupBox(self.Gf[num_case-1]))
-        self.Gf1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
+        self.Gf1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 161*sz_w, 131*sz_h))
         self.Gf1[num_case-1].setObjectName("Gf1")
         self.txtf3.append(QtWidgets.QLabel(self.Gf1[num_case-1]))
-        self.txtf3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
+        self.txtf3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 71*sz_w, 18*sz_h))
         self.txtf3[num_case-1].setObjectName("txtf3")
         self.txtf1.append(QtWidgets.QLabel(self.Gf1[num_case-1]))
-        self.txtf1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
+        self.txtf1[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtf1[num_case-1].setObjectName("txtf1")
         self.tol_ts_rel_f.append(QtWidgets.QPlainTextEdit(self.Gf1[num_case-1]))
-        self.tol_ts_rel_f[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
+        self.tol_ts_rel_f[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_rel_f[num_case-1].setObjectName("tol_ts_rel_f")
         self.tol_ts_abs_f.append(QtWidgets.QPlainTextEdit(self.Gf1[num_case-1]))
-        self.tol_ts_abs_f[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
+        self.tol_ts_abs_f[num_case-1].setGeometry(QtCore.QRect(50*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_abs_f[num_case-1].setObjectName("tol_ts_abs_f")
         self.txtf4.append(QtWidgets.QLabel(self.Gf1[num_case-1]))
-        self.txtf4[num_case-1].setGeometry(QtCore.QRect(10, 100, 51, 18))
+        self.txtf4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 100*sz_h, 51*sz_w, 18*sz_h))
         self.txtf4[num_case-1].setObjectName("txtf4")
         self.tol_ss_rel_f.append(QtWidgets.QPlainTextEdit(self.Gf1[num_case-1]))
-        self.tol_ss_rel_f[num_case-1].setGeometry(QtCore.QRect(100, 90, 51, 31))
+        self.tol_ss_rel_f[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 90*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ss_rel_f[num_case-1].setObjectName("tol_ss_rel_f")
         self.txtf2.append(QtWidgets.QLabel(self.Gf1[num_case-1]))
-        self.txtf2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
+        self.txtf2[num_case-1].setGeometry(QtCore.QRect(110*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtf2[num_case-1].setObjectName("txtf2")
         self.tol_ss_abs_f.append(QtWidgets.QPlainTextEdit(self.Gf1[num_case-1]))
-        self.tol_ss_abs_f[num_case-1].setGeometry(QtCore.QRect(50, 90, 51, 31))
+        self.tol_ss_abs_f[num_case-1].setGeometry(QtCore.QRect(50*sz_w, 90*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ss_abs_f[num_case-1].setObjectName("tol_ss_abs_f")
 
         self.Gf2.append(QtWidgets.QGroupBox(self.Gf[num_case-1]))
-        self.Gf2[num_case-1].setGeometry(QtCore.QRect(170, 30, 370, 131))
+        self.Gf2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 370*sz_w, 131*sz_h))
         self.Gf2[num_case-1].setObjectName("Gf2")
         self.txtf7.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf7[num_case-1].setGeometry(QtCore.QRect(10, 100, 71, 18))
+        self.txtf7[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 100*sz_h, 71*sz_w, 18*sz_h))
         self.txtf7[num_case-1].setObjectName("txtf7")
         self.txtf5.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf5[num_case-1].setGeometry(QtCore.QRect(10, 40, 61, 18))
+        self.txtf5[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 61*sz_w, 18*sz_h))
         self.txtf5[num_case-1].setObjectName("txtf5")
         self.txtf6.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf6[num_case-1].setGeometry(QtCore.QRect(10, 70, 81, 18))
+        self.txtf6[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 81*sz_w, 18*sz_h))
         self.txtf6[num_case-1].setObjectName("txtf6")
 
         self.txtf5b.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf5b[num_case-1].setGeometry(QtCore.QRect(160, 40, 61, 18))
+        self.txtf5b[num_case-1].setGeometry(QtCore.QRect(160*sz_w, 40*sz_h, 61*sz_w, 18*sz_h))
         self.txtf5b[num_case-1].setObjectName("txtf5b")
         self.txtf6b.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf6b[num_case-1].setGeometry(QtCore.QRect(160, 70, 81, 18))
+        self.txtf6b[num_case-1].setGeometry(QtCore.QRect(160*sz_w, 70*sz_h, 81*sz_w, 18*sz_h))
         self.txtf6b[num_case-1].setObjectName("txtf6b")
 
         self.txtf8.append(QtWidgets.QLabel(self.Gf2[num_case-1]))
-        self.txtf8[num_case-1].setGeometry(QtCore.QRect(310, 30, 61, 18))
+        self.txtf8[num_case-1].setGeometry(QtCore.QRect(310*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
         self.txtf8[num_case-1].setObjectName("txtf8")
         self.txt_Gf_xmax.append(QtWidgets.QPlainTextEdit(self.Gf2[num_case-1]))
-        self.txt_Gf_xmax[num_case-1].setGeometry(QtCore.QRect(300, 50, 51, 31))
+        self.txt_Gf_xmax[num_case-1].setGeometry(QtCore.QRect(300*sz_w, 50*sz_h, 51*sz_w, 31*sz_h))
         self.txt_Gf_xmax[num_case-1].setObjectName("txt_Gf_xmax")
         self.pts_scatter.append(QtWidgets.QPlainTextEdit(self.Gf2[num_case-1]))
-        self.pts_scatter[num_case-1].setGeometry(QtCore.QRect(80, 90, 221, 31))
+        self.pts_scatter[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 90*sz_h, 221*sz_w, 31*sz_h))
         self.pts_scatter[num_case-1].setObjectName("pts_scatter")
 
         self.slope_ff.append(QtWidgets.QDoubleSpinBox(self.Gf2[num_case-1]))
-        self.slope_ff[num_case-1].setGeometry(QtCore.QRect(80, 30, 61, 32))
+        self.slope_ff[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.slope_ff[num_case-1].setDecimals(2)
         self.slope_ff[num_case-1].setMaximum(1.0)
         self.slope_ff[num_case-1].setSingleStep(0.01)
         self.slope_ff[num_case-1].setProperty("value", d_slope_ff)
         self.slope_ff[num_case-1].setObjectName("slope_ff")
         self.curve_ff.append(QtWidgets.QDoubleSpinBox(self.Gf2[num_case-1]))
-        self.curve_ff[num_case-1].setGeometry(QtCore.QRect(80, 60, 61, 32))
+        self.curve_ff[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
         self.curve_ff[num_case-1].setDecimals(2)
         self.curve_ff[num_case-1].setMaximum(1.0)
         self.curve_ff[num_case-1].setSingleStep(0.01)
@@ -2460,14 +2527,14 @@ class Ui_MainWindow(object):
         self.curve_ff[num_case-1].setObjectName("curve_ff")
 
         self.ratio_ff.append(QtWidgets.QDoubleSpinBox(self.Gf2[num_case-1]))
-        self.ratio_ff[num_case-1].setGeometry(QtCore.QRect(210, 30, 61, 32))
+        self.ratio_ff[num_case-1].setGeometry(QtCore.QRect(210*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.ratio_ff[num_case-1].setDecimals(1)
         self.ratio_ff[num_case-1].setMaximum(10.0)
         self.ratio_ff[num_case-1].setSingleStep(.5)
         self.ratio_ff[num_case-1].setProperty("value", d_ratio_ff)
         self.ratio_ff[num_case-1].setObjectName("slope_ff")
         self.prune_ff.append(QtWidgets.QDoubleSpinBox(self.Gf2[num_case-1]))
-        self.prune_ff[num_case-1].setGeometry(QtCore.QRect(210, 60, 61, 32))
+        self.prune_ff[num_case-1].setGeometry(QtCore.QRect(210*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
         self.prune_ff[num_case-1].setDecimals(3)
         self.prune_ff[num_case-1].setMaximum(1.0)
         self.prune_ff[num_case-1].setSingleStep(0.01)
@@ -2476,13 +2543,13 @@ class Ui_MainWindow(object):
 
 
         self.Gf3.append(QtWidgets.QGroupBox(self.Gf[num_case-1]))
-        self.Gf3[num_case-1].setGeometry(QtCore.QRect(540, 30, 120, 131))
+        self.Gf3[num_case-1].setGeometry(QtCore.QRect(540*sz_w, 30*sz_h, 120*sz_w, 131*sz_h))
         self.Gf3[num_case-1].setObjectName("Gf3")
         self.mult.append(QtWidgets.QRadioButton(self.Gf3[num_case-1]))
-        self.mult[num_case-1].setGeometry(QtCore.QRect(30, 80, 61, 22))
+        self.mult[num_case-1].setGeometry(QtCore.QRect(30*sz_w, 80*sz_h, 61*sz_w, 22*sz_h))
         self.mult[num_case-1].setObjectName("mult")
         self.mix.append(QtWidgets.QRadioButton(self.Gf3[num_case-1]))
-        self.mix[num_case-1].setGeometry(QtCore.QRect(30, 50, 61, 22))
+        self.mix[num_case-1].setGeometry(QtCore.QRect(30*sz_w, 50*sz_h, 61*sz_w, 22*sz_h))
         self.mix[num_case-1].setObjectName("mix")
 
 
@@ -2520,35 +2587,37 @@ class Ui_MainWindow(object):
 
 
     def add_reactor_options(self,num_case):
+        global sz_w
+        global sz_h
         # Options for reactors
         _translate = QtCore.QCoreApplication.translate
 
         self.Gr.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.Gr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 862, 171))
+        self.Gr[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 862*sz_w, 171*sz_h))
         self.Gr[num_case-1].setObjectName("Gr")
         self.Gr[num_case-1].setTitle(_translate("MainWindow", "Options for reactor"))
 
         #tolerances
         self.Gr1.append(QtWidgets.QGroupBox(self.Gr[num_case-1]))
-        self.Gr1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
+        self.Gr1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 161*sz_w, 131*sz_h))
         self.Gr1[num_case-1].setObjectName("Gr1")
         self.Gr1[num_case-1].setTitle(_translate("MainWindow", "Tolerances"))
         self.txtr3.append(QtWidgets.QLabel(self.Gr1[num_case-1]))
-        self.txtr3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
+        self.txtr3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 71*sz_w, 18*sz_h))
         self.txtr3[num_case-1].setObjectName("txtr3")
         self.txtr3[num_case-1].setText(_translate("MainWindow", "tol ts"))
         self.tol_ts_abs_r.append(QtWidgets.QPlainTextEdit(self.Gr1[num_case-1]))
-        self.tol_ts_abs_r[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
+        self.tol_ts_abs_r[num_case-1].setGeometry(QtCore.QRect(50*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_abs_r[num_case-1].setObjectName("tol_ts_abs_r")
         self.txtr2.append(QtWidgets.QLabel(self.Gr1[num_case-1]))
-        self.txtr2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
+        self.txtr2[num_case-1].setGeometry(QtCore.QRect(110*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtr2[num_case-1].setObjectName("txtr2")
         self.txtr2[num_case-1].setText(_translate("MainWindow", "rel"))
         self.tol_ts_rel_r.append(QtWidgets.QPlainTextEdit(self.Gr1[num_case-1]))
-        self.tol_ts_rel_r[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
+        self.tol_ts_rel_r[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_rel_r[num_case-1].setObjectName("tol_ts_rel_r")
         self.txtr1.append(QtWidgets.QLabel(self.Gr1[num_case-1]))
-        self.txtr1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
+        self.txtr1[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtr1[num_case-1].setObjectName("txtr1")
         self.txtr1[num_case-1].setText(_translate("MainWindow", "abs"))
 
@@ -2557,54 +2626,54 @@ class Ui_MainWindow(object):
 
         # Time discretization
         self.Gr2.append(QtWidgets.QGroupBox(self.Gr[num_case-1]))
-        self.Gr2[num_case-1].setGeometry(QtCore.QRect(170, 30, 351, 131))
+        self.Gr2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 351*sz_w, 131*sz_h))
         self.Gr2[num_case-1].setObjectName("Gr2")
         self.Gr2[num_case-1].setTitle(_translate("MainWindow", "Time discretization"))
         self.delta_n_pts.append(QtWidgets.QDoubleSpinBox(self.Gr2[num_case-1]))
-        self.delta_n_pts[num_case-1].setGeometry(QtCore.QRect(80, 60, 61, 32))
+        self.delta_n_pts[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
         self.delta_n_pts[num_case-1].setDecimals(0)
         self.delta_n_pts[num_case-1].setMaximum(100.0)
         self.delta_n_pts[num_case-1].setSingleStep(5.0)
         self.delta_n_pts[num_case-1].setObjectName("delta_n_pts")
         self.txtr4.append(QtWidgets.QLabel(self.Gr2[num_case-1]))
-        self.txtr4[num_case-1].setGeometry(QtCore.QRect(10, 40, 61, 18))
+        self.txtr4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 61*sz_w, 18*sz_h))
         self.txtr4[num_case-1].setObjectName("txtr4")
         self.txtr4[num_case-1].setText(_translate("MainWindow", "pt num"))
         self.pts_num.append(QtWidgets.QDoubleSpinBox(self.Gr2[num_case-1]))
-        self.pts_num[num_case-1].setGeometry(QtCore.QRect(80, 30, 61, 32))
+        self.pts_num[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.pts_num[num_case-1].setDecimals(0)
         self.pts_num[num_case-1].setMaximum(1000.0)
         self.pts_num[num_case-1].setSingleStep(50.0)
         self.pts_num[num_case-1].setObjectName("pts_num")
         self.txtr5.append(QtWidgets.QLabel(self.Gr2[num_case-1]))
-        self.txtr5[num_case-1].setGeometry(QtCore.QRect(10, 70, 81, 18))
+        self.txtr5[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 81*sz_w, 18*sz_h))
         self.txtr5[num_case-1].setObjectName("txtr5")
         self.txtr5[num_case-1].setText(_translate("MainWindow", "delta n pts"))
         self.t_max_coeff.append(QtWidgets.QDoubleSpinBox(self.Gr2[num_case-1]))
-        self.t_max_coeff[num_case-1].setGeometry(QtCore.QRect(280, 30, 61, 32))
+        self.t_max_coeff[num_case-1].setGeometry(QtCore.QRect(280*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.t_max_coeff[num_case-1].setDecimals(0)
         self.t_max_coeff[num_case-1].setMaximum(10.0)
         self.t_max_coeff[num_case-1].setSingleStep(1.0)
         self.t_max_coeff[num_case-1].setObjectName("t_max_coeff")
         self.txtr8.append(QtWidgets.QLabel(self.Gr2[num_case-1]))
-        self.txtr8[num_case-1].setGeometry(QtCore.QRect(170, 100, 81, 18))
+        self.txtr8[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 100*sz_h, 81*sz_w, 18*sz_h))
         self.txtr8[num_case-1].setObjectName("txtr8")
         self.txtr8[num_case-1].setText(_translate("MainWindow", "grad/curv"))
         self.txtr6.append(QtWidgets.QLabel(self.Gr2[num_case-1]))
-        self.txtr6[num_case-1].setGeometry(QtCore.QRect(170, 40, 101, 18))
+        self.txtr6[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 40*sz_h, 101*sz_w, 18*sz_h))
         self.txtr6[num_case-1].setObjectName("txtr6")
         self.txtr6[num_case-1].setText(_translate("MainWindow", "time max coeff"))
         self.grad_curv.append(QtWidgets.QDoubleSpinBox(self.Gr2[num_case-1]))
-        self.grad_curv[num_case-1].setGeometry(QtCore.QRect(280, 90, 61, 32))
+        self.grad_curv[num_case-1].setGeometry(QtCore.QRect(280*sz_w, 90*sz_h, 61*sz_w, 32*sz_h))
         self.grad_curv[num_case-1].setDecimals(2)
         self.grad_curv[num_case-1].setMaximum(1.0)
         self.grad_curv[num_case-1].setSingleStep(0.1)
         self.grad_curv[num_case-1].setObjectName("grad_curv")
         self.ref_spec.append(QtWidgets.QPlainTextEdit(self.Gr2[num_case-1]))
-        self.ref_spec[num_case-1].setGeometry(QtCore.QRect(280, 60, 61, 31))
+        self.ref_spec[num_case-1].setGeometry(QtCore.QRect(280*sz_w, 60*sz_h, 61*sz_w, 31*sz_h))
         self.ref_spec[num_case-1].setObjectName("ref_spec")
         self.txtr7.append(QtWidgets.QLabel(self.Gr2[num_case-1]))
-        self.txtr7[num_case-1].setGeometry(QtCore.QRect(170, 70, 111, 18))
+        self.txtr7[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 70*sz_h, 111*sz_w, 18*sz_h))
         self.txtr7[num_case-1].setObjectName("txtr7")
         self.txtr7[num_case-1].setText(_translate("MainWindow", "reference species"))
 
@@ -2617,57 +2686,59 @@ class Ui_MainWindow(object):
 
         # Ignition detection parameters # depredicated
         self.Gr3.append(QtWidgets.QGroupBox(self.Gr[num_case-1]))
-        self.Gr3[num_case-1].setGeometry(QtCore.QRect(2000, 30, 202, 131))
+        self.Gr3[num_case-1].setGeometry(QtCore.QRect(2000*sz_w, 30*sz_h, 202*sz_w, 131*sz_h))
         self.Gr3[num_case-1].setObjectName("Gr3")
         self.Gr3[num_case-1].setTitle(_translate("MainWindow", "Ignition detection parameters"))
         self.txtr9.append(QtWidgets.QLabel(self.Gr3[num_case-1]))
-        self.txtr9[num_case-1].setGeometry(QtCore.QRect(10, 45, 150, 18))
+        self.txtr9[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 45*sz_h, 150*sz_w, 18*sz_h))
         self.txtr9[num_case-1].setObjectName("txtr9")
         self.txtr9[num_case-1].setText(_translate("MainWindow", "initial point number"))
         self.txtr10.append(QtWidgets.QLabel(self.Gr3[num_case-1]))
-        self.txtr10[num_case-1].setGeometry(QtCore.QRect(10, 90, 150, 18))
+        self.txtr10[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 90*sz_h, 150*sz_w, 18*sz_h))
         self.txtr10[num_case-1].setObjectName("txtr10")
         self.txtr10[num_case-1].setText(_translate("MainWindow", "initial time step"))
         self.txt_Gr_ipn.append(QtWidgets.QPlainTextEdit(self.Gr3[num_case-1]))
-        self.txt_Gr_ipn[num_case-1].setGeometry(QtCore.QRect(140, 35, 51, 31))
+        self.txt_Gr_ipn[num_case-1].setGeometry(QtCore.QRect(140*sz_w, 35*sz_h, 51*sz_w, 31*sz_h))
         self.txt_Gr_ipn[num_case-1].setObjectName("txt_Gr_ipn")
         self.txt_Gr_its.append(QtWidgets.QPlainTextEdit(self.Gr3[num_case-1]))
-        self.txt_Gr_its[num_case-1].setGeometry(QtCore.QRect(140, 80, 51, 31))
+        self.txt_Gr_its[num_case-1].setGeometry(QtCore.QRect(140*sz_w, 80*sz_h, 51*sz_w, 31*sz_h))
         self.txt_Gr_its[num_case-1].setObjectName("txt_Gr_its")
 
         self.txt_Gr_ipn[num_case-1].setPlainText(_translate("MainWindow", d_tign_nPoints))
         self.txt_Gr_its[num_case-1].setPlainText(_translate("MainWindow", d_tign_dt))
 
     def add_pfr_options(self,num_case):
+        global sz_w
+        global sz_h
         # Options for reactors
         _translate = QtCore.QCoreApplication.translate
 
         self.Gpfr.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.Gpfr[num_case-1].setGeometry(QtCore.QRect(20000, 10, 862, 171))
+        self.Gpfr[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 862*sz_w, 171*sz_h))
         self.Gpfr[num_case-1].setObjectName("Gr")
         self.Gpfr[num_case-1].setTitle(_translate("MainWindow", "Options for PFR"))
 
         #tolerances
         self.Gpfr1.append(QtWidgets.QGroupBox(self.Gpfr[num_case-1]))
-        self.Gpfr1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
+        self.Gpfr1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 161*sz_w, 131*sz_h))
         self.Gpfr1[num_case-1].setObjectName("Gpfr1")
         self.Gpfr1[num_case-1].setTitle(_translate("MainWindow", "Tolerances"))
         self.txtpfr3.append(QtWidgets.QLabel(self.Gpfr1[num_case-1]))
-        self.txtpfr3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
+        self.txtpfr3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 71*sz_w, 18*sz_h))
         self.txtpfr3[num_case-1].setObjectName("txtpfr3")
         self.txtpfr3[num_case-1].setText(_translate("MainWindow", "tol ts"))
         self.tol_ts_abs_pfr.append(QtWidgets.QPlainTextEdit(self.Gpfr1[num_case-1]))
-        self.tol_ts_abs_pfr[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
+        self.tol_ts_abs_pfr[num_case-1].setGeometry(QtCore.QRect(50*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_abs_pfr[num_case-1].setObjectName("tol_ts_abs_pfr")
         self.txtpfr2.append(QtWidgets.QLabel(self.Gpfr1[num_case-1]))
-        self.txtpfr2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
+        self.txtpfr2[num_case-1].setGeometry(QtCore.QRect(110*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtpfr2[num_case-1].setObjectName("txtpfr2")
         self.txtpfr2[num_case-1].setText(_translate("MainWindow", "rel"))
         self.tol_ts_rel_pfr.append(QtWidgets.QPlainTextEdit(self.Gpfr1[num_case-1]))
-        self.tol_ts_rel_pfr[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
+        self.tol_ts_rel_pfr[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_rel_pfr[num_case-1].setObjectName("tol_ts_rel_pfr")
         self.txtpfr1.append(QtWidgets.QLabel(self.Gpfr1[num_case-1]))
-        self.txtpfr1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
+        self.txtpfr1[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtpfr1[num_case-1].setObjectName("txtpfr1")
         self.txtpfr1[num_case-1].setText(_translate("MainWindow", "abs"))
 
@@ -2676,42 +2747,42 @@ class Ui_MainWindow(object):
 
         # Plug Flow Reactor properties
         self.Gpfr2.append(QtWidgets.QGroupBox(self.Gpfr[num_case-1]))
-        self.Gpfr2[num_case-1].setGeometry(QtCore.QRect(170, 30, 280, 131))
+        self.Gpfr2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 280*sz_w, 131*sz_h))
         self.Gpfr2[num_case-1].setObjectName("Gpfr2")
         self.Gpfr2[num_case-1].setTitle(_translate("MainWindow", "Plug Flow Reactor properties"))
 
         self.txtpfr4.append(QtWidgets.QLabel(self.Gpfr2[num_case-1]))
-        self.txtpfr4[num_case-1].setGeometry(QtCore.QRect(10, 40, 61, 18))
+        self.txtpfr4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 61*sz_w, 18*sz_h))
         self.txtpfr4[num_case-1].setObjectName("txtpfr4")
         self.txtpfr4[num_case-1].setText(_translate("MainWindow", "pt num"))
         self.pts_num_pfr.append(QtWidgets.QDoubleSpinBox(self.Gpfr2[num_case-1]))
-        self.pts_num_pfr[num_case-1].setGeometry(QtCore.QRect(60, 30, 61, 32))
+        self.pts_num_pfr[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.pts_num_pfr[num_case-1].setDecimals(0)
         self.pts_num_pfr[num_case-1].setMaximum(10000.0)
         self.pts_num_pfr[num_case-1].setSingleStep(100.0)
         self.pts_num_pfr[num_case-1].setObjectName("pts_num_pfr")
 
         self.pfr_u_0.append(QtWidgets.QPlainTextEdit(self.Gpfr2[num_case-1]))
-        self.pfr_u_0[num_case-1].setGeometry(QtCore.QRect(60, 60, 61, 32))
+        self.pfr_u_0[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
         self.pfr_u_0[num_case-1].setObjectName("pfr_length")
         self.txtpfr5.append(QtWidgets.QLabel(self.Gpfr2[num_case-1]))
-        self.txtpfr5[num_case-1].setGeometry(QtCore.QRect(10, 70, 81, 18))
+        self.txtpfr5[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 81*sz_w, 18*sz_h))
         self.txtpfr5[num_case-1].setObjectName("txtpfr5")
         self.txtpfr5[num_case-1].setText(_translate("MainWindow", "u_0"))
 
         self.pfr_length.append(QtWidgets.QPlainTextEdit(self.Gpfr2[num_case-1]))
-        self.pfr_length[num_case-1].setGeometry(QtCore.QRect(210, 30, 61, 32))
+        self.pfr_length[num_case-1].setGeometry(QtCore.QRect(210*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
         self.pfr_length[num_case-1].setObjectName("pfr_length")
         self.txtpfr6.append(QtWidgets.QLabel(self.Gpfr2[num_case-1]))
-        self.txtpfr6[num_case-1].setGeometry(QtCore.QRect(150, 40, 101, 18))
+        self.txtpfr6[num_case-1].setGeometry(QtCore.QRect(150*sz_w, 40*sz_h, 101*sz_w, 18*sz_h))
         self.txtpfr6[num_case-1].setObjectName("txtpfr6")
         self.txtpfr6[num_case-1].setText(_translate("MainWindow", "length"))
 
         self.pfr_area.append(QtWidgets.QPlainTextEdit(self.Gpfr2[num_case-1]))
-        self.pfr_area[num_case-1].setGeometry(QtCore.QRect(210, 60, 61, 31))
+        self.pfr_area[num_case-1].setGeometry(QtCore.QRect(210*sz_w, 60*sz_h, 61*sz_w, 31*sz_h))
         self.pfr_area[num_case-1].setObjectName("pfr_area")
         self.txtpfr7.append(QtWidgets.QLabel(self.Gpfr2[num_case-1]))
-        self.txtpfr7[num_case-1].setGeometry(QtCore.QRect(150, 70, 111, 18))
+        self.txtpfr7[num_case-1].setGeometry(QtCore.QRect(150*sz_w, 70*sz_h, 111*sz_w, 18*sz_h))
         self.txtpfr7[num_case-1].setObjectName("txtpfr7")
         self.txtpfr7[num_case-1].setText(_translate("MainWindow", "area"))
 
@@ -2723,34 +2794,36 @@ class Ui_MainWindow(object):
 
 
     def add_jsr_options(self, num_case):
+        global sz_w
+        global sz_h
         # Options for JSR
         _translate = QtCore.QCoreApplication.translate
 
         self.GJSR.append(QtWidgets.QGroupBox(self.scrollAreaWidgetContents))
-        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000, 10, 311, 171))
+        self.GJSR[num_case-1].setGeometry(QtCore.QRect(20000*sz_w, 10*sz_h, 311*sz_w, 171*sz_h))
         self.GJSR[num_case-1].setObjectName("GJSR")
         self.GJSR[num_case-1].setTitle(_translate("MainWindow", "Options for JSR"))
 
 
         # tolerances
         self.GJSR1.append(QtWidgets.QGroupBox(self.GJSR[num_case-1]))
-        self.GJSR1[num_case-1].setGeometry(QtCore.QRect(10, 30, 161, 131))
+        self.GJSR1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 161*sz_w, 131*sz_h))
         self.GJSR1[num_case-1].setObjectName("GJSR1")
         self.GJSR1[num_case-1].setTitle(_translate("MainWindow", "Tolerances"))
         self.txtjsr_3.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
-        self.txtjsr_3[num_case-1].setGeometry(QtCore.QRect(10, 70, 71, 18))
+        self.txtjsr_3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 71*sz_w, 18*sz_h))
         self.txtjsr_3[num_case-1].setObjectName("txtjsr_3")
         self.tol_ts_abs_jsr.append(QtWidgets.QPlainTextEdit(self.GJSR1[num_case-1]))
-        self.tol_ts_abs_jsr[num_case-1].setGeometry(QtCore.QRect(50, 60, 51, 31))
+        self.tol_ts_abs_jsr[num_case-1].setGeometry(QtCore.QRect(50*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_abs_jsr[num_case-1].setObjectName("tol_ts_abs_jsr")
         self.txtjsr_2.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
-        self.txtjsr_2[num_case-1].setGeometry(QtCore.QRect(110, 40, 31, 18))
+        self.txtjsr_2[num_case-1].setGeometry(QtCore.QRect(110*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtjsr_2[num_case-1].setObjectName("txtjsr_2")
         self.tol_ts_rel_jsr.append(QtWidgets.QPlainTextEdit(self.GJSR1[num_case-1]))
-        self.tol_ts_rel_jsr[num_case-1].setGeometry(QtCore.QRect(100, 60, 51, 31))
+        self.tol_ts_rel_jsr[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
         self.tol_ts_rel_jsr[num_case-1].setObjectName("tol_ts_rel_jsr")
         self.txtjsr_1.append(QtWidgets.QLabel(self.GJSR1[num_case-1]))
-        self.txtjsr_1[num_case-1].setGeometry(QtCore.QRect(60, 40, 31, 18))
+        self.txtjsr_1[num_case-1].setGeometry(QtCore.QRect(60*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
         self.txtjsr_1[num_case-1].setObjectName("txtjsr_1")
         self.txtjsr_3[num_case-1].setText(_translate("MainWindow", "tol ts"))
         self.txtjsr_2[num_case-1].setText(_translate("MainWindow", "rel"))
@@ -2760,11 +2833,11 @@ class Ui_MainWindow(object):
 
         # resident time
         self.GJSR2.append(QtWidgets.QGroupBox(self.GJSR[num_case-1]))
-        self.GJSR2[num_case-1].setGeometry(QtCore.QRect(170, 30, 131, 131))
+        self.GJSR2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 131*sz_w, 131*sz_h))
         self.GJSR2[num_case-1].setObjectName("GJSR2")
         self.GJSR2[num_case-1].setTitle(_translate("MainWindow", "Resident time"))
         self.t_max_jsr.append(QtWidgets.QDoubleSpinBox(self.GJSR2[num_case-1]))
-        self.t_max_jsr[num_case-1].setGeometry(QtCore.QRect(40, 50, 61, 32))
+        self.t_max_jsr[num_case-1].setGeometry(QtCore.QRect(40*sz_w, 50*sz_h, 61*sz_w, 32*sz_h))
         self.t_max_jsr[num_case-1].setDecimals(2)
         self.t_max_jsr[num_case-1].setMaximum(10.0)
         self.t_max_jsr[num_case-1].setSingleStep(0.1)
@@ -2774,42 +2847,44 @@ class Ui_MainWindow(object):
 
 
     def add_cf_pprem_options(self,num_case): # partially premixed flame conditions
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
-        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351, 10+(num_case-1)*181, 1161, 171))
-        self.Gf[num_case-1].setGeometry(QtCore.QRect(1512, 10+(num_case-1)*181, 670, 171))
+        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351*sz_w, (10+(num_case-1)*181)*sz_h, 1161*sz_w, 171*sz_h))
+        self.Gf[num_case-1].setGeometry(QtCore.QRect(1512*sz_w, (10+(num_case-1)*181)*sz_h, 670*sz_w, 171*sz_h))
         # Burner 1  -1
-        self.df_G11[num_case-1].setGeometry(QtCore.QRect(200, 20, 201, 141))
-        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(130, 30, 61, 18))
-        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10, 20, 41, 18))
-        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10, 50, 61, 18))
-        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10, 80, 61, 18))
-        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10, 110, 91, 18))
-        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100, 10, 91, 31))
-        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(100, 40, 91, 31))
-        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100, 70, 91, 31))
-        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100, 100, 91, 31))
+        self.df_G11[num_case-1].setGeometry(QtCore.QRect(200*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(130*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 41*sz_w, 18*sz_h))
+        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 80*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 110*sz_h, 91*sz_w, 18*sz_h))
+        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 10*sz_h, 91*sz_w, 31*sz_h))
+        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 40*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 70*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 100*sz_h, 91*sz_w, 31*sz_h))
         self.df_fuel_1[num_case-1].setPlainText(_translate("MainWindow", "CH4"))
         self.df_Diluent_1[num_case-1].setPlainText(_translate("MainWindow", "N2"))
         self.df_oxidant_1[num_case-1].setPlainText(_translate("MainWindow", "O2"))
         d_dil_ratio = str(d_diluent_ratio).replace('[','').replace(']','').replace(',','').replace("'","")
         self.df_Diluent_r_1[num_case-1].setPlainText(_translate("MainWindow", d_dil_ratio))
         # Burner 1  -2
-        self.df_G12[num_case-1].setGeometry(QtCore.QRect(400, 20, 231, 141))
-        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80, 110, 31, 18))
-        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120, 30, 51, 31))
-        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80, 70, 31, 18))
-        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140, 10, 31, 18))
-        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120, 60, 51, 31))
-        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120, 100, 51, 31))
-        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80, 40, 31, 18))
-        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10, 30, 51, 31))
-        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20, 10, 21, 18))
-        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(170, 60, 51, 31))
-        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(170, 30, 51, 31))
-        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(180, 10, 41, 20))
-        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(170, 97, 51, 31))
-        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(170, -97, 51, 31))
+        self.df_G12[num_case-1].setGeometry(QtCore.QRect(400*sz_w, 20*sz_h, 231, 141*sz_h))
+        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 110*sz_h, 31, 18*sz_h))
+        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 30*sz_h, 51, 31*sz_h))
+        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 70*sz_h, 31, 18*sz_h))
+        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140*sz_w, 10*sz_h, 31, 18*sz_h))
+        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 60*sz_h, 51, 31*sz_h))
+        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 100*sz_h, 51, 31*sz_h))
+        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20*sz_w, 10*sz_h, 21*sz_w, 18*sz_h))
+        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(180*sz_w, 10*sz_h, 41*sz_w, 20*sz_h))
+        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 97*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, -97*sz_h, 51*sz_w, 31*sz_h))
         self.df_eqmin_1[num_case-1].setPlainText(_translate("MainWindow", "0.5"))
         self.df_eqmax_1[num_case-1].setPlainText(_translate("MainWindow", "1.5"))
         self.df_eqincr_1[num_case-1].setPlainText(_translate("MainWindow", ".5"))
@@ -2818,41 +2893,41 @@ class Ui_MainWindow(object):
         self.df_mdot2_1[num_case-1].setPlainText(_translate("MainWindow", "3"))
         self.df_mdot3_1[num_case-1].setText(_translate("MainWindow", "1"))
         # Lines
-        self.line_2[num_case-1].setGeometry(QtCore.QRect(630, 23, 20, 141))
+        self.line_2[num_case-1].setGeometry(QtCore.QRect(630*sz_w, 23*sz_h, 20*sz_w, 141*sz_h))
         # Burner 2  -1
-        self.df_G21[num_case-1].setGeometry(QtCore.QRect(720, 20, 201, 141))
-        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(650, 30, 61, 18))
-        self.df_fuel_2[num_case-1].setGeometry(QtCore.QRect(100, 10, 91, 31))
-        self.df_oxidant_2[num_case-1].setGeometry(QtCore.QRect(100, 40, 91, 31))
-        self.df_Diluent_2[num_case-1].setGeometry(QtCore.QRect(100, 70, 91, 31))
-        self.df_Diluent_r_2[num_case-1].setGeometry(QtCore.QRect(100, 100, 91, 31))
-        self.df_txt1_2[num_case-1].setGeometry(QtCore.QRect(10, 20, 41, 18))
-        self.df_txt2_2[num_case-1].setGeometry(QtCore.QRect(10, 50, 61, 18))
-        self.df_txt4_2[num_case-1].setGeometry(QtCore.QRect(10, 110, 91, 18))
-        self.df_txt3_2[num_case-1].setGeometry(QtCore.QRect(10, 80, 61, 18))
+        self.df_G21[num_case-1].setGeometry(QtCore.QRect(720*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(650*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
+        self.df_fuel_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 10*sz_h, 91*sz_w, 31*sz_h))
+        self.df_oxidant_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 40*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 70*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_r_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 100*sz_h, 91*sz_w, 31*sz_h))
+        self.df_txt1_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 41*sz_w, 18*sz_h))
+        self.df_txt2_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt4_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 110*sz_h, 91*sz_w, 18*sz_h))
+        self.df_txt3_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 80*sz_h, 61*sz_w, 18*sz_h))
         self.df_fuel_2[num_case-1].setPlainText(_translate("MainWindow", "CH4"))
         self.df_oxidant_2[num_case-1].setPlainText(_translate("MainWindow", "O2"))
         self.df_Diluent_2[num_case-1].setPlainText(_translate("MainWindow", "N2"))
         d_dil_ratio = str(d_diluent_ratio).replace('[','').replace(']','').replace(',','').replace("'","")
         self.df_Diluent_r_2[num_case-1].setPlainText(_translate("MainWindow", d_dil_ratio))
         # Burner 2  -2
-        self.df_G22[num_case-1].setGeometry(QtCore.QRect(920, 20, 231, 141))
-        self.df_T_2[num_case-1].setGeometry(QtCore.QRect(10, 30, 51, 31))
-        self.df_eqmin_2[num_case-1].setGeometry(QtCore.QRect(120, 30, 51, 31))
-        self.df_eqmax_2[num_case-1].setGeometry(QtCore.QRect(120, 60, 51, 31))
-        self.df_eqincr_2[num_case-1].setGeometry(QtCore.QRect(120, 100, 51, 31))
+        self.df_G22[num_case-1].setGeometry(QtCore.QRect(920*sz_w, 20*sz_h, 231*sz_w, 141*sz_h))
+        self.df_T_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmin_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmax_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqincr_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
         self.df_eqincr_2[num_case-1].setAlignment(QtCore.Qt.AlignCenter)
-        self.df_mdot1_2[num_case-1].setGeometry(QtCore.QRect(170, 30, 51, 31))
-        self.df_mdot2_2[num_case-1].setGeometry(QtCore.QRect(170, 60, 51, 31))
-        self.df_mdot3_2[num_case-1].setGeometry(QtCore.QRect(170, 100, 51, 31))
+        self.df_mdot1_2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot2_2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot3_2[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
         self.df_mdot3_2[num_case-1].setAlignment(QtCore.Qt.AlignCenter)
-        self.df_mdot4_2[num_case-1].setGeometry(QtCore.QRect(120, -100, 51, 31))
-        self.txt5_3[num_case-1].setGeometry(QtCore.QRect(140, 10, 31, 18))
-        self.txt7_4[num_case-1].setGeometry(QtCore.QRect(20, 10, 21, 18))
-        self.txt7_5[num_case-1].setGeometry(QtCore.QRect(180, 10, 41, 20))
-        self.txt8_3[num_case-1].setGeometry(QtCore.QRect(80, 40, 31, 18))
-        self.txt9_3[num_case-1].setGeometry(QtCore.QRect(80, 70, 31, 18))
-        self.txt10_3[num_case-1].setGeometry(QtCore.QRect(80, 110, 31, 18))
+        self.df_mdot4_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -100*sz_h, 51*sz_w, 31*sz_h))
+        self.txt5_3[num_case-1].setGeometry(QtCore.QRect(140*sz_w, 10*sz_h, 31*sz_w, 18*sz_h))
+        self.txt7_4[num_case-1].setGeometry(QtCore.QRect(20*sz_w, 10*sz_h, 21*sz_w, 18*sz_h))
+        self.txt7_5[num_case-1].setGeometry(QtCore.QRect(180*sz_w, 10*sz_h, 41*sz_w, 20*sz_h))
+        self.txt8_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+        self.txt9_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 70*sz_h, 31*sz_w, 18*sz_h))
+        self.txt10_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 110*sz_h, 31*sz_w, 18*sz_h))
         self.df_eqmin_2[num_case-1].setPlainText(_translate("MainWindow", "0.5"))
         self.df_eqmax_2[num_case-1].setPlainText(_translate("MainWindow", "1.5"))
         self.df_eqincr_2[num_case-1].setText(_translate("MainWindow", ".5"))
@@ -2865,41 +2940,43 @@ class Ui_MainWindow(object):
 
 
     def add_cf_diff_options(self,num_case): # diffusion flame conditions
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
-        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351, 10+(num_case-1)*181, 1050, 171))
-        self.Gf[num_case-1].setGeometry(QtCore.QRect(1401, 10+(num_case-1)*181, 670, 171))
+        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351*sz_w, (10+(num_case-1)*181)*sz_h, 1050*sz_w, 171*sz_h))
+        self.Gf[num_case-1].setGeometry(QtCore.QRect(1401*sz_w, (10+(num_case-1)*181)*sz_h, 670*sz_w, 171*sz_h))
         # Burner 1  -1
-        self.df_G11[num_case-1].setGeometry(QtCore.QRect(200, 20, 201, 141))
-        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(130, 30, 61, 18))
-        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100, 30, 91, 31))
-        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100, 60, 91, 31))
-        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(-100, 40, 91, 31))
-        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100, 90, 91, 31))
-        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10, 40, 41, 18))
-        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10, -70, 61, 18))
-        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10, 100, 91, 18))
-        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10, 70, 61, 18))
+        self.df_G11[num_case-1].setGeometry(QtCore.QRect(200*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(130*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
+        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 30*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 91*sz_w, 31*sz_h))
+        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(-100*sz_w, 40*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 90*sz_h, 91*sz_w, 31*sz_h))
+        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 41*sz_w, 18*sz_h))
+        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, -70*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 100*sz_h, 91*sz_w, 18*sz_h))
+        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 61*sz_w, 18*sz_h))
         self.df_fuel_1[num_case-1].setPlainText(_translate("MainWindow", "CH4"))
         self.df_Diluent_1[num_case-1].setPlainText(_translate("MainWindow", "N2"))
         self.df_oxidant_1[num_case-1].setPlainText(_translate("MainWindow", "O2"))
         self.df_Diluent_r_1[num_case-1].setPlainText(_translate("MainWindow", str(d_diluent_ratio_diff1)))
         # Burner 1  -2
-        self.df_G12[num_case-1].setGeometry(QtCore.QRect(400, 20, 171, 141))
-        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120, -300, 51, 31))
-        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120, -300, 51, 31))
-        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120, -300, 51, 31))
-        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140, -100, 31, 18))
-        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20, 10, 21, 18))
-        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(120, 10, 41, 20))
-        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80, 40, 31, 18))
-        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80, 70, 31, 18))
-        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80, 110, 31, 18))
-        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10, 30, 51, 31))
-        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(120, 30, 51, 31))
-        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(120, 60, 51, 31))
-        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(120, -97, 51, 31))
-        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(120, 100, 51, 31))
+        self.df_G12[num_case-1].setGeometry(QtCore.QRect(400*sz_w, 20*sz_h, 171*sz_w, 141*sz_h))
+        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -300*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -300*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -300*sz_h, 51*sz_w, 31*sz_h))
+        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140*sz_w, -100*sz_h, 31*sz_w, 18*sz_h))
+        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20*sz_w, 10*sz_h, 21*sz_w, 18*sz_h))
+        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 10*sz_h, 41*sz_w, 20*sz_h))
+        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 70*sz_h, 31*sz_w, 18*sz_h))
+        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 110*sz_h, 31*sz_w, 18*sz_h))
+        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -97*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
         self.df_eqmin_1[num_case-1].setPlainText(_translate("MainWindow", "0.5"))
         self.df_eqmax_1[num_case-1].setPlainText(_translate("MainWindow", "1.5"))
         self.df_eqincr_1[num_case-1].setPlainText(_translate("MainWindow", ".5"))
@@ -2909,37 +2986,37 @@ class Ui_MainWindow(object):
         self.df_mdot3_1[num_case-1].setText(_translate("MainWindow", "1"))
         self.df_mdot4_1[num_case-1].setPlainText(_translate("MainWindow", "1"))
         # line
-        self.line_2[num_case-1].setGeometry(QtCore.QRect(580, 23, 20, 141))
+        self.line_2[num_case-1].setGeometry(QtCore.QRect(580*sz_w, 23*sz_h, 20*sz_w, 141*sz_h))
         # Burner 2  -1
-        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(600, 30, 61, 18))
-        self.df_G21[num_case-1].setGeometry(QtCore.QRect(660, 20, 201, 141))
-        self.df_fuel_2[num_case-1].setGeometry(QtCore.QRect(-100, 10, 91, 31))
-        self.df_Diluent_2[num_case-1].setGeometry(QtCore.QRect(100, 60, 91, 31))
-        self.df_oxidant_2[num_case-1].setGeometry(QtCore.QRect(100, 30, 91, 31))
-        self.df_Diluent_r_2[num_case-1].setGeometry(QtCore.QRect(100, 90, 91, 31))
-        self.df_txt1_2[num_case-1].setGeometry(QtCore.QRect(10, -200, 41, 18))
-        self.df_txt2_2[num_case-1].setGeometry(QtCore.QRect(10, 40, 61, 18))
-        self.df_txt4_2[num_case-1].setGeometry(QtCore.QRect(10, 100, 91, 18))
-        self.df_txt3_2[num_case-1].setGeometry(QtCore.QRect(10, 70, 61, 18))
+        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(600*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
+        self.df_G21[num_case-1].setGeometry(QtCore.QRect(660*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_fuel_2[num_case-1].setGeometry(QtCore.QRect(-100*sz_w, 10*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 60*sz_h, 91*sz_w, 31*sz_h))
+        self.df_oxidant_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 30*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_r_2[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 90*sz_h, 91*sz_w, 31*sz_h))
+        self.df_txt1_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, -200*sz_h, 41*sz_w, 18*sz_h))
+        self.df_txt2_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt4_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 100*sz_h, 91*sz_w, 18*sz_h))
+        self.df_txt3_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 70*sz_h, 61*sz_w, 18*sz_h))
         self.df_oxidant_2[num_case-1].setPlainText(_translate("MainWindow", "O2"))
         self.df_Diluent_2[num_case-1].setPlainText(_translate("MainWindow", "N2"))
         self.df_Diluent_r_2[num_case-1].setPlainText(_translate("MainWindow", str(d_diluent_ratio_diff2)))
         # Burner 2  -2
-        self.df_G22[num_case-1].setGeometry(QtCore.QRect(860, 20, 171, 141))
-        self.df_eqmin_2[num_case-1].setGeometry(QtCore.QRect(120, -50, 51, 31))
-        self.df_eqmax_2[num_case-1].setGeometry(QtCore.QRect(120, -60, 51, 31))
-        self.df_eqincr_2[num_case-1].setGeometry(QtCore.QRect(120, -100, 51, 31))
-        self.df_T_2[num_case-1].setGeometry(QtCore.QRect(10, 30, 51, 31))
-        self.txt5_3[num_case-1].setGeometry(QtCore.QRect(140, -100, 31, 18))
-        self.txt7_4[num_case-1].setGeometry(QtCore.QRect(20, 10, 21, 18))
-        self.txt7_5[num_case-1].setGeometry(QtCore.QRect(130, 10, 41, 20))
-        self.txt8_3[num_case-1].setGeometry(QtCore.QRect(80, 40, 31, 18))
-        self.txt9_3[num_case-1].setGeometry(QtCore.QRect(80, 70, 31, 18))
-        self.txt10_3[num_case-1].setGeometry(QtCore.QRect(80, 110, 31, 18))
-        self.df_mdot1_2[num_case-1].setGeometry(QtCore.QRect(120, 30, 51, 31))
-        self.df_mdot2_2[num_case-1].setGeometry(QtCore.QRect(120, 60, 51, 31))
-        self.df_mdot3_2[num_case-1].setGeometry(QtCore.QRect(120, -100, 51, 31))
-        self.df_mdot4_2[num_case-1].setGeometry(QtCore.QRect(120, 100, 51, 31))
+        self.df_G22[num_case-1].setGeometry(QtCore.QRect(860*sz_w, 20*sz_h, 171*sz_w, 141*sz_h))
+        self.df_eqmin_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -50*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmax_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqincr_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -100*sz_h, 51*sz_w, 31*sz_h))
+        self.df_T_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.txt5_3[num_case-1].setGeometry(QtCore.QRect(140*sz_w, -100*sz_h, 31*sz_w, 18*sz_h))
+        self.txt7_4[num_case-1].setGeometry(QtCore.QRect(20*sz_w, 10*sz_h, 21*sz_w, 18*sz_h))
+        self.txt7_5[num_case-1].setGeometry(QtCore.QRect(130*sz_w, 10*sz_h, 41*sz_w, 20*sz_h))
+        self.txt8_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+        self.txt9_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 70*sz_h, 31*sz_w, 18*sz_h))
+        self.txt10_3[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 110*sz_h, 31*sz_w, 18*sz_h))
+        self.df_mdot1_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot2_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot3_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, -100*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot4_2[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
         self.df_mdot3_2[num_case-1].setAlignment(QtCore.Qt.AlignCenter)
         self.df_eqmin_2[num_case-1].setPlainText(_translate("MainWindow", "0.5"))
         self.df_eqmax_2[num_case-1].setPlainText(_translate("MainWindow", "1.5"))
@@ -2954,41 +3031,43 @@ class Ui_MainWindow(object):
 
 
     def add_cf_tprem_options(self,num_case):
+        global sz_w
+        global sz_h
         _translate = QtCore.QCoreApplication.translate
 
-        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351, 10+(num_case-1)*181, 570, 171))
-        self.Gf[num_case-1].setGeometry(QtCore.QRect(921, 10+(num_case-1)*181, 670, 171))
+        self.Conditions_diff_flame[num_case-1].setGeometry(QtCore.QRect(351*sz_w, (10+(num_case-1)*181)*sz_h, 570*sz_w, 171*sz_h))
+        self.Gf[num_case-1].setGeometry(QtCore.QRect(921*sz_w, (10+(num_case-1)*181)*sz_h, 670*sz_w, 171*sz_h))
         # Burner 1  -1
-        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(10, -50, 61, 18))
-        self.df_G11[num_case-1].setGeometry(QtCore.QRect(130, 20, 201, 141))
-        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100, 10, 91, 31))
-        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100, 70, 91, 31))
-        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(100, 40, 91, 31))
-        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100, 100, 91, 31))
-        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10, 20, 41, 18))
-        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10, 50, 61, 18))
-        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10, 110, 91, 18))
-        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10, 80, 61, 18))
+        self.df_txt_burn1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, -50*sz_h, 61*sz_w, 18*sz_h))
+        self.df_G11[num_case-1].setGeometry(QtCore.QRect(130*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_fuel_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 10*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 70*sz_h, 91*sz_w, 31*sz_h))
+        self.df_oxidant_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 40*sz_h, 91*sz_w, 31*sz_h))
+        self.df_Diluent_r_1[num_case-1].setGeometry(QtCore.QRect(100*sz_w, 100*sz_h, 91*sz_w, 31*sz_h))
+        self.df_txt[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 41*sz_w, 18*sz_h))
+        self.df_txt_2[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 61*sz_w, 18*sz_h))
+        self.df_txt_4[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 110*sz_h, 91*sz_w, 18*sz_h))
+        self.df_txt_3[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 80*sz_h, 61*sz_w, 18*sz_h))
         self.df_fuel_1[num_case-1].setPlainText(_translate("MainWindow", "CH4"))
         self.df_Diluent_1[num_case-1].setPlainText(_translate("MainWindow", "N2"))
         self.df_oxidant_1[num_case-1].setPlainText(_translate("MainWindow", "O2"))
         self.df_Diluent_r_1[num_case-1].setPlainText(_translate("MainWindow", "O2/N2  3.76"))
         # Burner 1  -2
-        self.df_G12[num_case-1].setGeometry(QtCore.QRect(330, 20, 231, 141))
-        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10, 30, 51, 31))
-        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120, 30, 51, 31))
-        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120, 60, 51, 31))
-        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120, 100, 51, 31))
-        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(170, 30, 51, 31))
-        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(170, 60, 51, 31))
-        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(170, 97, 51, 31))
-        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(170, -97, 51, 31))
-        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140, 10, 31, 18))
-        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20, 10, 21, 18))
-        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(180, 10, 41, 20))
-        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80, 40, 31, 18))
-        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80, 70, 31, 18))
-        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80, 110, 31, 18))
+        self.df_G12[num_case-1].setGeometry(QtCore.QRect(330*sz_w, 20*sz_h, 231*sz_w, 141*sz_h))
+        self.df_T_1[num_case-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmin_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqmax_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_eqincr_1[num_case-1].setGeometry(QtCore.QRect(120*sz_w, 100*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot1_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 30*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot2_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 60*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot3_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, 97*sz_h, 51*sz_w, 31*sz_h))
+        self.df_mdot4_1[num_case-1].setGeometry(QtCore.QRect(170*sz_w, -97*sz_h, 51*sz_w, 31*sz_h))
+        self.txt5_2[num_case-1].setGeometry(QtCore.QRect(140*sz_w, 10*sz_h, 31*sz_w, 18*sz_h))
+        self.txt7_2[num_case-1].setGeometry(QtCore.QRect(20*sz_w, 10*sz_h, 21*sz_w, 18*sz_h))
+        self.txt7_3[num_case-1].setGeometry(QtCore.QRect(180*sz_w, 10*sz_h, 41*sz_w, 20*sz_h))
+        self.txt8_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 40*sz_h, 31*sz_w, 18*sz_h))
+        self.txt9_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 70*sz_h, 31*sz_w, 18*sz_h))
+        self.txt10_2[num_case-1].setGeometry(QtCore.QRect(80*sz_w, 110*sz_h, 31*sz_w, 18*sz_h))
         self.df_T_1[num_case-1].setPlainText(_translate("MainWindow", "300"))
         self.df_eqmin_1[num_case-1].setPlainText(_translate("MainWindow", "0.5"))
         self.df_eqmax_1[num_case-1].setPlainText(_translate("MainWindow", "1.5"))
@@ -2997,18 +3076,20 @@ class Ui_MainWindow(object):
         self.df_mdot2_1[num_case-1].setPlainText(_translate("MainWindow", "3"))
         self.df_mdot3_1[num_case-1].setText(_translate("MainWindow", "1"))
         # Lines
-        self.line_2[num_case-1].setGeometry(QtCore.QRect(-570, 23, 20, 141))
+        self.line_2[num_case-1].setGeometry(QtCore.QRect(-570*sz_w, 23*sz_h, 20*sz_w, 141*sz_h))
         # Burner 2  -1
-        self.df_G21[num_case-1].setGeometry(QtCore.QRect(-870, 20, 201, 141))
-        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(800, 30, 61, 18))
+        self.df_G21[num_case-1].setGeometry(QtCore.QRect(-870*sz_w, 20*sz_h, 201*sz_w, 141*sz_h))
+        self.df_txt_burn2[num_case-1].setGeometry(QtCore.QRect(800*sz_w, 30*sz_h, 61*sz_w, 18*sz_h))
         # Burner 2  -2
-        self.df_G22[num_case-1].setGeometry(QtCore.QRect(-1070, 20, 231, 141))
+        self.df_G22[num_case-1].setGeometry(QtCore.QRect(-1070*sz_w, 20*sz_h, 231*sz_w, 141*sz_h))
 
         self.pts_scatter[num_case-1].setPlainText(_translate("MainWindow", d_pts_scatter_cf))
 
 
 
     def write_parameters(self, get_fn):
+        global sz_w
+        global sz_h
         os.chdir(self.main_dir)
 
 
@@ -3023,6 +3104,7 @@ class Ui_MainWindow(object):
         mech_prev_red   = self.reduced_mechanism
         verbose         = int(self.MP_verbose.text())
         show_plots      = self.cB_show_plots.isChecked()
+        write_ck        = self.cB_chemkin_f.isChecked()
 
         # targets
         tspc = []
@@ -3322,7 +3404,7 @@ class Ui_MainWindow(object):
                     elif self.df_mdot3_1[case].text() == 'error':
                         mdot_incr  = 0
                     else:
-                        mdot_incr  = float(self.df_mdot3_1[case].text())                        
+                        mdot_incr  = float(self.df_mdot3_1[case].text())
                     if mdot_incr==0: mdot_incr=mdot_max-mdot_min+mdot_max*5
                     mdots_1.append(list(np.arange(mdot_min, mdot_max+mdot_min/2, mdot_incr)))
                     # Burner 2
@@ -3419,9 +3501,10 @@ class Ui_MainWindow(object):
         if self.external_results:
             fd.write('ext_results_file  = ' + self.external_results.split('/')[-1] + '\n')
             fd.write('conc_units        = ' + self.ext_res_conc_unit    + '\n')
-            fd.write('ext_data_type     = ' + self.ext_res_file_type    + '\n')
+#            fd.write('ext_data_type     = ' + self.ext_res_file_type    + '\n')
         fd.write('verbose           = ' + str(verbose)       + '\n')
         fd.write('show_plots        = ' + str(show_plots)    + '\n')
+        fd.write('write_ck          = ' + str(write_ck)    + '\n')
         fd.write('tspc              = ' + list2txt(tspc)     + '\n')
         fd.write('T_check           = ' + str(T_check)       + '\n')
         fd.write('sp_T              = ' + list2txt(sp_T)     + '\n')
@@ -3506,7 +3589,7 @@ class Ui_MainWindow(object):
                     fd.write('width             = ' + str(xmax[case_act])              + '\n')
                 fd.write('tol_ts            = ' + list2txt(tol_ts[case_act])   + '\n')
                 if 'flame' in configs[case_act]:
-                    fd.write('tol_ss            = ' + str(tol_ss[case_act])            + '\n')
+                    fd.write('tol_ss            = ' + list2txt(tol_ss[case_act])            + '\n')
                     fd.write('transport_model   = ' + transport_model[case_act]        + '\n')
                     fd.write('pts_scatter       = ' + str(pts_scatter[case_act])       + '\n')
                     fd.write('slope             = ' + str(slope_ff[case_act])       + '\n')
@@ -3603,6 +3686,8 @@ class Ui_MainWindow(object):
 
 
     def load_parameters(self):
+        global sz_w
+        global sz_h
 
         #remove conditions and operators
         for case in range(len(self.condition_activated)):
@@ -3640,6 +3725,7 @@ class Ui_MainWindow(object):
             if txt[0] == 'conc_units':        conc_units       = genf.clean_txt(txt[1])
             if txt[0] == 'verbose':           verbose       = int(txt[1])
             if txt[0] == 'show_plots':        show_plots    = genf.str2bool(txt[1])
+            if txt[0] == 'write_ck':          write_ck      = genf.str2bool(txt[1])
             if txt[0] == 'tspc':
                 tspc          = genf.txt2list_string(txt[1])
                 n_tspc = len(tspc)
@@ -3676,8 +3762,8 @@ class Ui_MainWindow(object):
                 item = self.list_spec.item(sp)
                 item.setText(_translate("MainWindow", self.gas_ref.species_name(sp)))
             # appearance of "import external data" option
-            self.pB_External_data.setGeometry(QtCore.QRect(10, 90, 151, 34))
-            self.label_External_data.setGeometry(QtCore.QRect(180, 100, 350, 18))
+            self.pB_External_data.setGeometry(QtCore.QRect(10*sz_w, 90*sz_h, 151*sz_w, 34*sz_h))
+            self.label_External_data.setGeometry(QtCore.QRect(180*sz_w, 100*sz_h, 350*sz_w, 18*sz_h))
         filename_save = filename.split('/')[-1].split('.')[0]
         self.Text_file_name.setPlainText(_translate("MainWindow", filename_save))
         if 'mech_prev_red' in locals():
@@ -3694,11 +3780,14 @@ class Ui_MainWindow(object):
                 self.ext_res_file_type = ext_data_type
             if 'conc_units' in locals():
                 self.ext_res_conc_unit = conc_units
-            
+
         if 'verbose' in locals():     self.MP_verbose.setProperty("value", verbose)
         if 'show_plots' in locals():
             if show_plots:  self.cB_show_plots.setChecked(True)
             else:           self.cB_show_plots.setChecked(False)
+        if 'write_ck' in locals():
+            if write_ck:    self.cB_chemkin_f.setChecked(True)
+            else:           self.cB_chemkin_f.setChecked(False)
         if 'tspc' in locals():        self.add_target_spec(tspc)
         if 'T_check' in locals():
             if T_check:     self.cB_tsp_T.setChecked(True)
@@ -3820,9 +3909,9 @@ class Ui_MainWindow(object):
                 if txt[0] == 'phi_max_2':         phi2_max           = genf.clean_txt(txt[1])
                 if txt[0] == 'phi_incr_2':        phi2_incr          = genf.clean_txt(txt[1])
                 if txt[0] == 'phis_2':            phis2              = genf.txt2list_float(txt[1])
-                
-                
-                
+
+
+
                 if txt[0] == 'width':             width = float(txt[1])
 
                 txt = fs.readline().split('=')
@@ -3836,11 +3925,11 @@ class Ui_MainWindow(object):
                         elif config=='reactor_HP':
                             self.rB_reactor_HP[case_n].setChecked(True)
                         self.add_conditions(case_n+1)
-                        self.Gr[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 731, 171))
+                        self.Gr[case_n].setGeometry(QtCore.QRect(700*sz_w, (10+(case_n)*181)*sz_h, 731*sz_w, 171*sz_h))
                         # options for reactor
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_r[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_r[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_rel_r[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_abs_r[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 'n_pts' in locals():
                             self.pts_num[case_n].setProperty("value", int(n_pts));            del n_pts
@@ -3860,11 +3949,11 @@ class Ui_MainWindow(object):
                     if config=='JSR':
                         self.rB_JSR[case_n].setChecked(True)
                         self.add_conditions(case_n+1)
-                        self.GJSR[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 311, 171))
+                        self.GJSR[case_n].setGeometry(QtCore.QRect(700*sz_w, (10+(case_n)*181)*sz_h, 311*sz_w, 171*sz_h))
                         # options for JSR
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_rel_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_abs_jsr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 't_max' in locals():
                             self.t_max_jsr[case_n].setProperty("value", float(t_max)); del t_max
@@ -3872,11 +3961,11 @@ class Ui_MainWindow(object):
                     if config=='PFR':
                         self.rB_PFR[case_n].setChecked(True)
                         self.add_conditions(case_n+1)
-                        self.Gpfr[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 460, 171))
+                        self.Gpfr[case_n].setGeometry(QtCore.QRect(700*sz_w, (10+(case_n)*181)*sz_h, 460*sz_w, 171*sz_h))
                         # options for PFR
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_pfr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_pfr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_rel_pfr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_abs_pfr[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 'n_pts' in locals():
                             self.pts_num_pfr[case_n].setProperty("value", int(n_pts))
@@ -3890,24 +3979,24 @@ class Ui_MainWindow(object):
                         if config=='free_flame':
                             self.rB_fflame[case_n].setChecked(True)
                             self.add_conditions(case_n+1)
-                            self.Gf[case_n].setGeometry(QtCore.QRect(700, 10+(case_n)*181, 670, 171))
+                            self.Gf[case_n].setGeometry(QtCore.QRect(700*sz_w, (10+(case_n)*181)*sz_h, 670*sz_w, 171*sz_h))
                         if config=='diff_flame' or config=='pp_flame' or config=='tp_flame':
                             self.rB_cfflame[case_n].setChecked(True)
                             self.add_conditions(case_n+1)
-                            self.Conditions_diff_flame[case_n].setGeometry(QtCore.QRect(351, 10+(case_n)*181, 1050, 171))
-                            self.Gf[case_n].setGeometry(QtCore.QRect(1401, 10+(case_n)*181, 670, 171))
+                            self.Conditions_diff_flame[case_n].setGeometry(QtCore.QRect(351*sz_w, (10+(case_n)*181)*sz_h, 1050*sz_w, 171*sz_h))
+                            self.Gf[case_n].setGeometry(QtCore.QRect(1401*sz_w, (10+(case_n)*181)*sz_h, 670*sz_w, 171*sz_h))
                         if config=='diff_flame': self.rB_cff_diff[case_n].setChecked(True)
                         if config=='pp_flame': self.rB_cff_pp[case_n].setChecked(True)
                         if config=='tp_flame': self.rB_cff_tp[case_n].setChecked(True)
 
                         # options for flame
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 'tol_ss' in locals():
-                            self.tol_ss_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[0]))
-                            self.tol_ss_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[1]))
+                            self.tol_ss_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[0]))
+                            self.tol_ss_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[1]))
                             del tol_ss
                         if 'transport_model' in locals():
                             if transport_model=='Mix':
@@ -3969,12 +4058,12 @@ class Ui_MainWindow(object):
 
                         # options for flame
                         if 'tol_ts' in locals():
-                            self.tol_ts_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
-                            self.tol_ts_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
+                            self.tol_ts_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[0]))
+                            self.tol_ts_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ts.split(',')[1]))
                             del tol_ts
                         if 'tol_ss' in locals():
-                            self.tol_ss_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[0]))
-                            self.tol_ss_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[1]))
+                            self.tol_ss_rel_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[0]))
+                            self.tol_ss_abs_f[case_n].setPlainText(_translate("MainWindow", tol_ss.split(',')[1]))
                             del tol_ss
                         if 'transport_model' in locals():
                             if transport_model=='Mix':
@@ -4040,7 +4129,7 @@ class Ui_MainWindow(object):
                             if len(phis)==1:    div_ = 1
                             else:               div_ = len(phis)-1
                             self.df_eqincr_1[case_n].setPlainText(_translate("MainWindow", format((phis[-1]-phis[0])/div_,'.2f')))
-                            del phis  
+                            del phis
                         if 'phi2_min'       in locals(): self.df_eqmin_2[case_n].setPlainText(_translate("MainWindow", phi_min));  del phi2_min
                         if 'phi2_max'       in locals(): self.df_eqmax_2[case_n].setPlainText(_translate("MainWindow", phi_max));  del phi2_max
                         if 'phi2_incr'      in locals(): self.df_eqincr_2[case_n].setPlainText(_translate("MainWindow",phi_incr)); del phi2_incr
@@ -4050,7 +4139,7 @@ class Ui_MainWindow(object):
                             if len(phis2)==1:    div_ = 1
                             else:               div_ = len(phis2)-1
 #                            self.df_eqincr_2[case_n].setPlainText(_translate("MainWindow", format((phis2[-1]-phis2[0])/div_,'.2f')))
-                            del phis2                                                   
+                            del phis2
                     else:
                         if 'phi_min'       in locals(): self.eqmin[case_n].setPlainText(_translate("MainWindow", phi_min));  del phi_min
                         if 'phi_max'       in locals(): self.eqmax[case_n].setPlainText(_translate("MainWindow", phi_max));  del phi_max
@@ -4061,12 +4150,12 @@ class Ui_MainWindow(object):
                             if len(phis)==1:    div_ = 1
                             else:               div_ = len(phis)-1
                             self.eqincr[case_n].setPlainText(_translate("MainWindow", format((phis[-1]-phis[0])/div_,'.2f')))
-                            del phis                        
+                            del phis
 
     #    print('\r start operator ')
         while '> Op:' not in txt[-1] and txt[0] != '':
             txt = fs.readline().split('=')
-            
+
         global condition_tab_removed
 
         # get data
@@ -4276,7 +4365,7 @@ class Ui_MainWindow(object):
                         self.GA_clic()
                         if condition_tab_removed == False:
                             self.tablet.removeTab(1)
-                            condition_tab_removed = True                                                
+                            condition_tab_removed = True
                         self.tablet.setCurrentIndex(0)
                     else:
                         self.GA_clic()
@@ -4409,12 +4498,14 @@ def list2txt(_list):
 class Files_windows(QtWidgets.QWidget):
 
     def __init__(self):
+        global sz_w
+        global sz_h
         super().__init__()
         self.title = 'PyQt5 file dialogs - pythonspot.com'
         self.left = 10
         self.top = 10
-        self.width = 640
-        self.height = 480
+        self.width = 640*sz_w
+        self.height = 480*sz_h
 
     def initUI(self):
         self.setWindowTitle(self.title)

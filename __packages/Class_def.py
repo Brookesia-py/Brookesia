@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -62,6 +62,15 @@ class Clock:
         print('\n\n' + '=' *(length_txt) + '\n ' + txt_disp)
         print('=' *length_txt + '\n\n')
 
+    def display_(self,mp):
+        difftime = self.stop_time - self.start_time
+        difftuple = timer.gmtime(difftime)
+        txt_disp = self.title +' computation time: %i h %i min %i sec' \
+        %(difftuple.tm_hour, difftuple.tm_min, difftuple.tm_sec)
+        length_txt = len(txt_disp)+2
+        print_('\n\n' + '=' *(length_txt) + '\n ' + txt_disp,mp)
+        print_('=' *length_txt + '\n\n',mp)
+
     def text(self):
         difftime = self.stop_time - self.start_time
         difftuple = timer.gmtime(difftime)
@@ -113,8 +122,8 @@ class Composition :
 
                 # X_diluent calculation
                 if type(self.diluent_ratio) is float :
-                    X_diluent = self.diluent_ratio * (X_oxidant + self.phi)   \
-                                 /(1-self.diluent_ratio)
+                    X_diluent = (self.diluent_ratio/100) * (X_oxidant + self.phi)   \
+                                 /(1-self.diluent_ratio/100)
                 else:
                     X_diluent = X_oxidant * self.diluent_ratio[1]
 
@@ -239,6 +248,7 @@ class conditions :
                 old_stdout = sys.stdout ; old_stderr = sys.stderr
                 with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
 
+                ct.suppress_thermo_warnings()
                 try:
                     gas = ct.Solution(mech)
                 except:
@@ -267,6 +277,7 @@ class conditions :
         self.exp_data    = False
         self.import_data = False
         self.conc_unit   = "volumic_concentration" # molar_fraction
+        self.mech_prev_red = False
 
 
 
@@ -305,9 +316,22 @@ class Red_operator :
         self.inter_sp_inter     = inter_sp_inter
         # drg
         self.graph_search       = 'Dijkstra'  # Dijkstra DFS
+        self.new_targets_4_DRG_r= copy.deepcopy(target_species)
 
         # sa
         self.tol_ts             = tol_ts
+
+        # csp
+        self.csp_method         = 'Valorani_2006'       # (e.g. 1-1e-5)
+        self.tol_csp            = .01       # (e.g. 1-1e-5)
+        self.nTime              = 10
+        self.TimeResolution     = 1e-7         # (e.g. 1e0)
+        self.epsilon_rel        = False
+        self.epsilon_abs        = 1e-12
+        self.I_fast             = []
+        self.I_slow             = []
+        self.radIdx             = []
+        self.csp_refin_iter     = 0
 
         self.OIC_sp             = False
 
@@ -497,11 +521,11 @@ class Errors:
         T_red             = red_results.T
 
         n_points = len(pts_scatter)
-        
+
         T_data = True
         if 'False' in T_ref:     T_data = False
         elif np.min(T_ref)<273:  T_data = False
-        
+
         if error_calculation=="points" and T_data:
 
             # ========   2 - Temperature error   ==========
@@ -1217,6 +1241,7 @@ class Mech_data:
                         break
 
         # check submechanism family:
+        ct.suppress_thermo_warnings()
         gas = ct.Solution(mech)
         nu_f = gas.reactant_stoich_coeffs()
         nu_r = gas.product_stoich_coeffs()
@@ -1266,7 +1291,9 @@ class Mech_data:
         # active species and reactions lists
         if act_sp=="no_arg": act_sp = self.spec.activ_p
         if act_r=="no_arg" : act_r  = self.react.activ_p
-        if True not in act_sp:
+        if not act_sp:
+            act_sp=self.spec.activ_m ; act_r =self.react.activ_m
+        elif True not in act_sp:
             act_sp=self.spec.activ_m ; act_r =self.react.activ_m
 
         sp_list=[];remove_sp_list=[]
@@ -1301,15 +1328,15 @@ class Mech_data:
 
         #elements
         txt_elements = self.gas_prop[l].split('"')[0]+'"'
-        elements = ["C","H","O","N","AR","HE","Ar","He"]
+        elements = ["C","H","O","N","AR","HE","Ar","He", "c", "h", "o", "n", "ar", "he"]
         for el in elements:
             if self.find_element(el,act_sp):
-                if el == "AR":
-                    txt_elements += "Ar" + " "
-                elif el == "HE":
-                    txt_elements += "He" + " "
-                else:
-                    txt_elements += el + " "
+#                if el == "AR":
+#                    txt_elements += "Ar" + " "
+#                elif el == "HE":
+#                    txt_elements += "He" + " "
+#                else:
+                txt_elements += el.capitalize() + " "
         txt_elements += '",\n'
         fd.write(txt_elements)
 
@@ -1323,7 +1350,7 @@ class Mech_data:
             else:
                 fd.write(txt_spec+"\n")
                 txt_spec="                     "+self.spec.name[sp]+"  "
-                i=0
+                i=1
         txt_spec+='""",\n'
         fd.write(txt_spec)
 
@@ -1336,9 +1363,38 @@ class Mech_data:
 
         fd.write("\n")
 
+
+#-------------------------------------------------------------------------------
+# Species data
+#-------------------------------------------------------------------------------
+
+
 # =============================================================================
 #         Species
 # =============================================================================
+
+        # ---------------------------------------------------------------------
+        #         CSP radicals
+        # ---------------------------------------------------------------------
+        if len(self.spec.CSP_radicals)>0:
+            fd.write("#-------------------------------------------------------------------------------\n")
+            fd.write("# CSP radicals\n")
+            fd.write("#-------------------------------------------------------------------------------\n")
+            fd.write("#\n#  ")
+            # check if species have been identified as radicals at every conditions
+            CSP_radicals_always = [True]*len(self.spec.name)
+            for _l in range(len(self.spec.CSP_radicals)):
+                for sp in range(len(self.spec.CSP_radicals[0])):
+                    if not self.spec.CSP_radicals[_l][sp]:
+                        CSP_radicals_always[sp] = False
+            # write radicals
+            _n_rad = 0
+            for sp in range(len(CSP_radicals_always)):
+                if _n_rad == 10:
+                    fd.write('\n#  ') ; _n_rad = 0
+                if CSP_radicals_always[sp] and self.spec.activ_m[sp]:
+                    fd.write(self.spec.name[sp] + '  ') ; _n_rad +=1
+            fd.write("\n#\n#\n")
 
         fd.write("#-------------------------------------------------------------------------------\n")
         fd.write("# Species data\n")
@@ -1523,6 +1579,308 @@ class Mech_data:
         fd.close()
 
 
+
+
+
+    def write_chemkin_mech(self,filename="temp.ck",act_sp="no_arg",act_r="no_arg"):
+
+        if len(filename)>3:
+            if filename[-4:]=='.cti':
+                filename = filename[:-4] + '.ck'
+
+        fd = open(filename, 'w')
+
+        # active species and reactions lists
+        if act_sp=="no_arg": act_sp = self.spec.activ_p
+        if act_r=="no_arg" : act_r  = self.react.activ_p
+        if True not in act_sp:
+            act_sp=self.spec.activ_m ; act_r =self.react.activ_m
+
+        sp_list=[];remove_sp_list=[]
+        for sp in range(len(act_sp)):
+            if act_sp[sp]:
+                sp_list.append(sp)
+            else:
+                remove_sp_list.append(sp)
+        r_list=[]
+        for r in range(len(act_r)):
+            if act_r[r]:
+                r_list.append(r)
+
+
+# =============================================================================
+#         Units ans gas properties
+# =============================================================================
+
+#        self.gas_prop = []
+
+#        # Units writing
+#        l=0
+#        while self.gas_prop[l]!="\n":
+#            fd.write(self.gas_prop[l])
+#            l+=1
+#
+#
+#        # Gas characteristics writing
+#        while "elements" not in self.gas_prop[l]:
+#            fd.write(self.gas_prop[l])
+#            l+=1
+
+        #elements
+        txt_elements = 'ELEMENTS\n'#self.gas_prop[l].split('"')[0]+'"'
+        elements = ["C","H","O","N","AR","HE","Ar","He"]
+        for el in elements:
+            if self.find_element(el,act_sp):
+                if el == "AR":
+                    txt_elements += "Ar" + " "
+                elif el == "HE":
+                    txt_elements += "He" + " "
+                else:
+                    txt_elements += el + " "
+        txt_elements += '\nEND\n'
+        fd.write(txt_elements)
+
+
+        #species
+        txt_spec = 'SPECIES\n'
+        i=0
+        for sp in sp_list:
+            if i<5 :
+                txt_spec+=self.spec.name[sp]+"  "
+                i+=1
+            else:
+                fd.write(txt_spec+"\n")
+                txt_spec=self.spec.name[sp]+"  "
+                i=1
+        txt_spec+='\nEND\n'
+
+        fd.write(txt_spec)
+
+#        while "reactions" not in self.gas_prop[l]:
+#            l+=1
+#
+#        while self.gas_prop[l]!="\n":
+#            fd.write(self.gas_prop[l])
+#            l+=1
+
+#        fd.write("\n")
+        # ---------------------------------------------------------------------
+        #         CSP radicals
+        # ---------------------------------------------------------------------
+        if len(self.spec.CSP_radicals)>0:
+            fd.write("!-------------------------------------------------------------------------------\n")
+            fd.write("! CSP radicals\n")
+            fd.write("!-------------------------------------------------------------------------------\n")
+            fd.write("!\n!  ")
+            # check if species have been identified as radicals at every conditions
+            CSP_radicals_always = [True]*len(self.spec.name)
+            for _l in range(len(self.spec.CSP_radicals)):
+                for sp in range(len(self.spec.CSP_radicals[0])):
+                    if not self.spec.CSP_radicals[_l][sp]:
+                        CSP_radicals_always[sp] = False
+            # write radicals
+            _n_rad = 0
+            for sp in range(len(CSP_radicals_always)):
+                if _n_rad == 10:
+                    fd.write('\n!  ') ; _n_rad = 0
+                if CSP_radicals_always[sp] and self.spec.activ_m[sp]:
+                    fd.write(self.spec.name[sp] + '  ') ; _n_rad +=1
+            fd.write("\n!\n!\n")
+
+
+
+# =============================================================================
+#         Reactions
+# =============================================================================
+
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("! Reaction data\n")
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("REACTIONS\n")
+
+        r_list_ = copy.deepcopy(r_list)
+        for r in r_list_:
+            if r in self.duplicate_list:
+                for d in self.duplicate_list:
+                        if self.react.formula[d]==self.react.formula[r]:
+                            if d not in r_list:
+                                r_list.append(d)
+        r_list.sort()
+
+        for r in r_list: # in activated reactions list
+            dup_txt = ''
+            txt_space = ''
+            for ts in range(50-len(self.react.formula[r])):
+                txt_space += ' '
+
+            # comments
+            comments = ''
+            for line in self.react.txt[r]:
+                if "options='duplicate'" in line:
+                    dup_txt = ' DUPLICATE\n'
+                elif "falloff=Troe(" in line or self.react.type[r]=="pdep_arrhenius":
+                    if "options='duplicate'" in self.react.eff[r]:
+                        dup_txt = ' DUPLICATE\n'
+                    comments += ''
+                else:
+                    comments +=  '!' + line
+
+            #fd.write("\n# Reaction "+str(self.react.number[r])+"\n")
+            if self.react.type[r]=="reaction":
+                #    # ReactionXX
+                #    reaction('H2O2 + OH <=> H2O + HO2', [1.740000e+12, 0.0, 318.0],
+                #             options='duplicate')
+#                r_line = "reaction('"+self.react.formula[r]+"', ["            \
+#                         + str('%0.6e' %self.react.kin[r][0]) + ", "          \
+#                         + str('%0.4f' %self.react.kin[r][1]) + ", "          \
+#                         + str('%0.3f' %self.react.kin[r][2]) + "]"
+                r_line = self.react.formula[r] + txt_space              \
+                         + str('%0.6e' %self.react.kin[r][0]) + "  "    \
+                         + str('%0.4f' %self.react.kin[r][1]) + "  "    \
+                         + str('%0.3f' %self.react.kin[r][2]) + "\n"
+#                r_txt = ''
+
+                fd.write(r_line)
+                fd.write(comments)
+
+            if self.react.type[r]=="three_body_reaction":
+                #    # Reaction XX
+                #    three_body_reaction('O + O + M <=> O2 + M', [6.165000e+15, -0.5, 0.0],
+                #    efficiencies='CO2:3.8 CO:1.9 H2:2.5 H2O:12.0 AR:0.83 CH4:2.0 C2H6:3.0 HE:0.83')
+                r_line = self.react.formula[r]+txt_space \
+                         + str('%0.6e' %self.react.kin[r][0]) + ", "          \
+                         + str('%0.4f' %self.react.kin[r][1]) + ", "          \
+                         + str('%0.3f' %self.react.kin[r][2]) + "\n"
+                if self.react.eff[r]!=[] or self.react.txt[r]!=[]:
+                    r_efficiencies=""
+                    if self.react.eff[r]!=[]:
+                        r_efficiencies=""
+                        #r_efficiencies += "                    efficiencies='"
+                        for sp in sp_list:
+                            for coll_sp in self.react.eff[r]:
+                                if self.spec.name[sp] == coll_sp.split(":")[0]:
+                                    r_efficiencies+=coll_sp.split(":")[0]+'/'\
+                                                    +coll_sp.split(":")[1]+'/ '
+                        r_efficiencies+="\n" ;
+                    if self.react.txt[r]!=[]:
+                        r_txt = ''
+                        for line in self.react.txt[r]:
+                            r_txt += '!' + line
+#                            if "options='duplicate'" in line:
+#                                dup_txt = ' DUPLICATE\n'
+                        r_txt += '\n'
+                    else: r_txt="\n"
+                else: r_efficiencies="";r_txt="\n"
+
+                fd.write(r_line)
+                fd.write(r_efficiencies)
+                fd.write(comments)
+
+            if self.react.type[r]=="falloff_reaction":
+                #    # Reaction 71
+                #    falloff_reaction('CO + H2 (+ M) <=> CH2O (+ M)',
+                #                     kf=[4.300000e+07, 1.5, 79600.0],
+                #                     kf0=[5.070000e+27, -3.42, 84348.0],
+                #                     efficiencies='CO2:2.0 CO:1.5 H2:2.0 H2O:6.0 AR:0.7 CH4:2.0 C2H6:3.0 HE:0.7',
+                #                     falloff=Troe(A=0.932, T3=197.0, T1=1540.0, T2=10300.0))
+                #H+CH2(+M)<=>CH3(+M)                      6.000E+14     .000        .00
+                #     LOW  /  1.040E+26   -2.760   1600.00/
+                #     TROE/   .5620  91.00  5836.00  8552.00/
+                #H2/2.00/ H2O/6.00/ CH4/2.00/ CO/1.50/ CO2/2.00/ C2H6/3.00/ AR/ .70/
+                r_line = self.react.formula[r]+txt_space        \
+                + str('%0.6e' %self.react.kin[r][0][0]) + '  '  \
+                + str('%0.4e' %self.react.kin[r][0][1]) + '  '  \
+                + str('%0.3e' %self.react.kin[r][0][2]) + '\n'  \
+                + '     LOW /  '                                \
+                + str('%0.6e' %self.react.kin[r][1][0]) + '  '  \
+                + str('%0.4e' %self.react.kin[r][1][1]) + '  '  \
+                + str('%0.3e' %self.react.kin[r][1][2]) + ' /\n'
+
+                if self.react.eff[r]!=[] or self.react.txt[r]!=[]:
+#                    else: r_efficiencies=""
+                    if self.react.txt[r]!=[]:
+                        r_txt = ''
+                        for line in self.react.txt[r]:
+                            if 'falloff=Troe' in line:
+                                r_txt += '     TROE/   '                     \
+                                + line.split('A=')[1].split(',')[0]  + '  ' \
+                                + line.split('T3=')[1].split(',')[0] + '  ' \
+                                + line.split('T1=')[1].split(',')[0].split(')')[0]
+                            if 'T2=' in line:
+                                r_txt += '  ' + line.split('T2=')[1].split(')')[0] + '/\n'
+                            else:
+                                r_txt += '/\n'
+                    else: r_txt=""
+                    if self.react.eff[r]!=[]:
+                        r_efficiencies=""
+                        #r_efficiencies += "                    efficiencies='"
+                        for sp in sp_list:
+                            for coll_sp in self.react.eff[r]:
+                                if self.spec.name[sp] == coll_sp.split(":")[0]:
+                                    r_efficiencies+=coll_sp.split(":")[0]+'/'\
+                                                    +coll_sp.split(":")[1]+'/ '
+                        r_efficiencies+="\n"
+                    else: r_efficiencies=""
+                else: r_txt="" ; r_efficiencies=""
+#                for line in self.react.txt[r]:
+#                    r_txt += '!' + line
+
+                fd.write(r_line)
+                fd.write(r_txt)
+                fd.write(r_efficiencies)
+                fd.write(comments)
+#                    if "options='duplicate'" in line:
+#                        dup_txt = ' DUPLICATE\n'
+#                fd.write(dup_txt)
+
+            if self.react.type[r]=="pdep_arrhenius":
+                #    # Reaction 391
+                #    pdep_arrhenius('CH3COCH3 <=> CH3CO + CH3',
+                #                   [(0.01, 'atm'), 2.050000e+58, -12.796, 100030.1],
+                #                   [(0.1, 'atm'), 3.300000e+51, -10.574, 98221.2],
+                #                   [(1.0, 'atm'), 1.310000e+42, -7.657, 94660.6],
+                #                   [(10.0, 'atm'), 2.160000e+33, -4.989, 90916.5],
+                #                   [(100.0, 'atm'), 9.400000e+28, -3.669, 89022.8])
+                #CH3+OH<=>CH2(S)+H2O                               4.936E+014    -0.669    -445.8
+                #PLOG/      0.0100     4.936E+014    -0.669      -445.8/
+                #PLOG/      0.1000     1.207E+015    -0.778      -175.6/
+                #PLOG/      1.0000     5.282E+017    -1.518      1772.0/
+                #PLOG/     10.0000     4.788E+023    -3.155      7003.0/
+                #PLOG/    100.0000     8.433E+019    -1.962      8244.0/
+
+                r_line = self.react.formula[r]+txt_space \
+                             + '%0.3e' %self.react.kin[r][0][0] + "  "  \
+                             + '%0.3f' %self.react.kin[r][0][1] + "  "  \
+                             + '%0.1f' %self.react.kin[r][0][2] + "\n"
+                k_line = ""
+                for l in range(len(self.react.txt[r])):
+                    if float(self.react.txt[r][l])<9:   txt_space = '      ';
+                    elif float(self.react.txt[r][l])<99: txt_space = '     ';
+                    elif float(self.react.txt[r][l])<999: txt_space = '    ';
+                    elif float(self.react.txt[r][l])<9999: txt_space = '   ';
+                    elif float(self.react.txt[r][l])<99999: txt_space = '  ';
+
+                    k_line += "PLOG/" + txt_space                             \
+                             + '%0.4f' %float(self.react.txt[r][l]) + "     " \
+                             + '%0.3e' %self.react.kin[r][l][0]     + "     " \
+                             + '%0.3f' %self.react.kin[r][l][1]     + "     " \
+                             + '%0.1f' %self.react.kin[r][l][2]     + "/\n"
+#                if self.react.eff[r]=="":  k_line+=")\n"
+#                else :                     k_line+=",\n"
+                fd.write(r_line)
+                fd.write(k_line)
+                fd.write(comments)
+#                fd.write(self.react.eff[r])
+
+            fd.write(dup_txt)
+
+        fd.write('\n END')
+        timer.sleep(1.5)
+
+        fd.close()
+
+
+
     def find_element(self,element,act_sp):
         for sp in range(len(self.spec.name)):
             if act_sp[sp]:
@@ -1659,19 +2017,20 @@ class Red_data :
 
 
 #        self.verbose                        = verbose
-        self.tspc                           = tspc
-        self.n_tspc                         = n_tspc
-        self.reduction_operator             = reduction_operator
-
         self.targetSpeciesIdx=[]
         while '' in tspc: tspc.remove('')
         for i in range(len(tspc)):
             	self.targetSpeciesIdx.append(gas_ref.species_index(tspc[i]))
 
+        self.tspc                           = tspc
+        self.n_tspc                         = n_tspc
+        self.reduction_operator             = reduction_operator
+
+
         if gas_act=='gas_ref': self.gas_act = gas_ref
         else :                 self.gas_act = gas_act
 
-        self.red_op = Red_operator(tspc)
+        self.red_op = Red_operator(self.targetSpeciesIdx)
 
         self.optim = optim
         self.write_results = False
@@ -1681,13 +2040,14 @@ class Red_data :
 class Species:
     def __init__(self,verbose=0):
 
-        self.name   = []
-        self.atoms  = []
-        self.thermo = []
-        self.trans  = []
-        self.note   = []
-        self.activ_p   = []
-        self.activ_m   = []
+        self.name           = []
+        self.atoms          = []
+        self.thermo         = []
+        self.trans          = []
+        self.note           = []
+        self.activ_p        = []
+        self.activ_m        = []
+        self.CSP_radicals   = []
 
 
 class Simul_param :
@@ -1696,8 +2056,8 @@ class Simul_param :
                  tol_ss = [1.0e-5, 1.0e-8],                                  \
                  tol_ts = [1.0e-4, 1.0e-8],                                  \
                  verbose = 0,                                                \
-                 tign_nPoints = 130, tign_dt = 1e-09,                    \
-                 n_pts = 250, delta_npts = 10, t_max_coeff = 5,              \
+                 tign_nPoints = 450, tign_dt = 1e-09,                    \
+                 n_pts = 250, delta_npts = 20, t_max_coeff = 5,              \
                  Scal_ref = 'H2O', grad_curv_ratio = 0.5):
 
         self.pts_scatter      = pts_scatter      # time stepping  or  grid
@@ -1709,13 +2069,14 @@ class Simul_param :
         self.n_pts            = n_pts
         self.delta_npts       = delta_npts
         self.t_max_coeff      = t_max_coeff
-        self.t_max_react      = 10
+        self.t_max_react      = 1
         self.Scal_ref         = Scal_ref
         self.grad_curv_ratio  = grad_curv_ratio
         self.mdot             = 1   # kg/m^2/s
         self.mdot2            = 3   # kg/m^2/s
         self.verbose          = verbose
         self.show_plots       = False
+        self.write_ck         = True
         self.transport_model  = "Mix"
         self.slope_ff         = 0.05
         self.curve_ff         = 0.05
@@ -1724,6 +2085,7 @@ class Simul_param :
         self.T_lim            = 800
         self.u_0              = .006   # PFR opt - inflow velocity [m/s]
         self.area             = 1.e-4  # PFR opt - cross-sectional area [m**2]
+        self.PFR_auto_time    = True  # PFR opt - automatic time discretization
         self.par_ind          = False
 
 class Sim_Results :
@@ -1747,6 +2109,7 @@ class Sim_Results :
         self.f           = False
 #        self.error_param = Error_param(error_param)
         self.X           = 0
+        self.Y           = 0
         self.conc2X()
         self.res_fname   = 'reduction_results.csv'
 
@@ -1762,12 +2125,35 @@ class Sim_Results :
                 else:
                     self.X[step].append(0)
 
+    def conc2Y(self):
+        gas = self.conditions.composition.gas_ref
+        self.Y=[]
+        for step in range(len(self.conc)):
+            self.Y.append([])
+            n_tot = sum(self.conc[step])
+            mean_molecular_weight = 0
+            for sp in range(len(self.conc[step])):
+                M_sp = gas.molecular_weights[sp]
+                mean_molecular_weight += self.X[step][sp]*M_sp
+            for sp in range(len(self.conc[step])):
+                M_sp = gas.molecular_weights[sp]
+                if n_tot!=0:
+                    self.Y[step].append((self.conc[step][sp]*M_sp)/(n_tot*mean_molecular_weight))
+                else:
+                    self.Y[step].append(0)
+
     def X2conc(self):
         conc=[]
 #        if sum(self.X[0])>0.001:
         for step in range(len(self.X)):
-#            if self.T[step]==0: print('toto')
-            ntot_V = self.P/(8.314*self.T[step])/1000  # kmol/m3
+            if type(self.P) is float: P = self.P
+            else: P = self.P[step]
+            try:
+                if type(self.T[step]) is str: T = 300
+                else: T =  self.T[step]
+            except:
+                T = 300
+            ntot_V = P/(8.314*T)/1000  # kmol/m3
             conc.append([])
             for idx in range(len(self.X[step])):
                 conc[step].append(self.X[step][idx]*ntot_V)
@@ -1869,7 +2255,7 @@ class Sim_Results :
             if "burner_flame" in self.conditions.config:
                 l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;mdot(kg/m2/s)"
             if "tp_flame" in self.conditions.config:
-                l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model"   
+                l1_conditions += ";Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model"
             if 'diff_' in self.conditions.config\
             or 'pp_'   in self.conditions.config:
                 l1_conditions += ";mdot;fuel2;oxidant2;diluent2;phi2;diluent_ratio2;mixt2;mdot2;Ti(K);rtol_ts;atol_ts;rtol_ss;atol_ss;transport_model;K_max(1/s)"
@@ -1907,11 +2293,11 @@ class Sim_Results :
                         +str(self.conditions.simul_param.tol_ss[0])+";"\
                         +str(self.conditions.simul_param.tol_ss[1])+";"\
                         +self.conditions.simul_param.transport_model+";"
-                if "free_" in self.conditions.config: 
+                if "free_" in self.conditions.config:
                     l2_conditions+=str(self.Sl)
-                if "diff_" in self.conditions.config or "pp_" in self.conditions.config: 
+                if "diff_" in self.conditions.config or "pp_" in self.conditions.config:
                     l2_conditions+=str(self.K_max)
-                if "burner" in self.conditions.config: 
+                if "burner" in self.conditions.config:
                     l2_conditions+=str(self.conditions.simul_param.mdot)
             elif "reactor" in self.conditions.config:
                 l2_conditions+=str(self.conditions.state_var.T)+";"\
@@ -1985,8 +2371,24 @@ class Sim_Results :
         elif "PFR" in self.conditions.config:
             fichier_data.write("\nt(s);Z(m);T(K)")
         for n_sp in range(gas.n_species):
+##            # ----------------------------------
+            #if gas.species_name(n_sp)=='nc7h16' \
+            #or gas.species_name(n_sp)=='co' \
+            #or gas.species_name(n_sp)=='co2' \
+            #or gas.species_name(n_sp)=='h2' \
+            #or gas.species_name(n_sp)=='o2' \
+            #or gas.species_name(n_sp)=='n2' \
+            #or gas.species_name(n_sp)=='c2h4':
+                #fichier_data.write(";"+str(gas.species_name(n_sp)))
+##            # ----------------------------------
             fichier_data.write(";"+str(gas.species_name(n_sp)))
+
         fichier_data.write("\n")
+
+        # ----------------------------------
+        self.conc2Y()
+        # ----------------------------------
+
         # data
         for nb_line in range(len(self.pts_scatter)):
             # time / z / Ti
@@ -1997,7 +2399,17 @@ class Sim_Results :
             # temperature
             fichier_data.write(str(self.T[nb_line]))
             for n_sp in range(gas.n_species):
-                # concentration
+                ## ----------------------------------
+                ## concentration
+                #if gas.species_name(n_sp)=='nc7h16' \
+                #or gas.species_name(n_sp)=='co' \
+                #or gas.species_name(n_sp)=='co2' \
+                #or gas.species_name(n_sp)=='h2' \
+                #or gas.species_name(n_sp)=='o2' \
+                #or gas.species_name(n_sp)=='n2' \
+                #or gas.species_name(n_sp)=='c2h4':
+                    #fichier_data.write(";"+str(self.X[nb_line][n_sp]))
+            # ----------------------------------
                 fichier_data.write(";"+str(self.X[nb_line][n_sp]))
             fichier_data.write("\n")
 
@@ -2071,3 +2483,9 @@ class ProgressBar:
 
 
 
+def get_screen_size():
+    from PyQt5 import QtWidgets
+
+    _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
+
+    return _height,_height

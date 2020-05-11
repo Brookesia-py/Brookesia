@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -46,7 +46,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
     n_tsp     = len(tsp_idx)
     tsp_name  = red_data.tspc
 
-    gas_ref = conditions.composition.gas
+    gas_ref = conditions.composition.gas_ref
     gas_red = red_results.gas
 
     X_red = conditions.composition.X
@@ -82,8 +82,8 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
     sensi_T        = np.zeros((n_r_ref))
     sensi_scatter  = []
 
-    time_start = timer.time() 
-    
+    time_start = timer.time()
+
     if 'flame' in conditions.config:
 
         f = red_results.f
@@ -144,7 +144,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                         sensi_scatter.append(z)
                         if conditions.simul_param.verbose >=2: bar.update(z)
                         sensi_T_z_adj = get_species_reaction_sensitivities(f, 'T', z)
-                        
+
                         if 'SARGEP' in red_data.reduction_operator:
                             n_spc = n_sp_ref
                         else:
@@ -457,7 +457,10 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                     n_spc = n_tsp
                 for spA in range(n_spc):
                     if 'SARGEP' not in red_data.reduction_operator or mech_data.spec.activ_m[spA]:
-                        sp_red+=1
+                        if 'SARGEP' not in red_data.reduction_operator:
+                            sp_red = gas_red.species_index(tsp_name[spA])
+                        else:
+                            sp_red+=1
                         r_red=-1
                         for r in range(n_r_ref):
                             if mech_data.react.activ_m[r]:
@@ -555,13 +558,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
         red_data.red_op.sensi_T = sensi_T
 
-        
-    time_end = timer.time() 
+
+    time_end = timer.time()
     if conditions.simul_param.verbose >=4 :
         print_("\n      time for SA computation+analysis: "+str(round(time_end-time_start))+'s',mp)
-        
+
     print_("\n",mp)
-    
+
 
 
     red_data.red_op.sensi_sp = S_AB_tsp

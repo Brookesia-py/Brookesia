@@ -1,10 +1,10 @@
-""" 
+"""
     Brookesia
     Reduction and optimization of kinetic mechanisms
-    
+
     Copyright (C) 2019  Matynia, Delaroque, Chakravarty
     contact : alexis.matynia@sorbonne-universite.fr
- 
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -44,7 +44,7 @@ from scipy.interpolate import interp1d
 #   Functions
 #==============================================================================
 
-def computation_reference(conditions, verbose=1):
+def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
     mp = conditions.main_path
     if verbose >=1:
         print_('\n\n============================ ',mp)
@@ -61,7 +61,7 @@ def computation_reference(conditions, verbose=1):
             print_('phi = '+str(conditions.composition.phi),mp)
         print_('============================ \n\n',mp)
 
-        results,conditions = comp.ref_computation(conditions,verbose)
+        results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
 
         return results,conditions
 
@@ -74,13 +74,19 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
     if conditions_list[0].import_data:
         ref_results_list_ext_data = copy_ref_results(ref_results_list)
         conditions_list, mech_results_list, ref_results_list \
-                  = input_results_treatment(conditions_list,ref_results_list)
+                  = input_results_treatment(conditions_list,ref_results_list,mech_data)
 
-    if 'mech_results_list' in locals(): 
+    if 'mech_results_list' in locals():
         red_results_list = copy_ref_results(mech_results_list)
     else:
         red_results_list = copy_ref_results(ref_results_list)
-        
+
+    if conditions_list[0].mech_prev_red:
+        gas_prev_mech = ct.Solution(conditions_list[0].mech_prev_red)
+        for i in range(len(red_results_list)):
+            red_results_list[i].gas = gas_prev_mech
+
+
     red_errors_list = []
 
 
@@ -109,6 +115,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         elif red_method == 'SAR_r':
             print_('            Reaction SA reduction \n',mp)
             folderCreation(conditions_list[0].mech,'','','_','__SAR_r',verbose)
+        elif red_method == 'CSP':
+            folderCreation(conditions_list[0].mech,'','','_','__CSP',verbose)
+            if len(mech_data.spec.CSP_radicals)>0: mech_data.spec.CSP_radicals = []
         elif red_method == 'NULL' and not conditions_list[0].import_data:
             mech_results_list = ref_results_list
 
@@ -128,12 +137,12 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 #        # for external results input : if no concentration data
 #        conc_ok = True
 #        for i in range(len(conditions_list)):
-#            if len(ref_results_list[i]) == 0: 
+#            if len(ref_results_list[i]) == 0:
 #                conc_ok = False
 #                _print('Warning: no concentration data')
 #                _print(red_method + ' cannot be applied')
 #                red_data_list[op][0].optim_param.optim_on_meth = False
-            
+
 
         if red_method != 'NULL':
             for i in range(len(conditions_list)):
@@ -149,13 +158,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 red_results = red_results_list[i]
                 # Reduction parameters
                 red_data    = red_data_list[op][i]
+#                if conditions_list[0].mech_prev_red:
+#                    red_data.gas_ref = gas_prev_mech
 
                 # loop variables
                 try_acc = [5]*n_tspecies ; try_n=1 # Reduction acceleration coeff
                 sp_try = np.zeros(n_tspecies)
                 sp_inter = np.zeros(n_tspecies)
                 T_try=0;ig_try=0;Sl_try=0;K_try=0
-                active_sp_pm = mech_data.react.activ_m
+                active_sp_pm = mech_data.spec.activ_m
                 active_r_pm  = mech_data.react.activ_m
                 red_results_loop = red_results
                 cross_red_error = False    # interactions between species reduction
@@ -180,18 +191,32 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     red_data = drg.dic(red_data,mech_data,red_results)
                     # Reaction interaction coefficients calculation
                     if '_r' in red_method:
+                        if i==0: red_data.red_op.first_step_DRG_r = True
+                        else:    red_data.red_op.first_step_DRG_r = False
+                        # add main coupled pecies coupled to targets for important reaction analysis
+                        if red_data.red_op.new_targets_4_DRG_r == tsp_idx:
+                            _eps = np.array(red_data.red_op.eps_init)*1e5
+                            _a = drg.graphSearch(conditions,red_data,mech_data,_eps)
+                            del _a
                         red_data = drg.ric(red_data, mech_data, red_results)
                     if red_data.optim:
                         if red_data.optim_param.optim_on_meth:
                             red_data = drg.ric(red_data, mech_data, red_results)
-                elif 'SA' in red_method :
-                    if conditions.config=='JSR': break
+                elif 'SA' in red_method:
+                    if conditions.config=='JSR':
+                        print_('Warning: non sensitivity analysis for JSR configuration',mp)
+                        break
                     # Sensitivity coefficients calculation
                     red_data = sa.sensitivities_computation_SA(red_data,mech_data,\
                                                             red_results)
                     if red_data.optim:
                         red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
-                
+                elif 'CSP' in red_method:
+                    if 'flame' in conditions.config:
+                        print_('Warning: no CSP analysis for flame configurations',mp)
+                        break
+                    red_data, CSP_radicals = csp.CSP_analysis(red_data,mech_data,red_results)
+                    mech_data.spec.CSP_radicals.append(CSP_radicals)
 
                 # eps definition
                 eps_init   = copy.deepcopy(red_data.red_op.eps_init)
@@ -293,7 +318,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
                     # testing new mech
                     if active_sp_pm   != sp_prev \
-                    or active_r_pm != r_prev:
+                    or active_r_pm    != r_prev  \
+                    or try_n==2:
                         if verbose>3:
                             print_("  "+str(active_sp_pm.count(True))+\
                                   " species, "+ str(active_r_pm.count(True))+\
@@ -518,7 +544,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     first_try =   [First_try_T_error]  + [First_try_ig_error]\
                                 + [First_try_Sl_error] +  [First_try_K_error]\
                                 +  First_try_sp_error
-                    if not cross_red_error: 
+                    if not cross_red_error:
                         if True in first_try or not errors.under_tol: # if reduced mech fails to respect the accuracy requirements
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
@@ -777,7 +803,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
             # clock
             clock.stop()
-            
+
             # Save method's reduced mech
             mech_data.spec.activ_m = list(mech_data.spec.activ_p)
             mech_data.react.activ_m = list(mech_data.react.activ_p)
@@ -789,6 +815,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
             if op==0:  os.mkdir('Red_mech')
             os.chdir('Red_mech')
             mech_data.write_new_mech(new_filename)
+            if conditions_list[0].simul_param.write_ck:
+                mech_data.write_chemkin_mech(new_filename)
             os.chdir(conditions_list[0].main_path)
 
 
@@ -866,7 +894,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
 
 
-def input_results_treatment(conditions_list,ref_results_list):
+def input_results_treatment(conditions_list,ref_results_list,mech_data):
 
     ''' return:
         - condition_list            which contain the vecto pts_scatter for the
@@ -885,95 +913,126 @@ def input_results_treatment(conditions_list,ref_results_list):
     '''
 
     mech_results_list = []
+    if conditions_list[-1].mech_prev_red:
+        gas = ct.Solution(conditions_list[-1].mech_prev_red)
+        for i in range(len(conditions_list)):
+            conditions_list[i].composition.gas = gas
     for i in range(len(conditions_list)):
-        results,conditions = computation_reference(conditions_list[i],1)
+        results,conditions = computation_reference(conditions_list[i],1,\
+                                mech_data.spec.activ_m,mech_data.react.activ_m)
         mech_results_list.append(results)
 
+    if conditions_list[0].exp_data :
     # shift free flame_data:
-    for i in range(len(conditions_list)):
-        conditions   = conditions_list[i]
-        if conditions.config == 'free_flame' and len(ref_results_list[i].X)>4:
-            # find z(1/2CH4)
-            fuel_idx = conditions_list[i].composition.gas_ref.species_index(\
-                    ref_results_list[i].conditions.composition.fuel.split('(')[0].split('/')[0])
-            c_i = ref_results_list[i].X[0][fuel_idx]
-            c_f = ref_results_list[i].X[-1][fuel_idx]
-            c_12 = (c_i-c_f)/2
-            for pt in range(len(ref_results_list[i].pts_scatter)):
-                if ref_results_list[i].X[pt][fuel_idx]<=c_12:
-                    pt_12_exp=ref_results_list[i].pts_scatter[pt]
-                    c_12 = ref_results_list[i].X[pt][fuel_idx]
-                    break
-            for pt in range(len(mech_results_list[i].pts_scatter)):
-                if mech_results_list[i].X[pt][fuel_idx]<=c_12:
-                    pt_12_sim=mech_results_list[i].pts_scatter[pt]
-                    break
-            # shift the experimental flame position:
-            shift = pt_12_sim-pt_12_exp
-            ref_results_list[i].pts_scatter = ref_results_list[i].pts_scatter+shift
-            # add points at the origin:
-            ref_results_list[i].pts_scatter = np.insert\
-                                              (ref_results_list[i].pts_scatter,0,0)
-            ref_results_list[i].X=[ref_results_list[i].X[0]]+ref_results_list[i].X
-            ref_results_list[i].T=[ref_results_list[i].T[0]]+ref_results_list[i].T
+        for i in range(len(conditions_list)):
+            conditions   = conditions_list[i]
+            if conditions.config == 'free_flame' and len(ref_results_list[i].X)>4:
+                # find z(1/2CH4)
+                fuel_idx = conditions_list[i].composition.gas_ref.species_index(\
+                        ref_results_list[i].conditions.composition.fuel.split('(')[0].split('/')[0])
+                c_i = ref_results_list[i].X[0][fuel_idx]
+                c_f = ref_results_list[i].X[-1][fuel_idx]
+                c_12 = (c_i-c_f)/2
+                for pt in range(len(ref_results_list[i].pts_scatter)):
+                    if ref_results_list[i].X[pt][fuel_idx]<=c_12:
+                        pt_12_exp=ref_results_list[i].pts_scatter[pt]
+                        c_12 = ref_results_list[i].X[pt][fuel_idx]
+                        break
+                for pt in range(len(mech_results_list[i].pts_scatter)):
+                    if mech_results_list[i].X[pt][fuel_idx]<=c_12:
+                        pt_12_sim=mech_results_list[i].pts_scatter[pt]
+                        break
+                # shift the experimental flame position:
+                shift = pt_12_sim-pt_12_exp
+                ref_results_list[i].pts_scatter = ref_results_list[i].pts_scatter+shift
+                # add points at the origin:
+                ref_results_list[i].pts_scatter = np.insert\
+                                                  (ref_results_list[i].pts_scatter,0,0)
+                ref_results_list[i].X=[ref_results_list[i].X[0]]+ref_results_list[i].X
+                ref_results_list[i].T=[ref_results_list[i].T[0]]+ref_results_list[i].T
 
-            # remove potential extra experimental points:
-            for pt in range(len(ref_results_list[i].pts_scatter)):
-                pts_scatter_end = mech_results_list[i].pts_scatter[-1]
-                conc_end        = ref_results_list[i].X[-(pt+1)]
-                T_end           = ref_results_list[i].T[-(pt+1)]
-                if ref_results_list[i].pts_scatter[-(pt+1)]>=mech_results_list[i].pts_scatter[-1]:
-                    ref_results_list[i].pts_scatter = np.delete(ref_results_list[i].pts_scatter,-1)
-                    del ref_results_list[i].X[-1]
-                    del ref_results_list[i].T[-1]
-                else:
-                    ref_results_list[i].pts_scatter=\
-                        np.concatenate((ref_results_list[i].pts_scatter,[pts_scatter_end]))
-                    ref_results_list[i].X+=list([conc_end])
-                    ref_results_list[i].T.append(T_end)
-                    ref_results_list[i].X2conc()
-                    break
+                # remove potential extra experimental points:
+                for pt in range(len(ref_results_list[i].pts_scatter)):
+                    pts_scatter_end = mech_results_list[i].pts_scatter[-1]
+                    conc_end        = ref_results_list[i].X[-(pt+1)]
+                    T_end           = ref_results_list[i].T[-(pt+1)]
+                    if ref_results_list[i].pts_scatter[-(pt+1)]>=mech_results_list[i].pts_scatter[-1]:
+                        ref_results_list[i].pts_scatter = np.delete(ref_results_list[i].pts_scatter,-1)
+                        del ref_results_list[i].X[-1]
+                        del ref_results_list[i].T[-1]
+                    else:
+                        ref_results_list[i].pts_scatter=\
+                            np.concatenate((ref_results_list[i].pts_scatter,[pts_scatter_end]))
+                        ref_results_list[i].X+=list([conc_end])
+                        ref_results_list[i].T.append(T_end)
+                        ref_results_list[i].X2conc()
+                        break
 
-    # Smoothed interpolation of experimental results
-    ref_results_list_smooth=[]
-    for i in range(len(conditions_list)):
-        ref_results_list_smooth.append(copy.copy(ref_results_list[i]))
-        pts_scatter_mech = list(mech_results_list[i].pts_scatter)
-        ns = conditions_list[i].composition.gas_ref.n_species
-        conc_smooth = np.zeros((len(pts_scatter_mech),ns))
-        for sp in range(len(mech_results_list[i].X[0])):
-            y=[]
-            for pt in range(len(ref_results_list[i].X)):
-                y.append(ref_results_list[i].X[pt][sp])
-            x=np.array(ref_results_list[i].pts_scatter)
-            y=np.array(y)
-            if len(x)==1: x=np.append(x,0.2) ; y=np.append(y,y)
-            conc_smooth_sp = interp1d(x, y, kind='linear')
-            for pt in range(len(pts_scatter_mech)):
-                if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
-                    conc_smooth[pt][sp]=conc_smooth_sp(pts_scatter_mech[pt])
-            conc_smooth[-1] = conc_smooth[-2]
+        # Smoothed interpolation of experimental results
+        ref_results_list_smooth=[]
+        for i in range(len(conditions_list)):
+            ref_results_list_smooth.append(copy.copy(ref_results_list[i]))
+            pts_scatter_mech = list(mech_results_list[i].pts_scatter)
+            ns = conditions_list[i].composition.gas_ref.n_species
+            conc_smooth = np.zeros((len(pts_scatter_mech),ns))
+            for sp in range(len(mech_results_list[i].X[0])):
+                y=[]
+                for pt in range(len(ref_results_list[i].X)):
+                    y.append(ref_results_list[i].X[pt][sp])
+                x=np.array(ref_results_list[i].pts_scatter)
+                y=np.array(y)
+                if len(x)==1: x=np.append(x,0.2) ; y=np.append(y,y)
+                conc_smooth_sp = interp1d(x, y, kind='linear')
+                for pt in range(len(pts_scatter_mech)):
+                    if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
+                        conc_smooth[pt][sp]=conc_smooth_sp(pts_scatter_mech[pt])
+                conc_smooth[-1] = conc_smooth[-2]
 
-        if 'False' not in ref_results_list[i].T:
-            T_v = np.array(ref_results_list[i].T)
-            if len(T_v)==1: T_v=np.append(T_v,T_v)
-            T = interp1d(x, T_v, kind='linear')
-            T_smooth = np.zeros((len(pts_scatter_mech)))
-            for pt in range(len(pts_scatter_mech)):
-                if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
-                    T_smooth[pt]=T(pts_scatter_mech[pt])
-            T_smooth[-1]=T_smooth[-2]
-            ref_results_list_smooth[i].T = list(T_smooth)
+            if 'False' not in ref_results_list[i].T:
+                T_v = np.array(ref_results_list[i].T)
+                if len(T_v)==1: T_v=np.append(T_v,T_v)
+                T = interp1d(x, T_v, kind='linear')
+                T_smooth = np.zeros((len(pts_scatter_mech)))
+                for pt in range(len(pts_scatter_mech)):
+                    if pts_scatter_mech[pt]<=ref_results_list[i].pts_scatter[-1]:
+                        T_smooth[pt]=T(pts_scatter_mech[pt])
+                T_smooth[-1]=T_smooth[-2]
+                ref_results_list_smooth[i].T = list(T_smooth)
+            else: ref_results_list_smooth[i].T = ref_results_list[i].T
+
+            ref_results_list_smooth[i].X = list(conc_smooth)
             ref_results_list_smooth[i].X2conc()
-        else: ref_results_list_smooth[i].T = ref_results_list[i].T
-            
-        
-        ref_results_list_smooth[i].X = list(conc_smooth)
-        
-        ref_results_list_smooth[i].pts_scatter=list(pts_scatter_mech)
-        ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
-        ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
-        conditions_list[i].simul_param.pts_scatter=list(pts_scatter_mech)
+
+            ref_results_list_smooth[i].pts_scatter=list(pts_scatter_mech)
+            ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
+            ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
+            conditions_list[i].simul_param.pts_scatter=list(pts_scatter_mech)
+#        else:
+#            ref_results_list_smooth = copy.copy(ref_results_list)
+#            for i in range(len(conditions_list)):
+#                ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
+#                ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
+#                ref_results_list_smooth[i].X2conc()
+#                mech_results_list[i].X2conc()
+    else:
+        # saving and suppression of unpickable variables
+        gas = ref_results_list[0].gas
+        f=[]
+        for res in range(len(ref_results_list)):
+            f.append(ref_results_list[res].f)
+            del ref_results_list[res].gas
+            del ref_results_list[res].f
+            del ref_results_list[res].conditions
+
+        ref_results_list_smooth = copy.deepcopy(ref_results_list)
+
+        for res in range(len(ref_results_list)):
+            ref_results_list[res].conditions        = conditions_list[res]
+            ref_results_list_smooth[res].conditions = conditions_list[res]
+            ref_results_list[res].gas               = gas
+            ref_results_list_smooth[res].gas        = gas
+            ref_results_list[res].f                 = f[res]
+            ref_results_list_smooth[res].f          = f[res]
 
     return conditions_list, mech_results_list, ref_results_list_smooth
 
@@ -988,8 +1047,8 @@ def folderCreation(mech, T, P, phi, name='', verbose=3):
 #        fs = open(mech, 'a')
 #        fs.write('\n#End')
 #        fs.close()
-    if verbose >=4:
-        print("folder : ", folder)
+    if verbose >=8:
+        print("creation of folder: ", folder)
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -1091,50 +1150,51 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             if line!=[]:
                 line_com = line
                 while ' ' in line_com: line_com=line_com.replace(' ','')
-                if "#" in line_com[0][0]:
-                    a=2
-                else:
-                    if "Case" in line[0]:
-                        # if applicable, save previous config data
-                        if case_nb>-1:
-                            data_save.append(data) ; data = [] ;
-                            steps_save.append(step_title) ;
-                            case_data.append(data_save); data_save = []
-                            case_steps.append(steps_save); steps_save = []
-                            headers_steps_save.append(headers_steps); headers_steps=[]
-                        
-                        if len(K_ext)<len(case_data):
-                            K_ext.append(False)
-                        case_nb += 1
-                        step_nb = -1
-                        read_data=0   # if applicable, stop recording data in data list
+                if len(line_com[0])>0:
+                    if '#' in line_com[0][0]:
+                        a=2
+                    else:
+                        if "Case" in line[0]:
+                            # if applicable, save previous config data
+                            if case_nb>-1:
+                                data_save.append(data) ; data = [] ;
+                                steps_save.append(step_title) ;
+                                case_data.append(data_save); data_save = []
+                                case_steps.append(steps_save); steps_save = []
+                                headers_steps_save.append(headers_steps); headers_steps=[]
 
-                    if "reactor" in line[0] or "flame" in line[0] or "JSR" in line[0] or "PFR" in line[0]:
-                        case_titles.append(line)
-                    
-                        
-                    if "Step" in line[0]:
-                        # if applicable, save previous step data
-                        if step_nb>-1:
-                            data_save.append(data) ; data = []
-                            steps_save.append(step_title)
+                            if len(K_ext)<len(case_data):
+                                K_ext.append(False)
+                            case_nb += 1
+                            step_nb = -1
+                            read_data=0   # if applicable, stop recording data in data list
 
-                        step_title = line[0].split(": ")[1]
-                        step_nb +=1
-                        read_data=0      # if applicable, stop recording data in data list
+                        if "reactor" in line[0] or "flame" in line[0] or "JSR" in line[0] or "PFR" in line[0]:
+                            case_titles.append(line)
 
-                    if "K_ext(1/s):" in line[0] and step_nb==0: #get K_ext ref
-                        K_ext.append(float(line[1]))
 
-                    if line[0] == "":
-                        read_data=0      # if applicable, stop recording data in data list
+                        if "Step" in line[0]:
+                            # if applicable, save previous step data
+                            if step_nb>-1:
+                                data_save.append(data) ; data = []
+                                steps_save.append(step_title)
 
-                    if "T(K)" in line or "Tf(K)" in line:   # means the headers line is reached
-                        headers_steps.append(line)
-                        read_data=1
+                            step_title = line[0].split(": ")[1]
+                            step_nb +=1
+                            read_data=0      # if applicable, stop recording data in data list
 
-                    elif read_data == 1:
-                        data.append(line) # Construct the data list
+                        if "K_ext(1/s):" in line[0] and step_nb==0: #get K_ext ref
+                            K_ext.append(float(line[1]))
+
+                        if line[0] == "":
+                            read_data=0      # if applicable, stop recording data in data list
+
+                        if "T(K)" in line or "Tf(K)" in line:   # means the headers line is reached
+                            headers_steps.append(line)
+                            read_data=1
+
+                        elif read_data == 1:
+                            data.append(line) # Construct the data list
 
 
     # Save previous config data
@@ -1156,7 +1216,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         fuel          = case_titles[c][1]
         oxidant       = case_titles[c][2]
         diluent       = case_titles[c][3]
-        if "diff_" not in config: 
+        if "diff_" not in config:
             phi           = float(case_titles[c][4])
         else: phi = False
         if "/" in case_titles[c][5]:
@@ -1196,9 +1256,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             fuel_2    = case_titles[c][9]
             oxidant_2 = case_titles[c][10]
             diluent_2 = case_titles[c][11]
-            if "diff_" not in config: 
+            if "diff_" not in config:
                 phi_2 = float(case_titles[c][12])
-            else: phi_2 = False            
+            else: phi_2 = False
             diluent_r_2 = case_titles[c][13]
             mixt2     = case_titles[c][14]
             mdot2     = float(case_titles[c][15])
@@ -1269,7 +1329,8 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             conditions_list[-1].simul_param.pts_scatter_i = np.array(pts_scatter)
             conditions_list[-1].simul_param.rtol_ts       = rtol_ts
             conditions_list[-1].simul_param.atol_ts       = atol_ts
-
+        else:
+            conditions_list[-1].exp_data = True
         if "flame" in config:
             conditions_list[-1].simul_param.rtol_ss = rtol_ss
             conditions_list[-1].simul_param.atol_ss = atol_ss
@@ -1280,12 +1341,12 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             conditions_list[-1].composition.oxidant2       = oxidant_2
             conditions_list[-1].composition.diluent2       = diluent_2
             conditions_list[-1].composition.phi2           = phi_2
-            conditions_list[-1].composition.diluent_ratio2 = diluent_r_2            
+            conditions_list[-1].composition.diluent_ratio2 = diluent_r_2
             conditions_list[-1].composition.X2             = mixt2
             conditions_list[-1].simul_param.mdot2          = mdot2  # kg/m^2/s
-            conditions_list[-1].state_var.T2               = Ti  # K            
+            conditions_list[-1].state_var.T2               = Ti  # K
 
-        conditions_list[-1].exp_data  = True
+        conditions_list[-1].ext_data  = True
         conditions_list[-1].conc_unit = conc_unit
 
         # -----------------------------
@@ -1296,8 +1357,8 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         ref_results_list[-1].P = P
         if conc_unit=="mol_m3":
             ref_results_list[-1].conc = list(conc) ; ref_results_list[-1].conc2X()
-        if conc_unit=="Molar_fraction":            
-            ref_results_list[-1].X = list(conc) ;    
+        if conc_unit=="Molar_fraction":
+            ref_results_list[-1].X = list(conc) ;
             if 'False' not in ref_results_list[-1].T:
                 ref_results_list[-1].X2conc()
         ref_results_list[-1].kf = False
@@ -1352,12 +1413,21 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
 
 
     fig, ax = plt.subplots()
-    if "reactor" in ref_results.conditions.config or "PFR" in ref_results.conditions.config:
-        ax.set_xlabel('t (s)')
-    elif "flame" in ref_results.conditions.config:
+    if "PFR" in ref_results.conditions.config:
+        ref_abs = np.array(ref_results.z1)*1000
+        if red_results: red_abs = np.array(red_results.z1)*1000
+        if opt_results: opt_abs = np.array(opt_results.z1)*1000
         ax.set_xlabel('Z (mm)')
-    elif "JSR" in ref_results.conditions.config:
-        ax.set_xlabel('T (K)')
+    else:
+        ref_abs = ref_results.pts_scatter
+        if red_results: red_abs = red_results.pts_scatter
+        if opt_results: opt_abs = opt_results.pts_scatter
+        if "reactor" in ref_results.conditions.config:
+            ax.set_xlabel('t (s)')
+        elif "flame" in ref_results.conditions.config:
+            ax.set_xlabel('Z (mm)')
+        elif "JSR" in ref_results.conditions.config:
+            ax.set_xlabel('T (K)')
 
     sp2plt_idx=[]
     for sp in spec2plot:
@@ -1369,7 +1439,7 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
         for step_X in ref_results.X:
             Xi.append(step_X[idx])
 
-        ax.plot(ref_results.pts_scatter, Xi, \
+        ax.plot(ref_abs[0:len(Xi)], Xi, \
                        linestyle=linestyles[i], color=colors_styles[0], \
                        linewidth=2, label=spec2plot[i])
 
@@ -1379,7 +1449,7 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
             Xi=[];idx=sp2plt_idx[i]
             for step_X in red_results.X:
                 Xi.append(step_X[idx])
-            ax.plot(red_results.pts_scatter, Xi, \
+            ax.plot(red_abs[0:len(Xi)], Xi, \
                            linestyle=linestyles[i], color=colors_styles[1],\
                            linewidth=2, label=spec2plot[i])
     # plot opt_results
@@ -1388,7 +1458,7 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
             Xi=[];idx=sp2plt_idx[i]
             for step_X in opt_results.X:
                 Xi.append(step_X[idx])
-            ax.plot(opt_results.pts_scatter, Xi, \
+            ax.plot(opt_abs[0:len(Xi)], Xi, \
                            linestyle=linestyles[i], color=colors_styles[0], \
                            linewidth=2, label=spec2plot[i])
 
@@ -1432,7 +1502,9 @@ def get_reduction_parameters(filename):
         if txt[0] == 'ext_data_type':       ext_data_type       = clean_txt2(txt[1])
         if txt[0] == 'verbose':             verbose             = int(txt[1])
         if txt[0] == 'show_plots':
-            show_plots    = str2bool(txt[1])
+            show_plots  = str2bool(txt[1])
+        if txt[0] == 'write_ck':
+            write_ck    = str2bool(txt[1])
         if txt[0] == 'tspc':
             tspc          = txt2list_string(txt[1])
             n_tspc = len(tspc)
@@ -1448,8 +1520,10 @@ def get_reduction_parameters(filename):
         if txt[0] == 'error_coupling':    error_coupling    = clean_txt(txt[1])
 
     # gas
-    try:    gas_ref = ct.Solution('_kinetic_mech/'+mech)
-    except: gas_ref = ct.Solution(mech)
+    try:
+        gas_ref = ct.Solution('_kinetic_mech/'+mech)
+    except:
+        gas_ref = ct.Solution(mech)
 
 
 # =============================================================================
@@ -1495,7 +1569,7 @@ def get_reduction_parameters(filename):
             if txt[0] == 'Scal_ref':          Scal_ref        = clean_txt(txt[1])
             if txt[0] == 'grad_curv_ratio':   grad_curv_ratio = float(txt[1])
             if txt[0] == 'tign_nPoints':      tign_nPoints    = float(txt[1])
-            if txt[0] == 'tign_dt':           tign_dt         = float(txt[1])
+            if txt[0] == 'tign_det_tmax_sec': t_max_react     = float(txt[1])
             # options for jsr
             if txt[0] == 't_max':             t_max           = float(txt[1]); caution_opt_jsr=False
             # options for flame
@@ -1702,6 +1776,8 @@ def get_reduction_parameters(filename):
                             conditions_list[-1].simul_param.verbose = verbose
                         if 'show_plots' in locals():
                             conditions_list[-1].simul_param.show_plots = show_plots
+                        if 'write_ck' in locals():
+                            conditions_list[-1].simul_param.write_ck = write_ck
                         if 'error_calculation' in locals():
                             conditions_list[-1].error_param.error_calculation = error_calculation
                         if 'error_coupling' in locals():
@@ -1909,6 +1985,15 @@ def get_reduction_parameters(filename):
             if txt[0] == 'max_error_K':       max_error_K        = float(txt[1])
             if txt[0] == 'inter_sp_inter':    inter_sp_inter     = str2bool(txt[1])
             if txt[0] == 'optim':             optim              = str2bool(txt[1])
+
+            if txt[0] == 'csp_method':        csp_method         = clean_txt(txt[1])
+            if txt[0] == 'tol_csp':           tol_csp            = float(txt[1])
+            if txt[0] == 'time_resolution':   time_resolution    = float(txt[1])
+            if txt[0] == 'epsilon_rel':
+                epsilon_rel        = float(txt[1])
+            if txt[0] == 'epsilon_abs':       epsilon_abs        = float(txt[1])
+            if txt[0] == 'csp_refin_iter':    csp_refin_iter     = int(txt[1])
+
             if txt[0] == 'ttol_sensi':
                 try:    ttol_sensi = txt2list_float(txt[1])
                 except: ttol_sensi = txt2list_bool(txt[1])
@@ -1958,6 +2043,15 @@ def get_reduction_parameters(filename):
                 if 'inter_sp_inter' in locals(): red_data.red_op.inter_sp_inter = inter_sp_inter
                 if 'optim'          in locals(): red_data.red_op.optim          = optim
                 if 'ttol_sensi'     in locals(): red_data.red_op.tol_ts         = ttol_sensi
+
+                if 'csp_method'     in locals(): red_data.red_op.csp_method     = csp_method
+                if 'tol_csp'        in locals(): red_data.red_op.tol_csp        = tol_csp
+                if 'time_resolution'in locals(): red_data.red_op.TimeResolution = time_resolution
+                if 'epsilon_rel'    in locals(): red_data.red_op.epsilon_rel    = epsilon_rel
+                if 'epsilon_abs'    in locals(): red_data.red_op.epsilon_abs    = epsilon_abs
+                if 'csp_refin_iter' in locals(): red_data.red_op.csp_refin_iter = csp_refin_iter
+
+
                 if 'optim' in locals():
                     if optim:
                         red_data.optim_param = cdef.Optim_param(tspc, n_tspc)
@@ -2143,4 +2237,17 @@ def copy_ref_results(ref_results_list):
 
 
     return ref_results_copy
- 
+
+
+def copytree(src, dst, symlinks=False, ignore=None):
+    import shutil
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            copytree(s, d, symlinks, ignore)
+        else:
+            if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+                shutil.copy2(s, d)
