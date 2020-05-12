@@ -1631,12 +1631,12 @@ class Mech_data:
         elements = ["C","H","O","N","AR","HE","Ar","He"]
         for el in elements:
             if self.find_element(el,act_sp):
-                if el == "AR":
-                    txt_elements += "Ar" + " "
-                elif el == "HE":
-                    txt_elements += "He" + " "
-                else:
-                    txt_elements += el + " "
+                #if el == "AR":
+                    #txt_elements += "Ar" + " "
+                #elif el == "HE":
+                    #txt_elements += "He" + " "
+                #else:
+                txt_elements += str.upper(el) + " "
         txt_elements += '\nEND\n'
         fd.write(txt_elements)
 

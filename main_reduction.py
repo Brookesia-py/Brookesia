@@ -151,6 +151,11 @@ def run_reduction(filename):
 
 
 if len(sys.argv)>1:
-    filename = sys.argv[1]
-    run_reduction(filename)
+    if sys.argv[1] == 'convert':
+        mech = sys.argv[2]
+        mech_data = cdef.Mech_data(mech)
+        mech_data.write_chemkin_mech(mech)
+    else:
+        filename = sys.argv[1]
+        run_reduction(filename)
 
