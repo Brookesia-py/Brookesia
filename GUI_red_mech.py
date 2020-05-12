@@ -3662,7 +3662,7 @@ class Ui_MainWindow(object):
                 fd.write('inter_sp_inter  = '  + str(isi[op])         +  '\n')
                 fd.write('optim           = '  + str(optim[op])         +  '\n')
                 if 'DRG' not in self.list_operator[red_i]:
-                    fd.write('ttol_sensi      = '    + str(ttol_sensi[op])    +  '\n')
+                    fd.write('ttol_sensi      = '    + list2txt(ttol_sensi[op])    +  '\n')
                 if optim[op]:
                     ag+=1
                     fd.write('#====> Optimization\n')

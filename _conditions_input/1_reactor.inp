@@ -5,6 +5,7 @@ main_path         = TEST_1_reactor
 mech              = C1_GRI30.cti
 verbose           = 4
 show_plots        = False
+write_ck          = True
 tspc              = CH4, CO, CO2
 T_check           = True
 sp_T              = CO2
@@ -85,7 +86,7 @@ max_error_T     = 30.0
 max_error_ig    = 30.0
 inter_sp_inter  = True
 optim           = True
-ttol_sensi      = [False, False]
+ttol_sensi      = [1e-05, 1e-08]
 #====> Optimization
 n_gen              = 5
 n_indiv            = 5
