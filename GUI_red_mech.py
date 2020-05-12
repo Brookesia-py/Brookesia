@@ -3616,12 +3616,21 @@ class Ui_MainWindow(object):
                 fd.write('n_indiv            = ' + str(n_indiv[ag])            + '\n')
                 fd.write('error_fitness      = ' + str(error_fitness[ag])      + '\n')
                 fd.write('Arrh_max_variation = ' + list2txt(Arrh_max_variation[ag]) + '\n')
-                if self.cB_GA_meth_DRG[0].isChecked():
-                    fd.write('optim_on_meth      = DRG \n')
-                    fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
-                elif self.cB_GA_meth_SA[0].isChecked():
-                    fd.write('optim_on_meth      = SA \n')
-                    fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
+                if type(self.cB_GA_meth_DRG[0]) is bool:
+                    if self.cB_GA_meth_DRG[0]:
+                        fd.write('optim_on_meth      = DRG \n')
+                        fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
+                else:
+                    if self.cB_GA_meth_DRG[0].isChecked():
+                        fd.write('optim_on_meth      = DRG \n')
+                        fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
+                if type(self.cB_GA_meth_SA[0]) is bool:
+                    if self.cB_GA_meth_SA[0]:
+                        fd.write('optim_on_meth      = SA \n')
+                        fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
+                    elif self.cB_GA_meth_SA[0].isChecked():
+                        fd.write('optim_on_meth      = SA \n')
+                        fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
                 fd.write('nb_r2opt           = ' + str(nb_r2opt[ag])         + '\n')
                 fd.write('selection_operator = ' + str(selection_operator[ag]) + '\n')
                 fd.write('selection_options  = ' + list2txt(selection_options[ag])  + '\n')
