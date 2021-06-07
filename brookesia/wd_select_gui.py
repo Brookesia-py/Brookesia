@@ -15,14 +15,32 @@ import sys
 import time as timer
 
 
+# path
 
 root_path   = sys.argv[1]
 if os.name == 'nt': #different python path on windows
     python_path = root_path.split('lib')[0] + 'python.exe'
 else:
     python_path = root_path.split('/lib/')[0] + '/bin/python'
+if os.name != 'nt': # for Linux or Mac
+    pers_config_path = '~/.Brookesia'
+    try:
+        os.chdir(os.path.expanduser(pers_config_path))
+    except:
+        os.chdir(os.path.expanduser('~'))
+        try:
+            os.mkdir('.Brookesia')
+        except:
+            a=False
+        os.chdir('.Brookesia')
+        pers_config_path = os.getcwd()
+else: # for windows
+    pers_config_path = root_path
 
-os.chdir(root_path)
+#os.chdir(root_path)
+try:    os.chdir(pers_config_path)
+except: os.chdir(os.path.expanduser(pers_config_path))
+
 
 import write_conditions_input as wc
 import write_kinetic_mech     as wk
@@ -31,7 +49,11 @@ import write_results_input    as wr
 
 global workdir_table
 global full_workdir_table
-workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+
+if os.name != 'nt': # for Linux or Mac
+    workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+
+#workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
 full_workdir_table = workdir_table
 total_nwd = len(workdir_table['directory'])
 
@@ -152,7 +174,9 @@ class Ui_MainWD(object):
         WD_name = full_workdir_table.iloc[nwd,0]
         WD_path = full_workdir_table.iloc[nwd,1]
 
-        os.chdir(root_path)
+        #os.chdir(root_path)
+        try:    os.chdir(pers_config_path)
+        except: os.chdir(os.path.expanduser(pers_config_path))
 
         fd = open('wd_activ.txt', 'w')
         fd.write(WD_name + ';' + WD_path)
@@ -173,7 +197,9 @@ class Ui_MainWD(object):
         else:
             os.system(python_path + ' ' + root_path + "wd_manage_gui.py False True " + root_path)
 
-        os.chdir(root_path)
+        #os.chdir(root_path)
+        try:    os.chdir(pers_config_path)
+        except: os.chdir(os.path.expanduser(pers_config_path))
 
         fs = open('wd_manage.txt', 'r')
         txt = fs.readline()
@@ -199,7 +225,9 @@ class Ui_MainWD(object):
 
         _translate = QtCore.QCoreApplication.translate
 
-        os.chdir(root_path)
+        #os.chdir(root_path)
+        try:    os.chdir(pers_config_path)
+        except: os.chdir(os.path.expanduser(pers_config_path))
 
         if not self.rm_list[nwd]:
             #remove wd
@@ -264,7 +292,9 @@ class Ui_MainWD(object):
 #        workdir_table['directory'].iloc[-1]        = WD_path
 
 
-        os.chdir(root_path)
+        #os.chdir(root_path)
+        try:    os.chdir(pers_config_path)
+        except: os.chdir(os.path.expanduser(pers_config_path))
         workdir_table.to_csv('working_dir.txt', sep=';')
 
         wdn = len(self.rm_list)

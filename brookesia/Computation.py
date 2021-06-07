@@ -43,6 +43,9 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         except:
             a=False
 
+    # simulation time start
+    tic_sim = timer.time()
+
 
     if 'free_flame' in conditions.config or 'burner_flame' in conditions.config:
 
@@ -120,7 +123,10 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 # -----
 
                 try:
-                    f.restore(flame_file, 'ref_solution')
+                    try:
+                        f.restore(flame_file, 'ref_solution')
+                    except:
+                        f.restore(flame_file, 'solution')
 
                     os.chdir(conditions.main_path)
 
@@ -162,8 +168,10 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
             f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
+            #f.set_refine_criteria(ratio=4.0, slope=0.4, curve=0.4, prune=0.01)
+
             f.solve(loglevel, auto = _auto)
-            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            if verbose >=2 : print_("1- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
             ratio_ff = conditions.simul_param.ratio_ff
             slope_ff = conditions.simul_param.slope_ff
@@ -171,7 +179,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             prune_ff = conditions.simul_param.prune_ff
             f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
             f.solve(loglevel, refine_grid)
-            if verbose >=2 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            if verbose >=2 : print_("2- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
 
         npoints = f.flame.n_points
@@ -319,47 +327,99 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         f.set_interrupt(interrupt_extinction)
 
 
-        energy_enabled = True
-        refine_grid = True
-        loglevel = 0
 
-        f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
-        try:
-            f.solve(loglevel, refine_grid, auto = energy_enabled)
-        except:
-            print_('Warning: inital computation failed',mp)
-            print_('try to recompute with an alternative approach',mp)
-            print_('     - first step:  pure undiluted diffusion flame (fuel/oxygen) ....',mp)
-            f.oxidizer_inlet.X = 'O2:1'
-            f.fuel_inlet.X     = conditions.composition.fuel + ':1'
-            f.solve(loglevel, refine_grid, auto = energy_enabled)
-            f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
+
+        if conditions.simul_param.restore_flame:
+            # -------- restore flame results
+            try:
+                os.chdir(conditions.r_path + '/_results_input/_flame_results/' + conditions.simul_param.flame_res_folder)
+            except:
+                try:
+                    os.chdir(conditions.simul_param.flame_res_folder)
+                except:
+                    print_('Warning: restore flame folder not found',mp)
+
+            flame_file = False
+            for _file in os.listdir('.'):
+                if conditions.num in _file[0:3]:
+                    flame_file = _file
+                    break
+            if flame_file:
+                if verbose >2:
+                    print_('Restored file: ' + flame_file, mp)
+                    # -----
+                    # supress console output during the simulation
+                if verbose<9:
+                    old_stdout = sys.stdout ; old_stderr = sys.stderr
+                    with open(os.devnull, "w") as devnull:
+                        sys.stdout = devnull ; sys.stderr = devnull
+                # -----
+
+                try:
+                    try:
+                        f.restore(flame_file, 'ref_solution')
+                    except:
+                        f.restore(flame_file, 'solution')
+
+                    os.chdir(conditions.main_path)
+
+                    f.solve(auto = False, loglevel = 0, refine_grid = False)
+                    simul_success = True
+
+                    # ---- restore console output
+                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                    if verbose >= 6:
+                        print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+                except:
+                    simul_success = False
+                    # ---- restore console output
+                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                    if verbose >= 3:
+                        print("\n     WARNING: No solution found starting from the restored file\n",mp)
+
+
+        if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
+            energy_enabled = True
+            refine_grid = True
+            loglevel = 0
+
+            f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
+            try:
+                f.solve(loglevel, refine_grid, auto = energy_enabled)
+            except:
+                print_('Warning: inital computation failed',mp)
+                print_('try to recompute with an alternative approach',mp)
+                print_('     - first step:  pure undiluted diffusion flame (fuel/oxygen) ....',mp)
+                f.oxidizer_inlet.X = 'O2:1'
+                f.fuel_inlet.X     = conditions.composition.fuel + ':1'
+                f.solve(loglevel, refine_grid, auto = energy_enabled)
+                f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
+                f.solve(loglevel, refine_grid)
+                print_('                    flame simulation successful',mp)
+                print_('     - second step: simulation of the initial counterflow flame',mp)
+                f.fuel_inlet.X =  conditions.composition.X
+                f.oxidizer_inlet.X =  conditions.composition.X2
+                f.solve(loglevel, refine_grid, auto = energy_enabled)
+
+    #        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
+    #        f.solve(loglevel, refine_grid, auto = energy_enabled)
+            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+            f.set_refine_criteria(ratio = 7.0, slope = 0.9, curve = 0.9)
             f.solve(loglevel, refine_grid)
-            print_('                    flame simulation successful',mp)
-            print_('     - second step: simulation of the initial counterflow flame',mp)
-            f.fuel_inlet.X =  conditions.composition.X2
-            f.oxidizer_inlet.X =  conditions.composition.X
-            f.solve(loglevel, refine_grid, auto = energy_enabled)
+            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-#        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
-#        f.solve(loglevel, refine_grid, auto = energy_enabled)
-        if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            f.set_refine_criteria(ratio=3.0, slope=0.1, curve=0.2, prune=0.03)
+            f.solve(loglevel, refine_grid)
+            if verbose >=5 : print_("Problem solved on ["+str(f.flame.n_points)+ "] point grid",mp)
 
-        f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
-        f.solve(loglevel, refine_grid)
-        if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
-
-        f.set_refine_criteria(ratio=3.0, slope=0.1, curve=0.2, prune=0.03)
-        f.solve(loglevel, refine_grid)
-        if verbose >=5 : print_("Problem solved on ["+str(f.flame.n_points)+ "] point grid",mp)
-
-        ratio_ff = conditions.simul_param.ratio_ff
-        slope_ff = conditions.simul_param.slope_ff
-        curve_ff = conditions.simul_param.curve_ff
-        prune_ff = conditions.simul_param.prune_ff
-        f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
-        f.solve(loglevel, refine_grid)
-        if verbose >=2 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            ratio_ff = conditions.simul_param.ratio_ff
+            slope_ff = conditions.simul_param.slope_ff
+            curve_ff = conditions.simul_param.curve_ff
+            prune_ff = conditions.simul_param.prune_ff
+            f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
+            f.solve(loglevel, refine_grid)
+            if verbose >=2 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
 
         # Save data
@@ -442,7 +502,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             # Compute counterflow diffusion flames at increasing strain rates at 1 bar
             # The strain rate is assumed to increase by 25% in each step until the flame is
             # extinguished
-            strain_factor = 10
+            strain_factor = 5
 
             # Exponents for the initial solution variation with changes in strain rate
             # Taken from Fiala and Sattelmayer (2014) (doi:10.1155/2014/484372)
@@ -462,24 +522,36 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
 
             strain_accuracy = conditions.error_param.strain_accuracy
-            max_it = 30 ; it_n = 0 ; n = 0 ; fn = 'Kref_'+fn
+            if conditions.simul_param.par_ind: Ki = conditions.simul_param.par_ind
+            else:                              Ki = ''
+            max_it = 30 ; it_n = 0 ; n = 0 ; fnKi = 'K'+Ki+'_'+fn
             pct_var_strain=strain_accuracy+1 ;
             strain_rate = 1 ; strain_rate_prev = 0
-            it_strain = 1 ; restart_sim=False   #009 46  025 41 05 43  2 46   20 49
+            it_strain = .75 ; restart_sim=False   #009 46  025 41 05 43  2 46   20 49
+
 
             # Do the strain rate loop
             clock = cdef.Clock('Stretch') ; clock.start()
 
+            first_it = True
             while pct_var_strain>strain_accuracy:
                 it_n += 1
                 if it_n>max_it: break
+                it_sn = 0
                 while np.max(f.T) > temperature_limit_extinction or restart_sim:
-#                    while np.max(f.T) > temperature_limit_extinction or restart_sim:
+                    it_sn +=1
+                    if it_sn>40:
+                        it_n = max_it*2
+                        break
+
                     # supress console output during the simulation
                     if verbose<9:
                         old_stdout = sys.stdout ; old_stderr = sys.stderr
                         with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                    if n!=0: f.restore(fn, 'solution')
+                    if first_it: f.restore(fn, 'ref_solution')
+                    else:        f.restore(fnKi, 'solution')
+
+#                    if n!=0: f.restore(fn, 'solution')
                     if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
                     n += 1
 
@@ -501,7 +573,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                         if verbose<9:
                             old_stdout = sys.stdout ; old_stderr = sys.stderr
                             with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                        f.save(fn,'solution')
+                        f.save(fnKi,'solution')
+                        first_it = False
                         if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
                         strain_factor=1+it_strain ;
                         if not restart_sim:
@@ -514,6 +587,12 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                         else:
                             restart_sim=False
                     except Exception as e:
+                        # if extinction at first iteration
+                        if first_it:
+                            it_strain *= 4
+                            strain_rate_prev2 = 1 ; strain_rate_prev=0.1
+                        else:
+                            it_strain = abs(it_strain)
                         if e.args[0] == 'Flame extinguished':
                             if verbose>3: print('\nFlame extinguished')
                             strain_factor=1-it_strain/(it_strain+1)
@@ -559,9 +638,86 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             f.transport_model = "Mix"
         f.set_refine_criteria(ratio=ratio, slope=slope, curve=curve, prune=prune)
 
+        if conditions.import_data and not conditions.exp_data: refine_grid = False
+        else:                                                  refine_grid = True
 
-#        f.show_solution()
-        f.solve(loglevel=0, auto=True)
+
+        if conditions.simul_param.restore_flame:
+            # -------- restore flame results
+            try:
+                os.chdir(conditions.r_path + '/_results_input/_flame_results/' + conditions.simul_param.flame_res_folder)
+            except:
+                try:
+                    os.chdir(conditions.simul_param.flame_res_folder)
+                except:
+                    print_('Warning: restore flame folder not found',mp)
+
+            flame_file = False
+            for _file in os.listdir('.'):
+                if conditions.num in _file[0:3]:
+                    flame_file = _file
+                    break
+            if flame_file:
+                if verbose >2:
+                    print_('Restored file: ' + flame_file, mp)
+                    # -----
+                    # supress console output during the simulation
+                if verbose<9:
+                    old_stdout = sys.stdout ; old_stderr = sys.stderr
+                    with open(os.devnull, "w") as devnull:
+                        sys.stdout = devnull ; sys.stderr = devnull
+                # -----
+
+                try:
+                    try:
+                        f.restore(flame_file, 'ref_solution')
+                    except:
+                        f.restore(flame_file, 'solution')
+
+                    os.chdir(conditions.main_path)
+
+                    f.solve(auto = False, loglevel = 0, refine_grid = False)
+                    simul_success = True
+
+                    # ---- restore console output
+                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                    if verbose >= 6:
+                        print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+                except:
+                    simul_success = False
+                    # ---- restore console output
+                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                    if verbose >= 3:
+                        print("\n     WARNING: No solution found starting from the restored file\n",mp)
+
+
+        if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
+            loglevel = 0
+            f.energy_enabled = False
+            f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
+    #        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
+            f.solve(loglevel, refine_grid)
+            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+            f.energy_enabled = True
+            _auto            = True
+            f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
+            f.solve(loglevel, auto = _auto)
+            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+            f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
+            f.solve(loglevel, auto = _auto)
+            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+            f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
+            #f.set_refine_criteria(ratio=4.0, slope=0.4, curve=0.4, prune=0.01)
+
+            f.solve(loglevel, auto = _auto)
+            if verbose >=2 : print_("1- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+#
+#    #        f.show_solution()
+#            f.solve(loglevel=0, auto=True)
 
         # Save data
         npoints = f.flame.n_points
@@ -998,7 +1154,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
                 else:
                     print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'µs',mp)
-                print_("      Time to compute reference data : "+"%5.2f" %(time2-time1)+'s',mp)
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(timeVec), list(T), \
@@ -1063,7 +1218,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         tempDependence.index.name = 'Temperature'
         inletConcentrations = conditions.composition.X
         concentrations      = inletConcentrations
-        tic_sim = timer.time()
         for temperature in T_list:
             #Re-initialize the gas
             reactorTemperature = temperature #Kelvin
@@ -1151,25 +1305,33 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 #            kr.append(gas.reverse_rate_constants)
 #            r_rate.append(gas.net_rates_of_progress)
 
-        toc_sim = timer.time()
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(T_list), list(T), \
                              list(P), list(conc), list(kf), list(kr))
         results.r_rate = r_rate
-        conditions.simul_param.time_jsr_ref_lim = toc_sim-tic_sim
+#        conditions.simul_param.time_jsr_ref_lim = toc_sim-tic_sim
 
+    toc_sim = timer.time()
+    results.simul_time = toc_sim-tic_sim
+    conditions.simul_param.ref_simul_time = toc_sim-tic_sim
 
+    if verbose>=4:
+        print_("      Time to compute reference data : "+"%5.2f" %(toc_sim-tic_sim)+'s',mp)
 
     return results,conditions
 
 
 
 
-def red_computation(conditions, gas_red, act_sp,act_r):
+def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
     verbose    = conditions.simul_param.verbose
     mp = conditions.main_path
+
+    # simulation time start
+    tic_sim = timer.time()
+
 
     if 'free_flame' in conditions.config or 'burner_flame' in conditions.config:
 
@@ -1480,7 +1642,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
             # Compute counterflow diffusion flames at increasing strain rates at 1 bar
             # The strain rate is assumed to increase by 25% in each step until the flame is
             # extinguished
-            strain_factor = 0.95
+            strain_factor = 5
 
             # Exponents for the initial solution variation with changes in strain rate
             # Taken from Fiala and Sattelmayer (2014) (doi:10.1155/2014/484372)
@@ -1495,82 +1657,81 @@ def red_computation(conditions, gas_red, act_sp,act_r):
             max_it = 30
             if conditions.simul_param.par_ind: Ki = conditions.simul_param.par_ind
             else:                              Ki = ''
-            it_n = 0 ; fnK = 'Kref_'+fn ; fnKi = 'K'+Ki+'_'+fn
+            it_n = 0 ; fnKi = 'K'+Ki+'_'+fn
             pct_var_strain=strain_accuracy+1 ;
             strain_rate = 1 ; strain_rate_prev = 0
-            it_strain = .05 ; restart_sim = False   #009 46  025 41 05 43  2 46   20 49
+            it_strain = .75 ; restart_sim = False   #009 46  025 41 05 43  2 46   20 49
 
 
-            if simul_success:
-                first_it = True
-                while pct_var_strain>strain_accuracy:
-                    it_n += 1
-                    if it_n>max_it: break
-                    it_sn = 0
-                    while np.max(f.T) > temperature_limit_extinction or restart_sim:
-                        it_sn +=1
-                        if it_sn>40:
-                            it_n = max_it*2
-                            break
-                        # supress console output during the simulation
+            first_it = True
+            while pct_var_strain>strain_accuracy:
+                it_n += 1
+                if it_n>max_it: break
+                it_sn = 0
+                while np.max(f.T) > temperature_limit_extinction or restart_sim:
+                    it_sn +=1
+                    if it_sn>40:
+                        it_n = max_it*2
+                        break
+                    # supress console output during the simulation
+                    if verbose<9:
+                        old_stdout = sys.stdout ; old_stderr = sys.stderr
+                        with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
+                    if first_it: f.restore(fn, 'ref_solution')
+                    else:        f.restore(fnKi, 'solution')
+                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+
+                    # Create an initial guess based on the previous solution
+                    # Update grid
+                    f.flame.grid    *= strain_factor ** exp_d_a
+                    normalized_grid  = f.grid / (f.grid[-1] - f.grid[0])
+                    # Update mass fluxes
+                    f.fuel_inlet.mdot     *= strain_factor ** exp_mdot_a
+                    f.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
+                    # Update velocities
+                    f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
+                    f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
+                    # Update pressure curvature
+                    f.set_profile('lambda', normalized_grid, f.L * strain_factor ** exp_lam_a)
+                    try:
+                        # Try solving the flame
+                        f.solve(loglevel=0)
                         if verbose<9:
                             old_stdout = sys.stdout ; old_stderr = sys.stderr
                             with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                        if first_it: f.restore(fnK, 'solution')
-                        else:        f.restore(fnKi, 'solution')
+                        f.save(fnKi,'solution')
                         if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+                        strain_factor=1+it_strain ;
+                        first_it = False
+                        if not restart_sim:
+                            strain_rate = f.strain_rate('max') # the maximum axial strain rate
+                            if verbose>5:
+                                print('\rStrain rate:' + format(strain_rate, '.2e') + ' 1/s',end='')
+                            strain_rate_prev2 = strain_rate_prev
+                            strain_rate_prev  = strain_rate
+                            temperature_limit_extinction=.75*np.max(f.T)
+                        else:
+                            restart_sim=False
 
-                        # Create an initial guess based on the previous solution
-                        # Update grid
-                        f.flame.grid    *= strain_factor ** exp_d_a
-                        normalized_grid  = f.grid / (f.grid[-1] - f.grid[0])
-                        # Update mass fluxes
-                        f.fuel_inlet.mdot     *= strain_factor ** exp_mdot_a
-                        f.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
-                        # Update velocities
-                        f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
-                        f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
-                        # Update pressure curvature
-                        f.set_profile('lambda', normalized_grid, f.L * strain_factor ** exp_lam_a)
-                        try:
-                            # Try solving the flame
-                            f.solve(loglevel=0)
-                            if verbose<9:
-                                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                                with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                            f.save(fnKi,'solution')
-                            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
-                            strain_factor=1+it_strain ;
-                            first_it = False
-                            if not restart_sim:
-                                strain_rate = f.strain_rate('max') # the maximum axial strain rate
-                                if verbose>5:
-                                    print('\rStrain rate:' + format(strain_rate, '.2e') + ' 1/s',end='')
-                                strain_rate_prev2 = strain_rate_prev
-                                strain_rate_prev  = strain_rate
-                                temperature_limit_extinction=.75*np.max(f.T)
+                    except Exception as e:
+                        if e.args[0] == 'Flame extinguished':
+                            if verbose>5: print('\nFlame extinguished')
+                            strain_factor=1-it_strain/(it_strain+1)
+                            restart_sim=True
+                            # if extinction at first iteration
+                            if first_it:
+                                it_strain *= 4
+                                strain_rate_prev2 = 1 ; strain_rate_prev=0.1
                             else:
-                                restart_sim=False
-
-                        except Exception as e:
-                            if e.args[0] == 'Flame extinguished':
-                                if verbose>5: print('\nFlame extinguished')
-                                strain_factor=1-it_strain/(it_strain+1)
-                                restart_sim=True
-                                # if extinction at first iteration
-                                if first_it:
-                                    it_strain *= 4
-                                    strain_rate_prev2 = 1 ; strain_rate_prev=0.1
-                                else:
-                                    it_strain = abs(it_strain)
-                            else:
-                                print('Error occurred while solving:', e)
-                            break
-                    it_strain /=2
-                    pct_var_strain = abs((strain_rate_prev2-strain_rate_prev)/strain_rate_prev)
-                    if verbose>6: print_('Accuracy: '+ format(pct_var_strain*100, '.1f') + '%',mp)
-                if verbose>5: print_('Extinction strain rate: ' + format(strain_rate, '.2e') + ' 1/s',mp)
-                results.K_ext = strain_rate_prev
+                                it_strain = abs(it_strain)
+                        else:
+                            print('Error occurred while solving:', e)
+                        break
+                it_strain /=2
+                pct_var_strain = abs((strain_rate_prev2-strain_rate_prev)/strain_rate_prev)
+                if verbose>6: print_('Accuracy: '+ format(pct_var_strain*100, '.1f') + '%',mp)
+            if verbose>5: print_('Extinction strain rate: ' + format(strain_rate, '.2e') + ' 1/s',mp)
+            results.K_ext = strain_rate_prev
 
         os.chdir(conditions.main_path)
 
@@ -1804,7 +1965,7 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         tempDependence.index.name = 'Temperature'
         inletConcentrations = X_red
         concentrations      = inletConcentrations
-        tic_sim = timer.time()
+#        tic_sim = timer.time()
         for temperature in T_list:
             conc_T = []
             #Re-initialize the gas
@@ -1839,8 +2000,8 @@ def red_computation(conditions, gas_red, act_sp,act_r):
                 t = 0
                 simul_success = True
                 while t < maxSimulationTime:
-                    toc_sim = timer.time()
-                    if (toc_sim-tic_sim) > (100*conditions.simul_param.time_jsr_ref_lim):  # if calculation time becomes too long
+                    toc = timer.time()
+                    if (toc-tic_sim) > (5*conditions.simul_param.ref_simul_time+30):  # if calculation time becomes too long
                         simul_success = False
                         t = maxSimulationTime + 1
                         if verbose >= 3:
@@ -1908,154 +2069,22 @@ def red_computation(conditions, gas_red, act_sp,act_r):
         results.r_rate      = list(r_rate)
 
 
-#    elif 'PFR' in conditions.config:
-#
-#        # Plug Flow reactor simulation:
-#        # https://cantera.org/examples/python/reactors/pfr.py.html
-#
-#        #####################################################################
-#        # Method 1: Lagrangian Particle Simulation
-#        #####################################################################
-#        # A Lagrangian particle is considered which travels through the PFR. Its
-#        # state change is computed by upwind time stepping. The PFR result is produced
-#        # by transforming the temporal resolution into spatial locations.
-#        # The spatial discretization is therefore not provided a priori but is instead
-#        # a result of the transformation.
-#
-#        tic_0 = timer.time()
-#
-#        T = [] ; P = [] ; conc = []; kf = [] ; kr = [] ; r_rate = []
-#
-#        length      = conditions.simul_param.end_sim    # 1.5e-7  # *approximate* PFR length [m]
-#        u_0         = conditions.simul_param.u_0        # .006  # inflow velocity [m/s]
-#        area        = conditions.simul_param.area       # 1.e-4  # cross-sectional area [m**2]
-#        n_steps     = conditions.simul_param.n_pts      #2000 # number of time steps considered for the simulation
-#
-#        X_red = conditions.composition.X
-#        gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
-#        gas_ref     = conditions.composition.gas
-#
-#        timeVec = conditions.simul_param.pts_scatter
-#
-#
-#        mass_flow_rate1 = u_0 * gas_red.density * area
-#
-#        # create a new reactor
-#        r1 = ct.IdealGasConstPressureReactor(gas_red)
-#        # create a reactor network for performing time integration
-#        sim = ct.ReactorNet([r1])
-#
-#        sim.rtol = conditions.simul_param.tol_ts[0]
-#        sim.atol = conditions.simul_param.tol_ts[1]
-#
-#
-#        # approximate a time step to achieve a similar resolution as in the next method
-#        t_total = length / u_0
-#        dt = t_total / n_steps
-#        # define time, space, and other information vectors
-#        z1 = np.zeros_like(timeVec)
-#        u1 = np.zeros_like(timeVec)
-#
-#
-#
-#        # saving data at t=0
-#        T.append(r1.T)
-#        P.append(r1.thermo.P)
-#        # conc
-#        conc_t=[]
-#        for sp in range(len(act_sp)):
-#            if act_sp[sp]:
-#                sp_ind=gas_red.species_index(gas_ref.species_name(sp))
-#                conc_t.append(r1.thermo.concentrations[sp_ind])
-#            else:
-#                conc_t.append(0)
-#        conc.append(conc_t)
-#
-#
-#        # saving kf and kr values
-#        kf_t=[];kr_t=[];r_rate_t=[];r_red=0
-#        for r in range(len(act_r)):
-#            if act_r[r]:
-#                    kf_t.append(gas_red.forward_rate_constants[r_red])
-#                    kr_t.append(gas_red.reverse_rate_constants[r_red])
-#                    r_rate_t.append(gas_red.net_rates_of_progress[r_red])
-#                    r_red+=1
-#            else:
-#                kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
-#        kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
-##        # reaction rate coefficients
-##        kf_t=[];kr_t=[];r_red=0
-##        for r in range(len(act_r)):
-##            if act_r[r]:
-##                    kf_t.append(gas_red.forward_rate_constants[r_red])
-##                    kr_t.append(gas_red.reverse_rate_constants[r_red])
-##                    r_red+=1
-##            else:
-##                kf_t.append(0); kr_t.append(0)
-##        kf.append(kf_t); kr.append(kr_t)
-#
-#
-#        for n1, t_i in enumerate(timeVec):
-#
-#            # perform time integration
-#
-#            # supress console output during the simulation
-#            if verbose<9:
-#                old_stdout = sys.stdout ; old_stderr = sys.stderr
-#                with open(os.devnull, "w") as devnull:
-#                    sys.stdout = devnull ; sys.stderr = devnull
-#            try:
-#                sim.advance(t_i)
-#                simul_success = True
-#                # restore console output
-#                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-#            except:
-#                simul_success = False
-#                # restore console output
-#                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-#                if verbose >= 3:
-#                    print("\n     WARNING: No solution found\n",mp)
-#
-#            # compute velocity and transform into space
-#            u1[n1] = mass_flow_rate1 / area / r1.thermo.density
-#            z1[n1] = z1[n1 - 1] + u1[n1] * dt
-##            states1.append(r1.thermo.state)
-#
-#            # save simulation data
-#            T.append(r1.T)
-#            P.append(r1.thermo.P)
-#            #conc
-#            conc_t=[]
-#            for sp in range(len(act_sp)):
-#                if act_sp[sp] and simul_success:
-#                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
-#                    conc_t.append(r1.thermo.concentrations[sp_ind])
-#                else:
-#                    conc_t.append(0)
-#            conc.append(conc_t)
-#
-#
-#            # reaction rate coefficients
-#            kf_t=[];kr_t=[];r_red=0
-#            for r in range(len(act_r)):
-#                if act_r[r]:
-#                        kf_t.append(gas_red.forward_rate_constants[r_red])
-#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-#                        r_red+=1
-#                else:
-#                    kf_t.append(0); kr_t.append(0)
-#            kf.append(kf_t); kr.append(kr_t)
-#
-#
-#        tic_1 = timer.time()
-#        timeVec = np.insert(timeVec,0,0)
-#        z1      = np.insert(z1,0,0)
-#
-#
-#        results = cdef.Sim_Results(conditions, gas_red, timeVec, list(T),\
-#                             list(P), list(conc), list(kf), list(kr))
-#        results.z1 = list(z1)
-#        conditions.simul_param.pts_scatter=np.array(timeVec)
+    toc_sim = timer.time()
+    results.simul_time = toc_sim-tic_sim
+
+
+    # --------- return results in reduction loop ---------
+    if type(return_list) is not bool:
+        del results.gas
+        del results.conditions
+        try:
+            del results.f
+        except:
+            not_a_flame = True
+        return_list.append(results)
+    # --------- return results in reduction loop ---------
+
+
 
 
     return results

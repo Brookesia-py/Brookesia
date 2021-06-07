@@ -32,6 +32,9 @@ import copy
 import platform
 
 
+global version
+
+
 #import re
 #from operator import xor
 
@@ -185,7 +188,7 @@ class Composition :
                 else:
                     X_diluent = X_oxidant * self.diluent_ratio2[1]/100
 
-                X = self.oxidant2    + ':' + str(1)       + ',' + \
+                X = self.oxidant2    + ':' + str(X_oxidant)  + ',' + \
                     self.diluent2 + ':' + str(X_diluent)
 
         return X
@@ -936,6 +939,8 @@ class Errors:
             if qoi_s:
                 if np.amax(qoi_s[i])*100>tolerance:
                     under_tol_s.append(False)
+                elif np.amax(qoi_s[i])!=np.amax(qoi_s[i]): # check nan
+                    under_tol_s.append(False)
                 else:
                     under_tol_s.append(True)
 
@@ -945,6 +950,8 @@ class Errors:
             if conditions.error_param.T_check:
                 if qoi_T*100>red_data_meth.max_error_T:
                     under_tol_T = False
+                elif qoi_T != qoi_T: # check nan
+                    under_tol_T = False
 
 
         # Flame speed
@@ -952,6 +959,8 @@ class Errors:
         if qoi_Sl:
             if 'flame' in conditions.config and conditions.error_param.Sl_check:
                 if qoi_Sl*100>red_data_meth.max_error_Sl:
+                    under_tol_Sl = False
+                elif qoi_Sl != qoi_Sl: # check nan
                     under_tol_Sl = False
 
 
@@ -961,12 +970,16 @@ class Errors:
             if 'reactor' in conditions.config and conditions.error_param.ig_check:
                 if qoi_ig*100>red_data_meth.max_error_ig:
                     under_tol_ig = False
+                elif qoi_ig != qoi_ig: # check nan
+                    under_tol_ig = False
 
         # Extinction strain rate
         under_tol_K = True
         if qoi_K:
             if 'diff_flame' in conditions.config and conditions.error_param.K_check:
                 if qoi_K*100>red_data_meth.max_error_K:
+                    under_tol_K = False
+                elif qoi_K != qoi_K: # check nan
                     under_tol_K = False
 
         # all tol under_tol
@@ -1761,7 +1774,7 @@ class Mech_data:
 
 
 
-    def write_chemkin_mech(self,filename="temp.ck",act_sp="no_arg",act_r="no_arg"):
+    def write_chemkin_mech(self,filename,version,act_sp="no_arg",act_r="no_arg"):
 
         if len(filename)>3:
             if filename[-4:]=='.cti':
@@ -1786,24 +1799,13 @@ class Mech_data:
             if act_r[r]:
                 r_list.append(r)
 
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("! Kinetic mechanism converted from the Cantera format (.cti) by Brookesia "+version+"\n")
+        fd.write("! https://github.com/Brookesia-py/Brookesia\n!\n")
 
-# =============================================================================
-#         Units ans gas properties
-# =============================================================================
-
-#        self.gas_prop = []
-
-#        # Units writing
-#        l=0
-#        while self.gas_prop[l]!="\n":
-#            fd.write(self.gas_prop[l])
-#            l+=1
-#
-#
-#        # Gas characteristics writing
-#        while "elements" not in self.gas_prop[l]:
-#            fd.write(self.gas_prop[l])
-#            l+=1
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("! Species and Elements\n")
+        fd.write("!-------------------------------------------------------------------------------\n")
 
         #elements
         txt_elements = 'ELEMENTS\n'#self.gas_prop[l].split('"')[0]+'"'
@@ -1815,10 +1817,9 @@ class Mech_data:
                 #elif el == "HE":
                     #txt_elements += "He" + " "
                 #else:
-                txt_elements += str.upper(el) + " "
+                txt_elements += str.capitalize(el) + " "
         txt_elements += '\nEND\n'
         fd.write(txt_elements)
-
 
         #species
         txt_spec = 'SPECIES\n'
@@ -1865,6 +1866,158 @@ class Mech_data:
                 if CSP_radicals_always[sp] and self.spec.activ_m[sp]:
                     fd.write(self.spec.name[sp] + '  ') ; _n_rad +=1
             fd.write("\n!\n!\n")
+
+
+
+# =============================================================================
+#         Species
+# =============================================================================
+
+
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("! Thermophysical properties\n")
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("THERMO ALL\n")
+        temp_line = str('%5.3f' %self.spec.thermo[sp][0])+"  "     \
+                  + str('%5.3f' %self.spec.thermo[sp][1])+"  "     \
+                  + str('%5.3f' %self.spec.thermo[sp][10])+"\n"
+        fd.write(temp_line)
+
+        for sp in sp_list: # in activated species list
+            # -------------    1st line    -------------
+            l_name  = self.spec.name[sp]
+            for i in range(24-len(self.spec.name[sp])):
+                l_name += ' '
+            atoms = self.spec.atoms[sp].split(' ')
+            l_atoms = ''
+            for atom in atoms:
+                l_atoms += atom.split(':')[0] + ' ' + atom.split(':')[1] + '  '
+            for i in range(20-len(l_atoms)):
+                l_atoms += ' '
+            l_atoms +='G   '
+            if float(self.spec.thermo[sp][0])<1000: l_atoms+='  '
+            else:                                   l_atoms+=' '
+            l_T =  '%0.1f' %self.spec.thermo[sp][0]  + '    ' + \
+                   '%0.1f' %self.spec.thermo[sp][10]  + '  ' + \
+                   '%0.1f' %self.spec.thermo[sp][1]
+            for i in range(29-len(l_T)):
+                l_T += ' '
+            l_T += '1\n'
+            first_line = l_name+l_atoms+l_T
+
+            # -------------    2nd line    -------------
+            second_line = ''
+            for i in range (5):
+                if self.spec.thermo[sp][11+i]>=0:  second_line += ' '
+                second_line += str('%0.8e' %self.spec.thermo[sp][11+i]).upper()
+            second_line += '    2\n'
+
+            # -------------    3rd line    -------------
+            third_line = ''
+            for i in range (2):
+                if self.spec.thermo[sp][16+i]>=0:   third_line += ' '
+                third_line += str('%0.8e' %self.spec.thermo[sp][16+i]).upper()
+            for i in range (3):
+                if self.spec.thermo[sp][2+i]>=0:
+                    third_line += ' '
+                third_line += str('%0.8e' %self.spec.thermo[sp][2+i]).upper()
+            third_line += '    3\n'
+
+            # -------------    4th line    -------------
+            fourth_line = ''
+            for i in range(4):
+                if self.spec.thermo[sp][5+i]>=0:   fourth_line += ' '
+                fourth_line += str('%0.8e' %self.spec.thermo[sp][5+i]).upper()
+            fourth_line += '                   4\n'
+
+            fd.write(first_line)
+            fd.write(second_line)
+            fd.write(third_line)
+            fd.write(fourth_line)
+
+        fd.write('END\n!\n')
+
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("! Transport properties\n")
+        fd.write("!-------------------------------------------------------------------------------\n")
+        fd.write("TRANSPORT\n")
+
+        for sp in sp_list: # in activated species list
+            line_trans  = self.spec.name[sp] + ' '
+            if len(line_trans)<14:
+                for i in range(14-len(line_trans)): line_trans+=' '
+            else:
+                line_trans += ' '
+            trans_diam, trans_wdepth, trans_polar, trans_rrelax, trans_dipole = '0.0', '0.0', '0.0', '0.0', '0.0'
+            for data_t in self.spec.trans[sp]:
+                if 'geom=' in data_t:
+                    if 'atom' in data_t.split('geom=')[1]:
+                        trans_geom = '0  '
+                    elif 'nonlinear' in data_t.split('geom=')[1]:
+                        trans_geom = '2  '
+                    else:
+                        trans_geom = '1  '
+
+                if 'well_depth=' in data_t:
+                    trans_wdepth = data_t.split('well_depth=')[1].split(',')[0].split(')')[0]
+                if len(trans_wdepth)<7:
+                    for i in range(7-len(trans_wdepth)): trans_wdepth+=' '
+                else:
+                    trans_wdepth += ' '
+
+                if 'diam=' in data_t:
+                    trans_diam = data_t.split('diam=')[1].split(',')[0].split(')')[0]
+                if len(trans_diam)<7:
+                    for i in range(7-len(trans_diam)): trans_diam+=' '
+                else:
+                    trans_diam += ' '
+
+                if 'dipole=' in data_t:
+                    trans_dipole = data_t.split('dipole=')[1].split(',')[0].split(')')[0]
+                if len(trans_dipole)<7:
+                    for i in range(7-len(trans_dipole)): trans_dipole+=' '
+                else:
+                    trans_dipole += ' '
+
+                if 'polar=' in data_t:
+                    trans_polar = data_t.split('polar=')[1].split(',')[0].split(')')[0]
+                if len(trans_polar)<7:
+                    for i in range(7-len(trans_polar)): trans_polar+=' '
+                else:
+                    trans_polar += ' '
+
+                if 'rot_relax=' in data_t:
+                    trans_rrelax = data_t.split('rot_relax=')[1].split(',')[0].split(')')[0]
+
+
+            line_trans += trans_geom   + \
+                          trans_wdepth + \
+                          trans_diam   + \
+                          trans_dipole + \
+                          trans_polar  + \
+                          trans_rrelax + '\n'
+            fd.write(line_trans)
+        fd.write('END\n!\n')
+
+
+# =============================================================================
+#         Units ans gas properties
+# =============================================================================
+
+#        self.gas_prop = []
+
+#        # Units writing
+#        l=0
+#        while self.gas_prop[l]!="\n":
+#            fd.write(self.gas_prop[l])
+#            l+=1
+#
+#
+#        # Gas characteristics writing
+#        while "elements" not in self.gas_prop[l]:
+#            fd.write(self.gas_prop[l])
+#            l+=1
+
 
 
 
@@ -1929,8 +2082,8 @@ class Mech_data:
                 #    three_body_reaction('O + O + M <=> O2 + M', [6.165000e+15, -0.5, 0.0],
                 #    efficiencies='CO2:3.8 CO:1.9 H2:2.5 H2O:12.0 AR:0.83 CH4:2.0 C2H6:3.0 HE:0.83')
                 r_line = self.react.formula[r]+txt_space \
-                         + str('%0.6e' %self.react.kin[r][0]) + ", "          \
-                         + str('%0.4f' %self.react.kin[r][1]) + ", "          \
+                         + str('%0.6e' %self.react.kin[r][0]) + "  "          \
+                         + str('%0.4f' %self.react.kin[r][1]) + "  "          \
                          + str('%0.3f' %self.react.kin[r][2]) + "\n"
                 if self.react.eff[r]!=[] or self.react.txt[r]!=[]:
                     r_efficiencies=""
@@ -2168,7 +2321,7 @@ class Mech_data:
 
             fd.write(dup_txt)
 
-        fd.write('\n END')
+        fd.write('END')
         timer.sleep(1.5)
 
         fd.close()
@@ -2263,13 +2416,14 @@ class Optim_param :
         self.worst_fitness         = []
         self.main_path            = ''
         self.exp_data             = False
-        self.nb_r2opt             = nb_r2opt
+        self.nb_r2opt             = nb_r2opt # number of reaction to optimized when optimization based on DRG/SA is selected
+        self.reactions2opt        = False
         self.opt_subm_C           = [True]*30
         self.opt_subm_CO          = True
         self.opt_subm_N           = [True]*30
         self.opt_subm_S           = [True]*30
         self.opt_subm_Si          = [True]*30
-
+        self.import_mech          = False
 
 
     def count_Xover(self):
@@ -2592,6 +2746,7 @@ class Sim_Results :
                                 +str(self.conditions.composition.X2)+";"\
                                 +str(self.conditions.simul_param.mdot2)+";"
             if "free_flame" in self.conditions.config\
+            or 'burner' in self.conditions.config\
             or 'diff_' in self.conditions.config\
             or 'tp_'   in self.conditions.config\
             or 'pp_'   in self.conditions.config:
@@ -2722,7 +2877,76 @@ class Sim_Results :
             fichier_data.write("\n")
 
 
+def generate_plot_style(plt, fig,  plot_style,delta_polices=[0,0,0,0]) :
 
+    from matplotlib import rcParams
+
+    delta_police_legend = delta_polices[0]
+    delta_police_axes   = delta_polices[1]
+    delta_police_ticks  = delta_polices[2]
+    delta_police_title  = delta_polices[3]
+
+
+    if plot_style=='presentation':
+        plt.style.use('seaborn-talk') # 'seaborn-talk'
+        fig.subplots_adjust(left = 0.1, bottom = 0.15,
+                right = 0.95, top = 0.93, wspace = 0, hspace = 0.5)
+
+        #rcParams['font.family'] = 'sans-serif'
+        #rcParams['font.sans-serif'] = ['Verdana']   #['Tahoma', 'DejaVu Sans','Lucida Grande', 'Verdana']
+        plt.rc('font', size=17)
+        plt.rc('text', usetex=False)
+
+        title_size   = 17 + delta_police_title
+        axes_size    = 17 + delta_police_axes
+        tick_size    = 14 + delta_police_ticks
+        legend_size  = 14 + delta_police_legend
+
+    elif 'paper' in plot_style:
+        plt.style.use('seaborn-paper')
+        fig.subplots_adjust(left = 0.25, bottom = 0.2,
+                right = 0.95, top = 0.93, wspace = 0, hspace = 0.5)
+
+        plt.rc('font', family='serif', size=15)
+        if 'latex' in plot_style:
+            plt.rc('text', usetex=True)
+        else:
+            plt.rc('text', usetex=False)
+
+        title_size   = 15 + delta_police_title
+        axes_size    = 15 + delta_police_axes
+        tick_size    = 12 + delta_police_ticks
+        legend_size  = 12 + delta_police_legend
+
+
+    elif plot_style=='poster':
+        plt.style.use('seaborn-paper')
+        fig.subplots_adjust(left = 0.13, bottom = 0.15,
+                right = 0.95, top = 0.93, wspace = 0, hspace = 0.5)
+        plt.rc('font', size=19)
+        plt.rc('text', usetex=False)
+
+        title_size   = 19 + delta_police_title
+        axes_size    = 19 + delta_police_axes
+        tick_size    = 16 + delta_police_ticks
+        legend_size  = 10 + delta_police_legend
+
+    parameters = {'axes.labelsize': axes_size,
+                  'axes.titlesize': title_size,
+                  'xtick.labelsize': tick_size,
+                  'ytick.labelsize': tick_size,
+                  'legend.fontsize': legend_size}
+    plt.rcParams.update(parameters)
+
+    #axes.legend(fontsize=legend_size)
+
+    #axes.tick_params(axis='x', labelsize=tick_size)
+    #axes.tick_params(axis='y', labelsize=tick_size)
+
+    plt.rc('xtick', direction='in')
+    plt.rc('ytick', direction='in')
+
+    return plt,fig
 
 
 def searchNearest(data, search_value, start =0, end_ind=-1) :

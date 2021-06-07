@@ -23,8 +23,10 @@
 #  default options
 # =============================================================================
 
+version = '1.6.0'
+
 d_verbose               = 4
-d_show_plots            = True
+d_show_plots            = False
 d_chemkin_f             = True
 
 d_T_check               = True
@@ -51,8 +53,8 @@ d_phi_max               = '1.5'
 d_phi_incr              = '0.5'
 
 # options for reactors
-d_T_min_r               = '1400'
-d_T_max_r               = '1800'
+d_T_min_r               = '1600'
+d_T_max_r               = '1600'
 d_T_incr_r              = '200'
 d_tol_ts_r              = '1e-06,1e-12'         # rel/abs
 d_n_pts_r               = 250
@@ -124,10 +126,29 @@ d_DRG_pt_num            = 10.0
 d_DRG_tgt_error         = 30.0
 d_DRG_ISI               = True
 
+# CSP
+try:
+    import brookesia.CSP as csp
+    CSP_method = True
+except:
+    CSP_method = False
+d_csp_eps               = '1e-5'
+d_csp_deps              = '2e-5'
+d_csp_pt_num            = 10
+d_csp_ref_num           = 0
+d_csp_tgt_error         = 30
+d_csp_ISI               = True
+d_csp_tr                = '1e-6'
+d_csp_emt_ea            = '1e-14'
+d_csp_emt_er            = '1e-2'
+rB_csp_fsa_tr           = True       # time resolution assessment
+
+
+
 # GA
-d_GA_gen                = 20
+d_GA_gen                = 30
 d_GA_ind                = 20
-d_GA_A                  = 5
+d_GA_A                  = 15
 d_GA_n                  = 5
 d_GA_Ea                 = 5
 d_GA_meth               = True
@@ -142,7 +163,7 @@ d_GA_Xover_op_1         = True       # Simple Xover
 d_GA_Xover_op_2         = True       # Multiple Xover
 d_GA_Xover_op_3         = True       # Arithmetic Xover
 d_GA_Xover_op_4         = True       # Heuristic Xover
-d_GA_Xover_int_1        = '10'
+d_GA_Xover_int_1        = '20'
 d_GA_Xover_int_2        = '20'
 d_GA_Xover_int_3        = '20'
 d_GA_Xover_int_4        = '20'
@@ -153,9 +174,9 @@ d_GA_Xover_opt_4        = ''
 d_GA_mut_op_1           = True       # Uniform mutation
 d_GA_mut_op_2           = True       # Non-uniform mutation
 d_GA_mut_op_3           = True       # Boundary mutation
-d_GA_mut_int_1          = '30'
-d_GA_mut_int_2          = '30'
-d_GA_mut_int_3          = '10'
+d_GA_mut_int_1          = '10'
+d_GA_mut_int_2          = '40'
+d_GA_mut_int_3          = '20'
 d_GA_mut_opt_1          = ''
 d_GA_mut_opt_2          = '3'
 d_GA_mut_opt_3          = ''
@@ -163,16 +184,16 @@ d_GA_mut_prob           = 30
 d_GA_fit                = 'mean'     #  mean / max
 
 # PSO
-d_PSO_inert_score       = True
+d_PSO_inert_score       = False
 d_PSO_inert_min         = 0.2   # default value with score integration
-d_PSO_inert_i           = 1.5   # default value with score integration
-d_PSO_inert_end         = 0.4   # default value with score integration
-d_PSO_inert_i_ws        = 0.6   # default value without score integration
-d_PSO_inert_end_ws      = 0.2   # default value without score integration
-d_PSO_cogn_i            = 1.3
-d_PSO_cogn_end          = .7
-d_PSO_social_i          = 1
-d_PSO_social_end        = 2
+d_PSO_inert_i           = 0.7   # default value with score integration
+d_PSO_inert_end         = 0.7   # default value with score integration
+d_PSO_inert_i_ws        = 0.8   # default value without score integration
+d_PSO_inert_end_ws      = 0.3   # default value without score integration
+d_PSO_cogn_i            = 1.6
+d_PSO_cogn_end          = 2.0
+d_PSO_social_i          = 0.5
+d_PSO_social_end        = 2.0
 
 
 
@@ -234,6 +255,7 @@ opt_num = 0
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow, WD_path, WD_name, root_path):
+        _translate = QtCore.QCoreApplication.translate
         global sz_w
         global sz_h
         _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
@@ -318,43 +340,70 @@ class Ui_MainWindow(object):
         self.external_results = False
 
         self.Gb_MP_reduction = QtWidgets.QGroupBox(self.Main_param)
-        self.Gb_MP_reduction.setGeometry(QtCore.QRect(10*sz_w, 160*sz_h, 520*sz_w, 131*sz_h))
+        self.Gb_MP_reduction.setGeometry(QtCore.QRect(10*sz_w, 140*sz_h, 520*sz_w, 131*sz_h))
         self.Gb_MP_reduction.setAlignment(QtCore.Qt.AlignCenter)
         self.Gb_MP_reduction.setObjectName("Gb_MP_reduction")
         # label
         self.label_Ref_method_r = QtWidgets.QLabel(self.Gb_MP_reduction)
-        self.label_Ref_method_r.setGeometry(QtCore.QRect(10*sz_w, 90*sz_h, 131*sz_w, 18*sz_h))
         self.label_Ref_method_r.setObjectName("label_Ref_method_r")
         # DRG_sp
         self.pB_DRG_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRG_sp.setGeometry(QtCore.QRect(140*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRG_sp.setObjectName("pB_DRG_sp")
         # DRGEP_sp
         self.pB_DRGEP_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRGEP_sp.setGeometry(QtCore.QRect(230*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRGEP_sp.setObjectName("pB_DRGEP_sp")
         # SAR_sp
         self.pB_SAR_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SAR_sp.setGeometry(QtCore.QRect(330*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SAR_sp.setObjectName("pB_SAR_sp")
         # SARGEP_sp
         self.pB_SARGEP_sp = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SARGEP_sp.setGeometry(QtCore.QRect(420*sz_w, 40*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SARGEP_sp.setObjectName("pB_SARGEP_sp")
         # label
         self.label_Red_method_sp = QtWidgets.QLabel(self.Gb_MP_reduction)
-        self.label_Red_method_sp.setGeometry(QtCore.QRect(10*sz_w, 50*sz_h, 131*sz_w, 18*sz_h))
         self.label_Red_method_sp.setObjectName("label_Red_method_sp")
         self.tablet.addTab(self.Main_param, "")
         # DRG_r
         self.pB_DRG_r = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_DRG_r.setGeometry(QtCore.QRect(140*sz_w, 80*sz_h, 88*sz_w, 34*sz_h))
         self.pB_DRG_r.setObjectName("pB_DRG_r")
         # SAR_r
         self.pB_SAR_r = QtWidgets.QPushButton(self.Gb_MP_reduction)
-        self.pB_SAR_r.setGeometry(QtCore.QRect(230*sz_w, 80*sz_h, 88*sz_w, 34*sz_h))
         self.pB_SAR_r.setObjectName("pB_SAR_r")
+        # CSP
+        self.pB_CSP = QtWidgets.QPushButton(self.Gb_MP_reduction)
+        self.pB_CSP.setObjectName("pB_CSP")
+        self.pB_CSP.setText(_translate("MainWindow", "CSP"))
 
+        self.label_Ref_method_stf = QtWidgets.QLabel(self.Gb_MP_reduction)
+        if CSP_method:
+            self.Gb_MP_reduction.setGeometry(QtCore.QRect(10*sz_w, 136*sz_h, 520*sz_w, 155*sz_h))
+
+            self.label_Red_method_sp.setGeometry(QtCore.QRect( 10*sz_w,  30*sz_h, 131*sz_w, 18*sz_h))
+            self.label_Ref_method_r.setGeometry(QtCore.QRect(  10*sz_w,  70*sz_h, 131*sz_w, 18*sz_h))
+            self.label_Ref_method_stf.setGeometry(QtCore.QRect(10*sz_w, 120*sz_h, 131*sz_w, 18*sz_h))
+
+            self.pB_DRG_sp.setGeometry(QtCore.QRect(   140*sz_w, 30*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_DRGEP_sp.setGeometry(QtCore.QRect( 230*sz_w, 30*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_SAR_sp.setGeometry(QtCore.QRect(   330*sz_w, 30*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_SARGEP_sp.setGeometry(QtCore.QRect(420*sz_w, 30*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_DRG_r.setGeometry(QtCore.QRect(    140*sz_w, 70*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_SAR_r.setGeometry(QtCore.QRect(    230*sz_w, 70*sz_h,  88*sz_w, 34*sz_h))
+            self.pB_CSP.setGeometry(QtCore.QRect(      140*sz_w, 110*sz_h, 88*sz_w, 34*sz_h))
+        else:
+            self.Gb_MP_reduction.setGeometry(QtCore.QRect(10*sz_w, 140*sz_h, 520*sz_w, 131*sz_h))
+
+            self.label_Red_method_sp.setGeometry(QtCore.QRect(   10*sz_w,  50*sz_h, 131*sz_w, 18*sz_h))
+            self.label_Ref_method_r.setGeometry(QtCore.QRect(    10*sz_w,  90*sz_h, 131*sz_w, 18*sz_h))
+            self.label_Ref_method_stf.setGeometry(QtCore.QRect(1000*sz_w, 120*sz_h, 131*sz_w, 18*sz_h))
+            self.pB_DRG_sp.setGeometry(QtCore.QRect(   140*sz_w, 40*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_DRGEP_sp.setGeometry(QtCore.QRect( 230*sz_w, 40*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_SAR_sp.setGeometry(QtCore.QRect(   330*sz_w, 40*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_SARGEP_sp.setGeometry(QtCore.QRect(420*sz_w, 40*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_DRG_r.setGeometry(QtCore.QRect(    140*sz_w, 80*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_SAR_r.setGeometry(QtCore.QRect(    230*sz_w, 80*sz_h,   88*sz_w, 34*sz_h))
+            self.pB_CSP.setGeometry(QtCore.QRect(      1400*sz_w, 110*sz_h, 88*sz_w, 34*sz_h))
+
+        self.label_Ref_method_stf.setObjectName("label_Ref_method_stf")
+        self.label_Ref_method_stf.setText(_translate("MainWindow", "Stiffness reduction"))
 
         self.Gb_MP_error = QtWidgets.QGroupBox(self.Main_param)
         self.Gb_MP_error.setGeometry(QtCore.QRect(540*sz_w, 160*sz_h, 181*sz_w, 131*sz_h))
@@ -763,6 +812,47 @@ class Ui_MainWindow(object):
         self.pB_PSO_sa              = []
         self.cB_ISI_sa              = []
 
+        self.csp_sp                  = []
+        self.CSP                     = []
+        self.frame_csp1              = []
+        self.label_csp_espi_2        = []
+        self.num_csp_eps             = []
+        self.label_csp_deps_2        = []
+        self.num_csp_deps            = []
+        self.label_csp               = []
+        self.label_csp_ref           = []
+        self.label_csp_comment       = []
+        self.num_csp_pt_num          = []
+        self.num_csp_ref_num         = []
+        self.pB_remove_csp           = []
+        self.Gb_csp2                 = []
+        self.tableWidget_CSP         = []
+        self.num_csp_tgt_error       = []
+        self.pB_csp_apply2all        = []
+        self.Gb_csp3                 = []
+        self.num_csp_tol_1           = []
+        self.num_csp_tol_2           = []
+        self.rB_csp_tol_1            = []
+        self.rB_csp_tol_2            = []
+        self.label_Red_method_sp_8   = []
+        self.label_Red_method_sp_9   = []
+        self.label_Red_method_sp_10  = []
+        self.label_Red_method_sp_11  = []
+        self.pB_GA_csp               = []
+        self.pB_PSO_csp              = []
+        self.cB_ISI_csp              = []
+        self.CSP_Method              = []
+        self.label_csp_tr            = []
+        self.label_csp_emt           = []
+        self.label_csp_emt_ea        = []
+        self.label_csp_emt_er        = []
+        self.txt_csp_tr              = []
+        self.txt_csp_emt_ea          = []
+        self.txt_csp_emt_er          = []
+        self.label_csp_meth          = []
+        self.rB_csp_fsa_1            = []
+        self.rB_csp_fsa_2            = []
+
 
 
 
@@ -970,6 +1060,7 @@ class Ui_MainWindow(object):
         self.pB_SAR_sp.clicked.connect(lambda: self.SA_clic('SAR_sp'))
         self.pB_SARGEP_sp.clicked.connect(lambda: self.SA_clic('SARGEP_sp'))
         self.pB_SAR_r.clicked.connect(lambda: self.SA_clic('SAR_r'))
+        self.pB_CSP.clicked.connect(lambda: self.CSP_clic('CSP'))
 
         self.pB_save.clicked.connect(lambda: self.write_parameters(True))
         self.pB_load.clicked.connect(self.load_parameters)
@@ -1070,7 +1161,7 @@ class Ui_MainWindow(object):
                 if okPressed and item:
                     self.ext_res_conc_unit = item
             def OptChoice(self):
-                items = ("Genetic Algorithm","No optimization")
+                items = ("Genetic Algorithm","Particle Swarm Optimization", "No optimization")
                 item, okPressed = QtWidgets.QInputDialog.getItem(self, "Get item","Do you want to start with an optimization ?", items, 0, False)
                 if okPressed and item:
                     self.opt_choice = item
@@ -1126,23 +1217,69 @@ class Ui_MainWindow(object):
 
     def select_wd_bis(self):
 
-        if os.name == 'nt': #different python path on windows
-            python_path = self.root_path.split('lib')[0] + 'python.exe'
-        else:
-            python_path = self.root_path.split('/lib/')[0] + '/bin/python'
+        # configuration path
+        if os.name != 'nt': # for Linux or Mac
+            pers_config_path = '~/.Brookesia'
+            try:
+                os.chdir(os.path.expanduser(pers_config_path))
+            except:
+                os.chdir(os.path.expanduser('~'))
+                try:
+                    os.mkdir('.Brookesia')
+                except:
+                    a=False
+                os.chdir('.Brookesia')
+                pers_config_path = os.getcwd()
+        else: # for windows
+            pers_config_path = self.root_path
 
-        os.system(python_path + ' ' + self.root_path + "wd_select_gui.py " + self.root_path)
 
-        os.chdir(self.root_path)
+        wd_path_ok = False
+        while not wd_path_ok:
+#            select_wd()
+#            os.system(python_path + ' ' + root_path + "wd_select_gui.py " + root_path)
+#            fs = open('wd_activ.txt', 'r')
+#            txt = fs.readline()
+#            WD_name = txt.split(';')[0]
+#            WD_path = txt.split(';')[1]
 
-        fs = open('wd_activ.txt', 'r')
-        txt = fs.readline()
-        self.WD_name = txt.split(';')[0]
-        self.WD_path = txt.split(';')[1]
+            if os.name == 'nt': #different python path on windows
+                python_path = self.root_path.split('lib')[0] + 'python.exe'
+            else:
+                python_path = self.root_path.split('/lib/')[0] + '/bin/python'
 
-        os.chdir(self.WD_path)
-        _translate = QtCore.QCoreApplication.translate
-        self.pB_working_dir.setText(_translate("MainWindow", "Working dir: "+self.WD_name))
+            os.system(python_path + ' ' + self.root_path + "wd_select_gui.py " + self.root_path)
+
+
+            try:    os.chdir(pers_config_path)
+            except: os.chdir(os.path.expanduser(pers_config_path))
+
+            import time as timer
+            timer.sleep(.5)
+
+            fs = open('wd_activ.txt', 'r')
+            txt = fs.readline()
+            self.WD_name = txt.split(';')[0]
+            self.WD_path = txt.split(';')[1]
+
+            try:
+                os.chdir(self.WD_path)
+                _translate = QtCore.QCoreApplication.translate
+                self.pB_working_dir.setText(_translate("MainWindow", "Working dir: "+self.WD_name))
+                wd_path_ok = True
+            except:
+                print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
+                print('Brookesia cannot access to the working directory:' + self.WD_path)
+                print('Please, change the path of this working directory')
+                print('working directory name: ' + self.WD_name + ')')
+                print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
+#        print('\n\n')
+#        print(self.WD_name)
+#        print(self.WD_path)
+#
+#        os.chdir(self.WD_path)
+#        _translate = QtCore.QCoreApplication.translate
+#        self.pB_working_dir.setText(_translate("MainWindow", "Working dir: "+self.WD_name))
 
 
     def remove_tab(self,_option):
@@ -1424,7 +1561,7 @@ class Ui_MainWindow(object):
         self.pB_GA_drg[-1].clicked.connect(lambda: self.opt_clic('GA'))
 
         self.pB_PSO_drg.append(QtWidgets.QPushButton(self.DRG[-1]))
-        self.pB_PSO_drg[-1].setGeometry(QtCore.QRect(41500*sz_w, 370*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_drg[-1].setGeometry(QtCore.QRect(415*sz_w, 370*sz_h, 190*sz_w, 34*sz_h))
         self.pB_PSO_drg[-1].setObjectName("pB_PSO_drg")
         self.pB_PSO_drg[-1].clicked.connect(lambda: self.opt_clic('PSO'))
 
@@ -1578,7 +1715,7 @@ class Ui_MainWindow(object):
         self.pB_GA_sa[-1].setText(_translate("MainWindow", "Genetic Algorithm Optimization"))
 
         self.pB_PSO_sa.append(QtWidgets.QPushButton(self.SA[-1]))
-        self.pB_PSO_sa[-1].setGeometry(QtCore.QRect(41500*sz_w, 420*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_sa[-1].setGeometry(QtCore.QRect(415*sz_w, 420*sz_h, 190*sz_w, 34*sz_h))
         self.pB_PSO_sa[-1].setObjectName("pB_PSO_sa")
         self.pB_PSO_sa[-1].clicked.connect(lambda: self.opt_clic('PSO'))
         self.pB_PSO_sa[-1].setText(_translate("MainWindow", "Particle Swarm Optimization"))
@@ -1606,6 +1743,229 @@ class Ui_MainWindow(object):
         else:           self.rB_SA_tol_2[-1].setChecked(True)
         self.cB_ISI_sa[-1].setChecked(d_SA_ISI)
 
+
+
+    def CSP_clic(self,_option):
+        global sz_w
+        global sz_h
+        self.CSP.append(QtWidgets.QWidget())
+
+        _translate = QtCore.QCoreApplication.translate
+
+        self.CSP[-1].setObjectName("CSP")
+
+
+        # Frame 1
+        self.frame_csp1.append(QtWidgets.QFrame(self.CSP[-1]))
+        self.frame_csp1[-1].setGeometry(QtCore.QRect(40*sz_w, 30*sz_h, 201*sz_w, 91*sz_h))
+        self.frame_csp1[-1].setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_csp1[-1].setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_csp1[-1].setObjectName("frame_csp1")
+
+        self.label_csp_espi_2.append(QtWidgets.QLabel(self.frame_csp1[-1]))
+        self.label_csp_espi_2[-1].setGeometry(QtCore.QRect(10*sz_w, 20*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_espi_2[-1].setObjectName("label_csp_espi_1")
+        self.label_csp_espi_2[-1].setText(_translate("MainWindow", "Initial epsilon"))
+
+        self.label_csp_deps_2.append(QtWidgets.QLabel(self.frame_csp1[-1]))
+        self.label_csp_deps_2[-1].setGeometry(QtCore.QRect(10*sz_w, 60*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_deps_2[-1].setObjectName("label_csp_deps_2")
+        self.label_csp_deps_2[-1].setText(_translate("MainWindow", "Delta epsilon"))
+
+        self.num_csp_eps.append(QtWidgets.QPlainTextEdit(self.frame_csp1[-1]))
+        self.num_csp_eps[-1].setGeometry(QtCore.QRect(130*sz_w, 10*sz_h, 61*sz_w, 32*sz_h))
+        self.num_csp_eps[-1].setObjectName("num_csp_eps")
+        self.num_csp_eps[-1].setPlainText(_translate("MainWindow", d_csp_eps))
+
+        self.num_csp_deps.append(QtWidgets.QPlainTextEdit(self.frame_csp1[-1]))
+        self.num_csp_deps[-1].setGeometry(QtCore.QRect(130*sz_w, 50*sz_h, 61*sz_w, 32*sz_h))
+        self.num_csp_deps[-1].setObjectName("num_csp_eps")
+        self.num_csp_deps[-1].setPlainText(_translate("MainWindow", d_csp_deps))
+
+
+        self.label_csp.append(QtWidgets.QLabel(self.CSP[-1]))
+        self.label_csp[-1].setGeometry(QtCore.QRect(350*sz_w, 40*sz_h, 191*sz_w, 18*sz_h))
+        self.label_csp[-1].setObjectName("label_csp")
+        self.label_csp[-1].setText(_translate("MainWindow", "CSP calculation point number"))
+        self.label_csp_ref.append(QtWidgets.QLabel(self.CSP[-1]))
+        self.label_csp_ref[-1].setGeometry(QtCore.QRect(3500*sz_w, 80*sz_h, 191*sz_w, 18*sz_h))
+        self.label_csp_ref[-1].setObjectName("label_csp")
+        self.label_csp_ref[-1].setText(_translate("MainWindow", "CSP refinement iteration"))
+
+
+        self.num_csp_pt_num.append(QtWidgets.QDoubleSpinBox(self.CSP[-1]))
+        self.num_csp_pt_num[-1].setGeometry(QtCore.QRect(550*sz_w, 30*sz_h, 61*sz_w, 32*sz_h))
+        self.num_csp_pt_num[-1].setDecimals(0)
+        self.num_csp_pt_num[-1].setMaximum(500.0)
+        self.num_csp_pt_num[-1].setSingleStep(5.0)
+        self.num_csp_pt_num[-1].setObjectName("num_csp_pt_num")
+        self.num_csp_pt_num[-1].setProperty("value", d_csp_pt_num)
+
+        self.num_csp_ref_num.append(QtWidgets.QDoubleSpinBox(self.CSP[-1]))
+        self.num_csp_ref_num[-1].setGeometry(QtCore.QRect(5500*sz_w, 70*sz_h, 61*sz_w, 32*sz_h))
+        self.num_csp_ref_num[-1].setDecimals(0)
+        self.num_csp_ref_num[-1].setMaximum(50.0)
+        self.num_csp_ref_num[-1].setSingleStep(1.0)
+        self.num_csp_ref_num[-1].setObjectName("num_csp_ref_num")
+        self.num_csp_ref_num[-1].setProperty("value", d_csp_ref_num)
+
+
+        self.pB_remove_csp.append(QtWidgets.QPushButton(self.CSP[-1]))
+        self.pB_remove_csp[-1].setGeometry(QtCore.QRect(670*sz_w, 20*sz_h, 80*sz_w, 70*sz_h))
+        self.pB_remove_csp[-1].setObjectName("pB_remove_csp")
+        self.pB_remove_csp[-1].setText(_translate("MainWindow", "Remove"))
+
+#        self.num_csp_eps[-1].setProperty("value", d_csp_eps)
+        self.num_csp_eps[-1].setPlainText(_translate("MainWindow", d_csp_eps))
+        self.num_csp_deps[-1].setPlainText(_translate("MainWindow", d_csp_deps))
+#        self.num_csp_deps[-1].setProperty("value", d_csp_deps)
+
+        self.Gb_csp2.append(QtWidgets.QGroupBox(self.CSP[-1]))
+        self.Gb_csp2[-1].setGeometry(QtCore.QRect(40*sz_w, 130*sz_h, 241*sz_w, 301*sz_h))
+        self.Gb_csp2[-1].setAlignment(QtCore.Qt.AlignCenter)
+        self.Gb_csp2[-1].setObjectName("Gb_SA2")
+        self.Gb_csp2[-1].setTitle(_translate("MainWindow", "Errors"))
+
+        self.tableWidget_CSP.append(QtWidgets.QTableWidget(self.Gb_csp2[-1]))
+        self.tableWidget_CSP[-1].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 241*sz_w, 221*sz_h))
+        self.tableWidget_CSP[-1].setObjectName("tableWidget_CSP")
+
+        self.update_error_table()
+
+        self.num_csp_tgt_error.append(QtWidgets.QDoubleSpinBox(self.Gb_csp2[-1]))
+        self.num_csp_tgt_error[-1].setGeometry(QtCore.QRect(40*sz_w, 260*sz_h, 61*sz_w, 32*sz_h))
+        self.num_csp_tgt_error[-1].setDecimals(0)
+        self.num_csp_tgt_error[-1].setMaximum(100.0)
+        self.num_csp_tgt_error[-1].setSingleStep(5.0)
+        self.num_csp_tgt_error[-1].setObjectName("num_CSP_tgt_error")
+
+#        self.num_SA_tgt_error.append(QtWidgets.QDoubleSpinBox(self.Gb_SA2[-1]))
+#        self.num_SA_tgt_error[-1].setGeometry(QtCore.QRect(40*sz_w, 260*sz_h, 61*sz_w, 32*sz_h))
+#        self.num_SA_tgt_error[-1].setDecimals(0)
+#        self.num_SA_tgt_error[-1].setMaximum(100.0)
+#        self.num_SA_tgt_error[-1].setSingleStep(5.0)
+#        self.num_SA_tgt_error[-1].setObjectName("num_SA_tgt_error")
+#        self.pB_SA_apply2all.append(QtWidgets.QPushButton(self.Gb_SA2[-1]))
+#        self.pB_SA_apply2all[-1].setGeometry(QtCore.QRect(140*sz_w, 260*sz_h, 88*sz_w, 34*sz_h))
+#        self.pB_SA_apply2all[-1].setObjectName("pB_SA_apply2all")
+#        self.pB_SA_apply2all[-1].setText(_translate("MainWindow", "Apply to all"))
+#
+#        self.num_SA_tgt_error[-1].setProperty("value", d_SA_tgt_error)
+
+        self.pB_csp_apply2all.append(QtWidgets.QPushButton(self.Gb_csp2[-1]))
+        self.pB_csp_apply2all[-1].setGeometry(QtCore.QRect(140*sz_w, 260*sz_h, 88*sz_w, 34*sz_h))
+        self.pB_csp_apply2all[-1].setObjectName("pB_csp_apply2all")
+        self.pB_csp_apply2all[-1].setText(_translate("MainWindow", "Apply to all"))
+
+        self.num_csp_tgt_error[-1].setProperty("value", d_csp_tgt_error)
+
+        self.label_csp_meth.append(QtWidgets.QLabel(self.CSP[-1]))
+        self.label_csp_meth[-1].setGeometry(QtCore.QRect(3100*sz_w, 125*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_meth[-1].setObjectName("label_csp_tr")
+        self.label_csp_meth[-1].setText(_translate("MainWindow", "CSP method: "))
+
+        self.CSP_Method.append(QtWidgets.QComboBox(self.CSP[-1]))
+        self.CSP_Method[-1].setGeometry(QtCore.QRect(4000*sz_w, 120*sz_h, 221*sz_w, 25*sz_h))
+        self.CSP_Method[-1].setObjectName("CSP_Method")
+        self.CSP_Method[-1].addItem("")
+        self.CSP_Method[-1].addItem("")
+        self.CSP_Method[-1].setItemText(0, _translate("MainWindow", "Valorani_2006"))
+        self.CSP_Method[-1].setItemText(1, _translate("MainWindow", "Lam_1984"))
+
+        # Fast / Slow  mode assessment
+        self.Gb_csp3.append(QtWidgets.QGroupBox(self.CSP[-1]))
+        self.Gb_csp3[-1].setGeometry(QtCore.QRect(310*sz_w, 170*sz_h, 431*sz_w, 171*sz_h))
+        self.Gb_csp3[-1].setAlignment(QtCore.Qt.AlignCenter)
+        self.Gb_csp3[-1].setObjectName("Gb_csp3")
+        self.Gb_csp3[-1].setTitle(_translate("MainWindow", "Fast / Slow  mode assessment"))
+
+        self.rB_csp_fsa_1.append(QtWidgets.QRadioButton(self.Gb_csp3[-1]))
+        self.rB_csp_fsa_1[-1].setGeometry(QtCore.QRect(20*sz_w, 60*sz_h, 231*sz_w, 18*sz_h))
+        self.rB_csp_fsa_1[-1].setObjectName("rB_csp_fsa_1")
+        self.rB_csp_fsa_1[-1].setText(_translate("MainWindow", "From time resolution"))
+        self.rB_csp_fsa_2.append(QtWidgets.QRadioButton(self.Gb_csp3[-1]))
+        self.rB_csp_fsa_2[-1].setGeometry(QtCore.QRect(20*sz_w, 100*sz_h, 231*sz_w, 18*sz_h))
+        self.rB_csp_fsa_2[-1].setObjectName("rB_csp_fsa_2")
+        self.rB_csp_fsa_2[-1].setText(_translate("MainWindow", "From error assessment"))
+
+        self.label_csp_tr.append(QtWidgets.QLabel(self.Gb_csp3[-1]))
+        self.label_csp_tr[-1].setGeometry(QtCore.QRect(200*sz_w, 90*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_tr[-1].setObjectName("label_csp_tr")
+        self.label_csp_tr[-1].setText(_translate("MainWindow", "Time resolution (s) "))
+
+        self.label_csp_emt_ea.append(QtWidgets.QLabel(self.Gb_csp3[-1]))
+        self.label_csp_emt_ea[-1].setGeometry(QtCore.QRect(1000*sz_w, 130*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_emt_ea[-1].setObjectName("label_csp_emt_ea")
+        self.label_csp_emt_ea[-1].setText(_translate("MainWindow", "Eps abs"))
+        self.label_csp_emt_er.append(QtWidgets.QLabel(self.Gb_csp3[-1]))
+        self.label_csp_emt_er[-1].setGeometry(QtCore.QRect(20000*sz_w, 130*sz_h, 131*sz_w, 18*sz_h))
+        self.label_csp_emt_er[-1].setObjectName("label_csp_emt_er")
+        self.label_csp_emt_er[-1].setText(_translate("MainWindow", "Eps rel"))
+
+        self.txt_csp_tr.append(QtWidgets.QPlainTextEdit(self.Gb_csp3[-1]))
+        self.txt_csp_tr[-1].setGeometry(QtCore.QRect(320*sz_w, 80*sz_h, 60*sz_w, 31*sz_h))
+        self.txt_csp_tr[-1].setObjectName("txt_csp_emt")
+        self.txt_csp_tr[-1].setPlainText(_translate("MainWindow", d_csp_tr))
+        self.txt_csp_emt_ea.append(QtWidgets.QPlainTextEdit(self.Gb_csp3[-1]))
+        self.txt_csp_emt_ea[-1].setGeometry(QtCore.QRect(10000*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
+        self.txt_csp_emt_ea[-1].setObjectName("txt_csp_ea")
+        self.txt_csp_emt_ea[-1].setPlainText(_translate("MainWindow", d_csp_emt_ea))
+        self.txt_csp_emt_er.append(QtWidgets.QPlainTextEdit(self.Gb_csp3[-1]))
+        self.txt_csp_emt_er[-1].setGeometry(QtCore.QRect(27000*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
+        self.txt_csp_emt_er[-1].setObjectName("txt_csp_er")
+        self.txt_csp_emt_er[-1].setPlainText(_translate("MainWindow", d_csp_emt_er))
+
+
+        self.cB_ISI_csp.append(QtWidgets.QCheckBox(self.CSP[-1]))
+        self.cB_ISI_csp[-1].setGeometry(QtCore.QRect(430*sz_w, 360*sz_h, 181*sz_w, 22*sz_h))
+        self.cB_ISI_csp[-1].setObjectName("cB_ISI_csp")
+        self.cB_ISI_csp[-1].setText(_translate("MainWindow", "Inter-species interactions"))
+
+        self.pB_GA_csp.append(QtWidgets.QPushButton(self.CSP[-1]))
+        self.pB_GA_csp[-1].setGeometry(QtCore.QRect(415*sz_w, 400*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_GA_csp[-1].setObjectName("pB_GA_csp")
+        self.pB_GA_csp[-1].clicked.connect(lambda: self.opt_clic('GA'))
+        self.pB_GA_csp[-1].setText(_translate("MainWindow", "Genetic Algorithm Optimization"))
+
+        self.pB_PSO_csp.append(QtWidgets.QPushButton(self.CSP[-1]))
+        self.pB_PSO_csp[-1].setGeometry(QtCore.QRect(415*sz_w, 440*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_csp[-1].setObjectName("pB_PSO_csp")
+        self.pB_PSO_csp[-1].clicked.connect(lambda: self.opt_clic('PSO'))
+        self.pB_PSO_csp[-1].setText(_translate("MainWindow", "Particle Swarm Optimization"))
+
+
+
+#        self.pB_GA_csp.append(QtWidgets.QPushButton(self.CSP[-1]))
+#        self.pB_GA_csp[-1].setGeometry(QtCore.QRect(460*sz_w, 400*sz_h, 88*sz_w, 34*sz_h))
+#        self.pB_GA_csp[-1].setObjectName("pB_GA_csp")
+#        self.pB_GA_csp[-1].clicked.connect(self.opt_clic)
+#        self.pB_GA_csp[-1].setText(_translate("MainWindow", "Optimization"))
+
+        self.tablet.addTab(self.CSP[-1], "")
+
+#        _option = 'CSP'
+
+        if _option == 'CSP':
+            self.tablet.setTabText(self.tablet.indexOf(self.CSP[-1]), _translate("MainWindow", "CSP"))
+            self.list_operator.append('CSP')
+#        elif _option == 'SARGEP_sp':
+#            self.tablet.setTabText(self.tablet.indexOf(self.csp[-1]), _translate("MainWindow", "SARGEP_sp"))
+#            self.list_operator.append('SARGEP_sp')
+#        if _option == 'SAR_r':
+#            self.tablet.setTabText(self.tablet.indexOf(self.csp[-1]), _translate("MainWindow", "SAR_r"))
+#            self.list_operator.append('SAR_r')
+
+        self.pB_remove_csp[-1].clicked.connect(lambda: self.remove_tab(_option))
+        self.pB_csp_apply2all[-1].clicked.connect(self.change_error_table)
+        self.rB_csp_fsa_1[-1].toggled.connect(lambda: self.csp_fserr_appear('out'))
+        self.rB_csp_fsa_2[-1].toggled.connect(lambda: self.csp_fserr_appear('in'))
+        if rB_csp_fsa_tr:    self.rB_csp_fsa_1[-1].setChecked(True)
+        else:               self.rB_csp_fsa_2[-1].setChecked(True)
+        self.cB_ISI_csp[-1].setChecked(d_csp_ISI)
+
+
+
+
     def SA_tol_appear(self,option):
         global sz_w
         global sz_h
@@ -1624,6 +1984,35 @@ class Ui_MainWindow(object):
             self.num_SA_tol_1[idx_op].setGeometry(QtCore.QRect(3500*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
             self.label_Red_method_sp_9[idx_op].setGeometry(QtCore.QRect(2300*sz_w, 110*sz_h, 131*sz_w, 18*sz_h))
             self.num_SA_tol_2[idx_op].setGeometry(QtCore.QRect(3500*sz_w, 100*sz_h, 61*sz_w, 32*sz_h))
+
+    def csp_fserr_appear(self,option):
+        global sz_w
+        global sz_h
+        idx = self.tablet.currentIndex()
+        idx_op=0
+        for i in range(idx-2):
+            if 'CSP' in self.list_operator[i]:
+                idx_op+=1
+        if option == 'in':
+            # out time resolution
+            self.label_csp_tr[-1].setGeometry(QtCore.QRect(100000*sz_w, 40*sz_h, 131*sz_w, 18*sz_h))
+            self.txt_csp_tr[-1].setGeometry(QtCore.QRect(   13000*sz_w, 30*sz_h,  60*sz_w, 31*sz_h))
+            # in error assessment
+            self.label_csp_emt_ea[-1].setGeometry(QtCore.QRect(200*sz_w,  60*sz_h, 131*sz_w, 18*sz_h))
+            self.label_csp_emt_er[-1].setGeometry(QtCore.QRect(200*sz_w, 100*sz_h, 131*sz_w, 18*sz_h))
+            self.txt_csp_emt_ea[-1].setGeometry(QtCore.QRect(  320*sz_w,  50*sz_h,  60*sz_w, 31*sz_h))
+            self.txt_csp_emt_er[-1].setGeometry(QtCore.QRect(  320*sz_w, 90*sz_h,  60*sz_w, 31*sz_h))
+        else:
+            # in time resolution
+            self.label_csp_tr[-1].setGeometry(QtCore.QRect(200*sz_w, 90*sz_h, 131*sz_w, 18*sz_h))
+            self.txt_csp_tr[-1].setGeometry(QtCore.QRect(  320*sz_w, 80*sz_h,  60*sz_w, 31*sz_h))
+            # out error assessment
+            self.label_csp_emt_ea[-1].setGeometry(QtCore.QRect(1000*sz_w,  130*sz_h, 131*sz_w, 18*sz_h))
+            self.label_csp_emt_er[-1].setGeometry(QtCore.QRect(20000*sz_w, 130*sz_h, 131*sz_w, 18*sz_h))
+            self.txt_csp_emt_ea[-1].setGeometry(QtCore.QRect(  10000*sz_w, 120*sz_h,  60*sz_w, 31*sz_h))
+            self.txt_csp_emt_er[-1].setGeometry(QtCore.QRect(  27000*sz_w, 120*sz_h,  60*sz_w, 31*sz_h))
+
+
 
     def PSO_score_appear(self):
         global sz_w
@@ -1677,6 +2066,23 @@ class Ui_MainWindow(object):
 
         # update DRG table
         for tw in range(len(self.tableWidget_DRG)):
+            # get actual data
+            sp_name,max_error_sp = [],[]
+            max_error_T, max_error_ig, max_error_Sl, max_error_K = 30,30,30,30
+            for r in range(self.tableWidget_DRG[tw].rowCount()):
+                if self.tableWidget_DRG[tw].item(r, 0).text()=='T':
+                    max_error_T  = self.tableWidget_DRG[tw].item(r, 1).text()
+                elif self.tableWidget_DRG[tw].item(r, 0).text()=='Ig_t':
+                    max_error_ig = self.tableWidget_DRG[tw].item(r, 1).text()
+                elif self.tableWidget_DRG[tw].item(r, 0).text()=='Sl':
+                    max_error_Sl = self.tableWidget_DRG[tw].item(r, 1).text()
+                elif self.tableWidget_DRG[tw].item(r, 0).text()=='K':
+                    max_error_K  = self.tableWidget_DRG[tw].item(r, 1).text()
+                else:
+                    sp_name.append(self.tableWidget_DRG[tw].item(r, 0).text())
+                    max_error_sp.append(self.tableWidget_DRG[tw].item(r, 1).text())
+
+            # construction of the new table
             self.tableWidget_DRG[tw].setColumnCount(2)
             self.tableWidget_DRG[tw].setRowCount(len(tspc))
 
@@ -1694,20 +2100,52 @@ class Ui_MainWindow(object):
                 self.tableWidget_DRG[tw].setHorizontalHeaderItem(col, item)
                 item = self.tableWidget_DRG[tw].horizontalHeaderItem(col)
                 item.setText(_translate("MainWindow", col_title[col]))
-
-
             # fill the table
             for col in range(2):
-                if col==0: txt = tspc
-                else:      txt = [30]*len(tspc)
-                for r in range(len(tspc)):
-                    item = QtWidgets.QTableWidgetItem()
-                    self.tableWidget_DRG[tw].setItem(r, col, item)
-                    item = self.tableWidget_DRG[tw].item(r, col)
-                    item.setText(_translate("MainWindow", str(txt[r])))
+                if col==0:
+                    txt = tspc
+                    for r in range(len(tspc)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_DRG[tw].setItem(r, col, item)
+                        item = self.tableWidget_DRG[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt[r])))
+                else:
+                    txt = 30; n_sp = 0
+                    for r in range(len(tspc)):
+                        if   tspc[r] == 'T':    txt = max_error_T
+                        elif tspc[r] == 'Ig_t': txt = max_error_ig
+                        elif tspc[r] == 'Sl':   txt = max_error_Sl
+                        elif tspc[r] == 'K':    txt = max_error_K
+                        else:
+                            for i in range(len(sp_name)):
+                                if tspc[r] == sp_name[i]:
+                                    txt    = max_error_sp[i]
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_DRG[tw].setItem(r, col, item)
+                        item = self.tableWidget_DRG[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt)))
+
 
         # update SA table
         for tw in range(len(self.tableWidget_SA)):
+            # get actual data
+            sp_name,max_error_sp = [],[]
+            max_error_T, max_error_ig, max_error_Sl, max_error_K = 30,30,30,30
+            for r in range(self.tableWidget_SA[tw].rowCount()):
+                if self.tableWidget_SA[tw].item(r, 0).text()=='T':
+                    max_error_T  = self.tableWidget_SA[tw].item(r, 1).text()
+                elif self.tableWidget_SA[tw].item(r, 0).text()=='Ig_t':
+                    max_error_ig = self.tableWidget_SA[tw].item(r, 1).text()
+                elif self.tableWidget_SA[tw].item(r, 0).text()=='Sl':
+                    max_error_Sl = self.tableWidget_SA[tw].item(r, 1).text()
+                elif self.tableWidget_SA[tw].item(r, 0).text()=='K':
+                    max_error_K  = self.tableWidget_SA[tw].item(r, 1).text()
+                else:
+                    sp_name.append(self.tableWidget_SA[tw].item(r, 0).text())
+                    max_error_sp.append(self.tableWidget_SA[tw].item(r, 1).text())
+
+
+            # construction of the new table
             self.tableWidget_SA[tw].setColumnCount(2)
             self.tableWidget_SA[tw].setRowCount(len(tspc))
 
@@ -1729,13 +2167,93 @@ class Ui_MainWindow(object):
 
             # fill the table
             for col in range(2):
-                if col==0: txt = tspc
-                else:      txt = ['30']*len(tspc)
-                for r in range(len(tspc)):
-                    item = QtWidgets.QTableWidgetItem()
-                    self.tableWidget_SA[tw].setItem(r, col, item)
-                    item = self.tableWidget_SA[tw].item(r, col)
-                    item.setText(_translate("MainWindow", txt[r]))
+                if col==0:
+                    txt = tspc
+                    for r in range(len(tspc)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_SA[tw].setItem(r, col, item)
+                        item = self.tableWidget_SA[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt[r])))
+                else:
+                    txt = 30; n_sp = 0
+                    for r in range(len(tspc)):
+                        if   tspc[r] == 'T':    txt = max_error_T
+                        elif tspc[r] == 'Ig_t': txt = max_error_ig
+                        elif tspc[r] == 'Sl':   txt = max_error_Sl
+                        elif tspc[r] == 'K':    txt = max_error_K
+                        else:
+                            for i in range(len(sp_name)):
+                                if tspc[r] == sp_name[i]:
+                                    txt    = max_error_sp[i]
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_SA[tw].setItem(r, col, item)
+                        item = self.tableWidget_SA[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt)))
+
+        # update CSP table
+        for tw in range(len(self.tableWidget_CSP)):
+            # get actual data
+            sp_name,max_error_sp = [],[]
+            max_error_T, max_error_ig, max_error_Sl, max_error_K = 30,30,30,30
+            for r in range(self.tableWidget_CSP[tw].rowCount()):
+                if self.tableWidget_CSP[tw].item(r, 0).text()=='T':
+                    max_error_T  = self.tableWidget_CSP[tw].item(r, 1).text()
+                elif self.tableWidget_CSP[tw].item(r, 0).text()=='Ig_t':
+                    max_error_ig = self.tableWidget_CSP[tw].item(r, 1).text()
+                elif self.tableWidget_CSP[tw].item(r, 0).text()=='Sl':
+                    max_error_Sl = self.tableWidget_CSP[tw].item(r, 1).text()
+                elif self.tableWidget_CSP[tw].item(r, 0).text()=='K':
+                    max_error_K  = self.tableWidget_CSP[tw].item(r, 1).text()
+                else:
+                    sp_name.append(self.tableWidget_CSP[tw].item(r, 0).text())
+                    max_error_sp.append(self.tableWidget_CSP[tw].item(r, 1).text())
+
+
+            # construction of the new table
+            self.tableWidget_CSP[tw].setColumnCount(2)
+            self.tableWidget_CSP[tw].setRowCount(len(tspc))
+
+            _translate = QtCore.QCoreApplication.translate
+            # row titles :
+            for r in range(len(tspc)):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_CSP[tw].setVerticalHeaderItem(r, item)
+                item = self.tableWidget_CSP[tw].verticalHeaderItem(r)
+                item.setText(_translate("MainWindow", str(r+1)))
+            # column titles :
+            col_title = ["Target","Error (%)"]
+            for col in range(2):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_CSP[tw].setHorizontalHeaderItem(col, item)
+                item = self.tableWidget_CSP[tw].horizontalHeaderItem(col)
+                item.setText(_translate("MainWindow", col_title[col]))
+
+
+            # fill the table
+            for col in range(2):
+                if col==0:
+                    txt = tspc
+                    for r in range(len(tspc)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_CSP[tw].setItem(r, col, item)
+                        item = self.tableWidget_CSP[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt[r])))
+                else:
+                    txt = 30; n_sp = 0
+                    for r in range(len(tspc)):
+                        if   tspc[r] == 'T':    txt = max_error_T
+                        elif tspc[r] == 'Ig_t': txt = max_error_ig
+                        elif tspc[r] == 'Sl':   txt = max_error_Sl
+                        elif tspc[r] == 'K':    txt = max_error_K
+                        else:
+                            for i in range(len(sp_name)):
+                                if tspc[r] == sp_name[i]:
+                                    txt    = max_error_sp[i]
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_CSP[tw].setItem(r, col, item)
+                        item = self.tableWidget_CSP[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt)))
+
 
     def change_error_table(self):
         global sz_w
@@ -1757,9 +2275,9 @@ class Ui_MainWindow(object):
                 item = self.tableWidget_DRG[idx_op].item(r, 1)
                 item.setText(_translate("MainWindow", txt))
 
-        if 'SA' in operator or 'DSRG' in operator:
+        if 'SA' in operator or 'SARGEP' in operator:
             for i in range(idx-2):
-                if 'SA' in self.list_operator[i] or 'DSRG' in self.list_operator[i]:
+                if 'SA' in self.list_operator[i] or 'SARGEP' in self.list_operator[i]:
                     idx_op+=1
 #            txt = [self.num_SA_tgt_error[idx_op].text()]*self.list_target.count()
             txt = self.num_SA_tgt_error[idx_op].text()
@@ -1767,6 +2285,18 @@ class Ui_MainWindow(object):
                 item = QtWidgets.QTableWidgetItem()
                 self.tableWidget_SA[idx_op].setItem(r, 1, item)
                 item = self.tableWidget_SA[idx_op].item(r, 1)
+                item.setText(_translate("MainWindow", txt))
+
+        if 'CSP' in operator:
+            for i in range(idx-2):
+                if 'CSP' in self.list_operator[i]:
+                    idx_op+=1
+#            txt = [self.num_SA_tgt_error[idx_op].text()]*self.list_target.count()
+            txt = self.num_csp_tgt_error[idx_op].text()
+            for r in range(self.tableWidget_CSP[idx_op].rowCount()):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_CSP[idx_op].setItem(r, 1, item)
+                item = self.tableWidget_CSP[idx_op].item(r, 1)
                 item.setText(_translate("MainWindow", txt))
 
     def mdot_incr_calc(self,num_case):
@@ -2052,12 +2582,12 @@ class Ui_MainWindow(object):
             self.Box_GA_Selection[idx_opt].setItemText(3, _translate("MainWindow", "Elitism"))
 #            self.Box_GA_Selection[idx_opt].setItemText(4, _translate("MainWindow", "Tournament"))
             self.txt_GA_sel_opt.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Selection[idx_opt]))
-            self.txt_GA_sel_opt[idx_opt].setGeometry(QtCore.QRect(145*sz_w, 60*sz_h, 101*sz_w, 31*sz_h))
+            self.txt_GA_sel_opt[idx_opt].setGeometry(QtCore.QRect(210*sz_w, 60*sz_h, 70*sz_w, 31*sz_h))
             self.txt_GA_sel_opt[idx_opt].setObjectName("txt_GA_sel_opt")
             self.label_GA_sel_opt.insert(idx_opt,QtWidgets.QLabel(self.GA_Box_Selection[idx_opt]))
-            self.label_GA_sel_opt[idx_opt].setGeometry(QtCore.QRect(25*sz_w, 70*sz_h, 131*sz_w, 18*sz_h))
+            self.label_GA_sel_opt[idx_opt].setGeometry(QtCore.QRect(25*sz_w, 70*sz_h, 170*sz_w, 18*sz_h))
             self.label_GA_sel_opt[idx_opt].setObjectName("label_GA_sel_opt")
-            self.label_GA_sel_opt[idx_opt].setText(_translate("MainWindow", "Selection option"))
+            self.label_GA_sel_opt[idx_opt].setText(_translate("MainWindow", "q (for Geometric norm operator)"))
 
             self.txt_GA_sel_opt[idx_opt].setPlainText(_translate("MainWindow", d_GA_sel_opt))
 
@@ -2102,19 +2632,19 @@ class Ui_MainWindow(object):
             self.txt_GA_Xover_int_4[idx_opt].setObjectName("txt_GA_Xover_int_4")
             self.txt_GA_Xover_int_4[idx_opt].setPlainText(_translate("MainWindow", d_GA_Xover_int_4))
             self.txt_GA_Xover_opt_1.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Xover[idx_opt]))
-            self.txt_GA_Xover_opt_1[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_Xover_opt_1[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_1[idx_opt].setPlainText(_translate("MainWindow", d_GA_Xover_opt_1))
             self.txt_GA_Xover_opt_1[idx_opt].setObjectName("txt_GA_Xover_opt_1")
             self.txt_GA_Xover_opt_2.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Xover[idx_opt]))
-            self.txt_GA_Xover_opt_2[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_Xover_opt_2[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_2[idx_opt].setPlainText(_translate("MainWindow", d_GA_Xover_opt_2))
             self.txt_GA_Xover_opt_2[idx_opt].setObjectName("txt_GA_Xover_opt_2")
             self.txt_GA_Xover_opt_3.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Xover[idx_opt]))
-            self.txt_GA_Xover_opt_3[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_Xover_opt_3[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_3[idx_opt].setPlainText(_translate("MainWindow", d_GA_Xover_opt_3))
             self.txt_GA_Xover_opt_3[idx_opt].setObjectName("txt_GA_Xover_opt_3")
             self.txt_GA_Xover_opt_4.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Xover[idx_opt]))
-            self.txt_GA_Xover_opt_4[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 140*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_Xover_opt_4[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 140*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_Xover_opt_4[idx_opt].setPlainText(_translate("MainWindow", d_GA_Xover_opt_4))
             self.txt_GA_Xover_opt_4[idx_opt].setObjectName("txt_GA_Xover_opt_4")
             self.label_GA_Xover_int.insert(idx_opt,QtWidgets.QLabel(self.GA_Box_Xover[idx_opt]))
@@ -2122,7 +2652,7 @@ class Ui_MainWindow(object):
             self.label_GA_Xover_int[idx_opt].setObjectName("label_GA_Xover_int")
             self.label_GA_Xover_int[idx_opt].setText(_translate("MainWindow", "Intensity(%)"))
             self.label_GA_Xover_opt.insert(idx_opt,QtWidgets.QLabel(self.GA_Box_Xover[idx_opt]))
-            self.label_GA_Xover_opt[idx_opt].setGeometry(QtCore.QRect(320*sz_w, 30*sz_h, 71*sz_w, 18*sz_h))
+            self.label_GA_Xover_opt[idx_opt].setGeometry(QtCore.QRect(3200*sz_w, 30*sz_h, 71*sz_w, 18*sz_h))
             self.label_GA_Xover_opt[idx_opt].setObjectName("label_GA_Xover_opt")
             self.label_GA_Xover_opt[idx_opt].setText(_translate("MainWindow", "Options"))
             self.pB_GA_remove.insert(idx_opt,QtWidgets.QPushButton(self.GA[idx_opt]))
@@ -2172,13 +2702,13 @@ class Ui_MainWindow(object):
 #            self.txt_GA_mut_int_4[idx_opt].setGeometry(QtCore.QRect(250, 150, 71, 31))
 #            self.txt_GA_mut_int_4[idx_opt].setObjectName("txt_GA_mut_int_4")
             self.txt_GA_mut_opt_1.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_mut[idx_opt]))
-            self.txt_GA_mut_opt_1[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_mut_opt_1[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 50*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_1[idx_opt].setObjectName("txt_GA_mut_opt_1")
             self.txt_GA_mut_opt_2.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_mut[idx_opt]))
             self.txt_GA_mut_opt_2[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 80*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_2[idx_opt].setObjectName("txt_GA_mut_opt_2")
             self.txt_GA_mut_opt_3.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_mut[idx_opt]))
-            self.txt_GA_mut_opt_3[idx_opt].setGeometry(QtCore.QRect(310*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
+            self.txt_GA_mut_opt_3[idx_opt].setGeometry(QtCore.QRect(3100*sz_w, 110*sz_h, 71*sz_w, 31*sz_h))
             self.txt_GA_mut_opt_3[idx_opt].setObjectName("txt_GA_mut_opt_3")
 #            self.txt_GA_mut_opt_4.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_mut[idx_opt]))
 #            self.txt_GA_mut_opt_4[idx_opt].setGeometry(QtCore.QRect(350, 150, 71, 31))
@@ -3756,6 +4286,12 @@ class Ui_MainWindow(object):
         optim               = []
         ttol_sensi          = []
         isi                 = []
+        csp_method          = []
+        csp_tr              = []
+        csp_exhaust_ea      = []
+        csp_exhaust_er      = []
+        csp_select_tr       = []
+        csp_ref_num         = []
 
         n_gen               = []
         n_indiv             = []
@@ -3784,7 +4320,7 @@ class Ui_MainWindow(object):
 
         error_fitness       = []
 
-        drg = -1 ; sa = -1 ; ga = -1
+        drg = -1 ; sa = -1 ; csp = -1 ; ga = -1
 
 
         for red_i in range(len(self.list_operator)):
@@ -3852,6 +4388,55 @@ class Ui_MainWindow(object):
                     else:
                         ttol_sensi.append([float(self.num_SA_tol_1[sa].document().toPlainText().replace(',','.')),\
                                            float(self.num_SA_tol_2[sa].document().toPlainText().replace(',','.'))])
+                    # fill empty csp options
+                    csp_method.append([])
+                    csp_tr.append([])
+                    csp_exhaust_ea.append([])
+                    csp_exhaust_er.append([])
+                    csp_select_tr.append(False)
+                    csp_ref_num.append([])
+
+
+                if 'CSP' in self.list_operator[red_i]:
+                    csp+=1
+                    # eps
+                    eps.append(float(self.num_csp_eps[csp].document().toPlainText().replace(',','.')))
+                    delta_eps.append(float(self.num_csp_deps[csp].document().toPlainText().replace(',','.')))
+                    # npts
+                    npoints.append(float(self.num_csp_pt_num[csp].text().replace(',','.')))
+                    # errors
+                    max_error_sp.append([])
+                    for r in range(self.tableWidget_CSP[csp].rowCount()):
+                        if self.tableWidget_CSP[csp].item(r, 0).text()=='T':
+                            max_error_T.append(self.tableWidget_CSP[csp].item(r, 1).text())
+                        elif self.tableWidget_CSP[csp].item(r, 0).text()=='Ig_t':
+                            max_error_ig.append(self.tableWidget_CSP[csp].item(r, 1).text())
+                        elif self.tableWidget_CSP[csp].item(r, 0).text()=='Sl':
+                            max_error_Sl.append(self.tableWidget_CSP[csp].item(r, 1).text())
+                        elif self.tableWidget_CSP[csp].item(r, 0).text()=='K':
+                            max_error_K.append(self.tableWidget_CSP[csp].item(r, 1).text())
+                        else:
+                            max_error_sp[-1].append(self.tableWidget_CSP[csp].item(r, 1).text())
+                    # Inter-species interations
+                    isi.append(self.cB_ISI_csp[csp].isChecked())
+                    # optimization
+                    if red_i+1<len(self.list_operator):
+                        if self.list_operator[red_i+1]=='opt': optim.append(True)
+                        else:                                 optim.append(False)
+                    else:                                     optim.append(False)
+                    if self.rB_csp_fsa_1[csp].isChecked(): csp_select_tr.append(True)
+                    else:                                  csp_select_tr.append(False)
+
+
+                    # fill empty sa options
+                    ttol_sensi.append([])
+                    # csp options
+                    csp_method.append(self.CSP_Method[csp].currentText())
+                    csp_ref_num.append(float(self.num_csp_ref_num[csp].text().replace(',','.')))
+                    csp_tr.append(float(self.txt_csp_tr[csp].document().toPlainText()))
+                    csp_exhaust_ea.append(float(self.txt_csp_emt_ea[csp].document().toPlainText()))
+                    csp_exhaust_er.append(float(self.txt_csp_emt_er[csp].document().toPlainText()))
+
 
             else: #GA
                 ga+=1
@@ -4216,7 +4801,8 @@ class Ui_MainWindow(object):
                         fd.write('diluent_1         = ' + diluent[case_act]            + '\n')
                         fd.write('diluent_ratio_1   = ' + str(diluent_ratio[case_act]) + '\n')
                     fd.write('Ts_1              = ' + list2txt(Ts[case_act])       + '\n')
-                    fd.write('phis_1            = ' + list2txt(phis[case_act])     + '\n')
+                    if 'diff_' not in configs[case_act]:
+                        fd.write('phis_1            = ' + list2txt(phis[case_act])     + '\n')
                 if 'diff_' in configs[case_act] or 'pp_' in configs[case_act]:
                     fd.write('mdots_1           = ' + list2txt(mdots_1[case_act])      + '\n')
                 if 'reactor' in configs[case_act]:
@@ -4225,8 +4811,8 @@ class Ui_MainWindow(object):
                     fd.write('t_max_coeff       = ' + str(t_max_coeff[case_act])       + '\n')
                     fd.write('Scal_ref          = ' + Scal_ref[case_act]               + '\n')
                     fd.write('grad_curv_ratio   = ' + str(grad_curv_ratio[case_act])   + '\n')
-                    fd.write('tign_det_nPoints  = ' + str(tign_nPoints[case_act])      + '\n')
-                    fd.write('tign_det_tmax_sec = ' + str(tign_dt[case_act])           + '\n')
+                    #fd.write('tign_det_nPoints  = ' + str(tign_nPoints[case_act])      + '\n')
+                    #fd.write('tign_det_tmax_sec = ' + str(tign_dt[case_act])           + '\n')
                 elif 'JSR' in configs[case_act]:
                     fd.write('t_max             = ' + str(t_max[case_act])             + '\n')
                 elif 'PFR' in configs[case_act]:
@@ -4369,8 +4955,17 @@ class Ui_MainWindow(object):
                 if Sl_check: fd.write('max_error_Sl    = ' + str(max_error_Sl[op])  +  '\n')
                 if K_check:  fd.write('max_error_K     = ' + str(max_error_K[op])   +  '\n')
                 fd.write('inter_sp_inter  = '  + str(isi[op])         +  '\n')
-                if 'DRG' not in self.list_operator[red_i]:
+                if 'SA' in self.list_operator[red_i]:
                     fd.write('ttol_sensi      = '    + list2txt(ttol_sensi[op])    +  '\n')
+                if 'CSP' in self.list_operator[red_i]:
+                    #fd.write('csp_method      = ' + str(csp_method[op])   +  '\n')
+                    if csp_select_tr[op]:
+                        fd.write('time_resolution    = ' + str(csp_tr[op])  +  '\n')
+                    else:
+                        fd.write('epsilon_abs        = ' + str(csp_exhaust_ea[op])  +  '\n')
+                        fd.write('epsilon_rel        = ' + str(csp_exhaust_er[op])  +  '\n')
+                    #fd.write('csp_refin_iter     = ' + str(csp_ref_num[op])  +  '\n')
+
                 if optim[op]:
                     ag+=1
                     fd.write('optim           = '  + str(opt_meth[ag])         +  '\n')
@@ -4779,10 +5374,13 @@ class Ui_MainWindow(object):
 
                         # options for counterflow flame
                         if 'fuel' in locals():
+                            self.fuel_1[case_n].setPlainText(_translate("MainWindow", fuel))
                             self.df_fuel_1[case_n].setPlainText(_translate("MainWindow", fuel));            del fuel
                         if 'oxidant' in locals():
+                            self.oxidant_1[case_n].setPlainText(_translate("MainWindow", oxidant))
                             self.df_oxidant_1[case_n].setPlainText(_translate("MainWindow", oxidant));      del oxidant
                         if 'diluent' in locals():
+                            self.Diluent_1[case_n].setPlainText(_translate("MainWindow", diluent))
                             self.df_Diluent_1[case_n].setPlainText(_translate("MainWindow", diluent));      del diluent
 #                        if 'diluent_ratio' in locals():
 #                            self.df_Diluent_r_1[case_n].setPlainText(_translate("MainWindow", str(diluent_ratio))); del diluent_ratio
@@ -4947,6 +5545,12 @@ class Ui_MainWindow(object):
                 if txt[0] == 'ttol_sensi':
                     try:    ttol_sensi = genf.txt2list_float(txt[1])
                     except: ttol_sensi = genf.txt2list_bool(txt[1])
+                if txt[0] == 'csp_method':        csp_method         = genf.clean_txt(txt[1])
+                if txt[0] == 'tol_csp':           tol_csp            = genf.clean_txt(txt[1])
+                if txt[0] == 'time_resolution':   time_resolution    = genf.clean_txt(txt[1])
+                if txt[0] == 'epsilon_rel':       epsilon_rel        = genf.clean_txt(txt[1])
+                if txt[0] == 'epsilon_abs':       epsilon_abs        = genf.clean_txt(txt[1])
+
 
                 if 'optim' in locals() and optim != False:
                     if txt[0] == 'n_gen':               n_gen              = int(txt[1])
@@ -4993,6 +5597,8 @@ class Ui_MainWindow(object):
                 elif  reduction_operator=='SAR_sp':    self.SA_clic('SAR_sp')
                 elif  reduction_operator=='SARGEP_sp':  self.SA_clic('SARGEP_sp')
                 elif  reduction_operator=='SAR_r':     self.SA_clic('SAR_r')
+                elif  reduction_operator=='CSP':       self.CSP_clic('CSP')
+
                 if reduction_operator != 'NULL' and 'ext_results_file' in locals():
                     if condition_tab_removed == False:
                         self.tablet.removeTab(1)
@@ -5012,7 +5618,7 @@ class Ui_MainWindow(object):
                     num_row+=1 ; tspc_red.insert(0,'K')
 
 
-                if 'SAR' in reduction_operator:
+                if 'SA' in reduction_operator:
                     if 'eps'            in locals():
                         self.num_SA_eps[-1].setProperty("value", eps);         del eps
                     if 'delta_eps'      in locals():
@@ -5130,6 +5736,76 @@ class Ui_MainWindow(object):
 
                     idx_tab = self.tablet.indexOf(self.DRG[-1])
                     self.tablet.setCurrentIndex(idx_tab)
+
+
+                if 'CSP' in reduction_operator:
+                    if 'eps'            in locals():
+                        self.num_csp_eps[-1].setProperty("value", eps);         del eps
+                    if 'delta_eps'      in locals():
+                        self.num_csp_deps[-1].setProperty("value", delta_eps);  del delta_eps
+                    if 'n_points'       in locals():
+                        self.num_csp_pt_num[-1].setProperty("value", n_points); del n_points
+                    if 'inter_sp_inter'       in locals():
+                        if inter_sp_inter:  self.cB_ISI_csp[-1].setChecked(True)
+                        else:               self.cB_ISI_csp[-1].setChecked(False)
+
+                    if T_check:
+                        if 'max_error_T' in locals():  errors.insert(0,max_error_T);  del max_error_T
+                        else:                          errors.insert(0,30)
+                    if Sl_check:
+                        if 'max_error_Sl' in locals(): errors.insert(0,max_error_Sl); del max_error_Sl
+                        else:                          errors.insert(0,30)
+                    if ig_check:
+                        if 'max_error_ig' in locals(): errors.insert(0,max_error_ig); del max_error_ig
+                        else:                          errors.insert(0,30)
+                    if K_check:
+                        if 'max_error_K' in locals():  errors.insert(0,max_error_K); del max_error_K
+                        else:                          errors.insert(0,30)
+
+                    self.tableWidget_CSP[-1].setColumnCount(2)
+                    self.tableWidget_CSP[-1].setRowCount(len(tspc_red))
+
+                    _translate = QtCore.QCoreApplication.translate
+                    # row titles :
+                    for r in range(len(tspc_red)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_CSP[-1].setVerticalHeaderItem(r, item)
+                        item = self.tableWidget_CSP[-1].verticalHeaderItem(r)
+                        item.setText(_translate("MainWindow", str(r+1)))
+                    # column titles :
+                    col_title = ["Target","Error (%)"]
+                    for col in range(2):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_CSP[-1].setHorizontalHeaderItem(col, item)
+                        item = self.tableWidget_CSP[-1].horizontalHeaderItem(col)
+                        item.setText(_translate("MainWindow", col_title[col]))
+
+                    # fill the table
+                    for col in range(2):
+                        if col==0: txt = copy.deepcopy(tspc_red)
+                        else:      txt = copy.deepcopy(errors)
+                        for r in range(len(tspc_red)):
+                            item = QtWidgets.QTableWidgetItem()
+                            self.tableWidget_CSP[-1].setItem(r, col, item)
+                            item = self.tableWidget_CSP[-1].item(r, col)
+                            item.setText(_translate("MainWindow", str(txt[r])))
+
+                    idx_tab = self.tablet.indexOf(self.CSP[-1])
+                    self.tablet.setCurrentIndex(idx_tab)
+
+                if 'csp_method' in locals():
+                    if csp_method=='Valorani_2006':
+                        self.CSP_Method[-1].setCurrentIndex(0)
+                    if csp_method=='Lam_1984':
+                        self.CSP_Method[-1].setCurrentIndex(1)
+#                if 'tol_csp'        in locals():
+#                    self.txt_GA_Xover_int_2[-1].setPlainText(_translate("MainWindow", tol_csp) ; X_nb+=1
+                if 'time_resolution'    in locals():
+                    self.txt_csp_tr[-1].setPlainText(_translate("MainWindow", time_resolution))
+                if 'epsilon_rel'        in locals():
+                    self.txt_csp_emt_ea[-1].setPlainText(_translate("MainWindow", epsilon_rel))
+                if 'epsilon_abs'        in locals():
+                    self.txt_csp_emt_er[-1].setPlainText(_translate("MainWindow", epsilon_abs))
 
             if 'optim' in locals():
                 if optim:
@@ -5287,8 +5963,7 @@ class Ui_MainWindow(object):
 
     def run_reduction(self):
         self.write_parameters(False)
-        genf.main_redopt_algo('last_condition.inp',self.WD_path)
-
+        genf.main_redopt_algo('last_condition.inp',self.WD_path,version)
 
 
 def get_wd_folder(WD_p=True, WD_n=True):

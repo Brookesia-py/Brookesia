@@ -55,7 +55,7 @@ tol_ts            = 1e-06, 1e-12
 
 
 #===========> Op: DRGEP_sp
-operator        = DRGEP_sp 
+operator        = DRGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -63,26 +63,10 @@ max_error_sp    = 30, 30, 30
 max_error_T     = 30
 max_error_ig    = 30
 inter_sp_inter  = True
-optim           = GA
-#====> Genetic Algorithm Optimization
-n_gen               = 5
-n_indiv             = 5
-error_fitness       = mean
-Arrh_max_variation  = 5, 5, 5
-optim_on_meth       = False
-sub_mech_sel        = H2, CO, C1, C2, C3, N
-selection_operator  = Roulette
-selection_options   = 0.2
-Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
-Xover_pct           = 10, 20, 20, 20
-mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
-mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
-mut_intensity       = 20
-
+optim           = False
 
 #===========> Op: SAR_sp
-operator        = SAR_sp 
+operator        = SAR_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -105,7 +89,7 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
+mut_opt             = , 3,
 mut_intensity       = 20
     """)
 
@@ -160,7 +144,7 @@ tol_ts            = 1e-12, 1e-18
 
 
 #===========> Op: DRGEP_sp
-operator        = DRGEP_sp 
+operator        = DRGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -169,7 +153,7 @@ max_error_T     = 30
 inter_sp_inter  = True
 
 #===========> Op: DRG_r
-operator        = DRG_r 
+operator        = DRG_r
 eps             = 0.02
 delta_eps       = 0.0
 n_points        = 10.0
@@ -190,7 +174,7 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
+mut_opt             = , 3,
 mut_intensity       = 30
     """)
 
@@ -253,7 +237,7 @@ restore_flame_folder = ex3_ffl
 
 
 #===========> Op: DRGEP_sp
-operator        = DRGEP_sp 
+operator        = DRGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -263,7 +247,7 @@ max_error_Sl    = 30
 inter_sp_inter  = True
 
 #===========> Op: SARGEP_sp
-operator        = SARGEP_sp 
+operator        = SARGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -286,7 +270,7 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
+mut_opt             = , 3,
 mut_intensity       = 20
     """)
 
@@ -329,13 +313,12 @@ fuel_1            = H2
 diluent_1         = N2
 diluent_ratio_1   = 0.0
 Ts_1              = 300.0
-phis_1            = 0.5, 1.0, 1.5
-mdots_1           = 2.0
+mdots_1           = 3.0
 oxidant_2         = O2
 diluent_2         = N2
 diluent_ratio_2   = 79.0
 Ts_2              = 300.0
-mdots_2           = 2.0
+mdots_2           = 3.0
 width             = 0.02
 tol_ts            = 1e-05, 1e-08
 tol_ss            = 1e-06, 1e-08
@@ -355,7 +338,7 @@ restore_flame_folder = False
 
 
 #===========> Op: DRGEP_sp
-operator        = DRGEP_sp 
+operator        = DRGEP_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -367,7 +350,7 @@ max_error_K     = 30
 inter_sp_inter  = True
 
 #===========> Op: DRG_r
-operator        = DRG_r 
+operator        = DRG_r
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -391,7 +374,7 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
+mut_opt             = , 3,
 mut_intensity       = 20
     """)
 
@@ -456,7 +439,6 @@ slope             = 0.05
 curve             = 0.05
 ratio             = 2.0
 prune             = 0.01
-restore_flame_folder = ex3_ffl
 
 
 
@@ -466,7 +448,7 @@ restore_flame_folder = ex3_ffl
 
 
 #===========> Op: DRG_sp
-operator        = DRG_sp 
+operator        = DRG_sp
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -475,7 +457,7 @@ max_error_T     = 30
 inter_sp_inter  = True
 
 #===========> Op: SAR_r
-operator        = SAR_r 
+operator        = SAR_r
 eps             = 0.02
 delta_eps       = 0.01
 n_points        = 10.0
@@ -498,8 +480,8 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
-mut_intensity       = 20     
+mut_opt             = , 3,
+mut_intensity       = 20
     """)
 
 
@@ -522,7 +504,7 @@ conc_units        = Molar_fraction
 verbose           = 4
 show_plots        = True
 write_ck          = True
-tspc              = 
+tspc              =
 T_check           = False
 sp_T              = CO2
 Sl_check          = True
@@ -546,14 +528,14 @@ error_coupling    = mean
 #=============================================
 
 #===========> Op: Optimization without reduction
-operator        = NULL 
+operator        = NULL
 optim           = GA
 #====> Genetic Algorithm Optimization
 n_gen              = 5
 n_indiv            = 5
 error_fitness      = mean
 Arrh_max_variation = 10, 5, 5
-optim_on_meth      = DRG 
+optim_on_meth      = DRG
 optim_on_meth_pts  = 20
 nb_r2opt            = 30
 selection_operator  = Roulette
@@ -562,7 +544,172 @@ Xover_operator      = simple_Xover, multiple_Xover, arith_Xover, heuristic_Xover
 Xover_pct           = 10, 20, 20, 20
 mut_operator        = uniform_mutation, non_uniform_mutation, boundary_mutation
 mut_pct             = 30, 30, 10
-mut_opt             = , 3, 
-mut_intensity       = 20    
+mut_opt             = , 3,
+mut_intensity       = 20
     """)
 
+
+
+
+    # ================================================================
+    # ================================================================
+    # ================================================================
+    # ================================================================
+
+    # ================================================================
+    # ================================================================
+    # ================================================================
+    # ================================================================
+    try:
+        import brookesia.CSP as csp
+        CSP_method = True
+        try:
+            os.chdir('_conditions_input')
+        except:
+            a=2
+    except:
+        CSP_method = False
+    if CSP_method:
+
+        fichier_data = open('7_CSP_C0.inp', 'w')
+        fichier_data.write("""#=============================================
+#           Main parameters
+#=============================================
+main_path         = CSP_C0_r_ff
+mech              = C0_H2_Law.cti
+verbose           = 4
+show_plots        = False
+write_ck          = True
+tspc              = H2, OH, H2O
+T_check           = True
+sp_T              = H2O
+Sl_check          = True
+sp_Sl             = H
+ig_check          = True
+sp_ig             = H
+K_check           = False
+sp_K              = H
+error_calculation = points
+error_coupling    = mean
+
+
+#=============================================
+#           Simulation cases
+#=============================================
+
+#======> Case 1
+config            = reactor_HP
+Ps                = 100000.0
+fuel              = H2
+oxidant           = O2
+diluent           = N2
+diluent_ratio     = N2/O2 3.76
+Ts                = 1400.0
+phis              = 0.5, 1.0, 1.5
+n_pts             = 250.0
+delta_npts        = 20.0
+t_max_coeff       = 5.0
+Scal_ref          = H2O
+grad_curv_ratio   = 0.5
+tign_nPoints      = 130.0
+tign_dt           = 1e-09
+tol_ts            = 1e-12, 1e-06
+
+
+
+#=============================================
+#           Operators
+#=============================================
+
+
+
+#===========> Op: CSP
+operator        = CSP
+eps             = 1e-05
+delta_eps       = 2e-05
+n_points        = 20.0
+max_error_sp    = 30, 30, 30
+max_error_T     = 30
+max_error_ig    = 30
+max_error_Sl    = 30
+inter_sp_inter  = True
+optim           = False
+#csp_method      = Valorani_2006
+time_resolution = 1e-7
+#epsilon_rel     = 0.01
+#epsilon_abs     = 1e-14
+        """)
+
+
+
+    # ================================================================
+    # ================================================================
+    # ================================================================
+    # ================================================================
+
+        fichier_data = open('8_CSPr_34.inp', 'w')
+        fichier_data.write("""#=============================================
+#           Main parameters
+#=============================================
+main_path         = 8_C1_CSPr_b
+mech              = C1_GRI30.cti
+verbose           = 4
+show_plots        = True
+write_ck          = True
+tspc              = CH4, CO2, CO, OH
+T_check           = True
+sp_T              = CO2
+Sl_check          = True
+sp_Sl             = H
+ig_check          = True
+sp_ig             = CH3
+K_check           = False
+sp_K              = H
+error_calculation = QoI
+error_coupling    = mean
+
+
+#=============================================
+#           Simulation cases
+#=============================================
+
+#======> Case 1
+config            = reactor_HP
+Ps                = 100000.0
+fuel              = CH4
+oxidant           = O2
+diluent           = N2
+diluent_ratio     = N2/O2 3.76
+Ts                = 1600.0
+phis              = 0.5, 1.0, 1.5
+n_pts             = 250.0
+delta_npts        = 20.0
+t_max_coeff       = 5.0
+Scal_ref          = H2O
+grad_curv_ratio   = 0.5
+tign_nPoints      = 500.0
+tign_dt           = 1e-09
+tol_ts            = 1e-06, 1e-12
+
+
+
+#=============================================
+#           Operators
+#=============================================
+
+
+#===========> Op: CSP
+operator        = CSP
+eps             = 1e-05
+delta_eps       = 2e-05
+n_points        = 6
+max_error_sp    = 20, 20, 40, 40
+max_error_T     = 30
+max_error_ig    = 30
+max_error_Sl    = 30
+inter_sp_inter  = True
+optim           = False
+time_resolution = 1e-11
+#epsilon_rel     = 0.01
+#epsilon_abs     = 1e-14
+        """)

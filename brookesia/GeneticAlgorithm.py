@@ -29,6 +29,9 @@ import os
 import sys
 import multiprocessing
 from multiprocessing import Pool
+from pebble import ProcessPool
+from concurrent.futures import TimeoutError
+
 
 from shutil import copyfile
 import time as timer
@@ -82,7 +85,6 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
                      size_tot)
     pop.fitness_eval_newpop(optim_param,conditions_list,ref_results_list)
 
-
     # Find new best ind and save the mech,
     # if not, replace worst ind of the current pop by the previous best ind
     best_ind,new_best_ind = pop.compare_best_ind(best_ind,optim_param,verbose)
@@ -94,6 +96,8 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     pop.selection(optim_param,verbose)
 
     time_1 = timer.time()
+
+#    a =asdfkjh
 
     for gen in range(1, optim_param.n_gen+1):
         print_("\n\nGeneration:" + str(gen),mp)
@@ -123,7 +127,7 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     os.chdir('Red_mech')
     best_ind.mech.write_new_mech(new_filename)
     if conditions_list[0].simul_param.write_ck:
-        best_ind.mech.write_chemkin_mech(new_filename)
+        best_ind.mech.write_chemkin_mech(new_filename,conditions_list[0].version)
     os.chdir(conditions_list[0].main_path)
 
     Opt_results_list, errors_list, fitness = \
@@ -157,16 +161,18 @@ class Chromosome:
     def __init__(self,conditions_list,mech_data,ref_results_list,red_data_list,\
                  rand_kin=True):
         optim_param = red_data_list[0].optim_param
-        self.mech    = copy.deepcopy(mech_data)
+        if type(rand_kin) is bool:
+            self.mech    = copy.deepcopy(mech_data)
+        else: # if the option to import kinetic mechanism have been selected
+            self.mech    = copy.deepcopy(rand_kin)
         self.r2opt   = []
         self.find_r2opt(red_data_list,optim_param,conditions_list)
         self.get_uncertainty(optim_param)
 
-        if rand_kin:
+        if rand_kin == True:
             self.randomize_kin(optim_param)
 
         self.fitness = 0
-
 
 
     def find_r2opt(self,red_data_list,optim_param,conditions_list):
@@ -357,6 +363,14 @@ class Chromosome:
             else:
                 self.mech.react.modif = [True]*len(self.mech.react.modif)
 
+        if type(optim_param.reactions2opt) is not bool:
+            if False not in self.mech.react.modif: # if no restriction is defined, prevent the modification of not specified reactions
+                self.mech.react.modif = [False]*len(self.mech.react.modif)
+            # allow the modification of specified reactions
+            for r2mod in optim_param.reactions2opt:
+                for r in range(len(self.mech.react.modif)):
+                    if r2mod == r+1:
+                        self.mech.react.modif[r] = True
 
 
     def get_uncertainty(self,optim_param):
@@ -392,6 +406,54 @@ class Chromosome:
             if not react_found:
                 self.mech.react.incert.append(optim_param.Arrh_max_variation)
         os.chdir("GA")
+
+#    def get_values(self,optim_param,n_ind):
+#
+#        n_ind+=1
+#
+#        # Directory
+#        os.chdir(optim_param.main_path)
+#        table = [] ; new_values =[] ; num_react=[]
+#
+#        try :
+#            f=open('new_values.csv')
+#            csv_f=csv.reader(f, delimiter=';')
+#            for row in csv_f:
+#                table.append(row)
+#            f.close()
+#
+#            for i in range(len(table)-1):
+#                num_react.append(table[i+1][0])      # [0] reaction number column
+#                new_values.append(table[i+1][n_ind].split(','))    # [4] uncertainties column
+#        except:
+#            a=2
+#            # print('Uncertainties.csv absent: all uncertainties are fixed to ',str(optim_param.Arrh_max_variation))
+#
+##        self.mech.react.incert = []
+##        for r in range(len(self.mech.react.formula)):
+##            if not react_found:
+##                self.mech.react.incert.append(optim_param.Arrh_max_variation)
+#
+#        for r in range(len(self.mech.react.type)):
+#            for r_inc in range(len(new_values)):
+#                if int(num_react[r_inc])==self.mech.react.number[r]\
+#                and new_values[r_inc]!='':
+#                    if self.mech.react.type[r] == "three_body_reaction"\
+#                    or self.mech.react.type[r] == "reaction":
+#                        self.mech.react.kin[r]=new_values[r]
+#
+#                    elif self.mech.react.type[r] == "falloff_reaction"\
+#                    or self.mech.react.type[r] == "chemically_activated_reaction"\
+#                    or self.mech.react.type[r] == "chebyshev"\
+#                    or self.mech.react.type[r] == "pdep_arrhenius":
+#                        for k1 in range(len(self.mech.react.kin[r])):
+#                            for k2 in range(len(self.mech.react.kin[r][k1])):
+#                                self.mech.react.kin[r][k1] = new_values[r][k1*3:len(self.mech.react.kin[r][k1])]
+#
+#
+#
+#        os.chdir("GA")
+
 
 
     def shift_flame_data(self,conditions_list,optim_param,ref_results_list):
@@ -505,20 +567,25 @@ class Chromosome:
                 if self.mech.react.type[r] == "three_body_reaction"\
                 or self.mech.react.type[r] == "reaction":
                     for k in range(len(self.mech.react.kin[r])):
+#                        if k==0:
                         self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
                         +self.mech.react.ref_kin[r][k]*random.uniform(-1,1)*incert_r[k]
-                        if k==0: # avoid negative pre-exponential factor
-                            self.mech.react.kin[r][k]=abs(self.mech.react.kin[r][k])
+#                        else:
+#                            self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
+#                            +self.mech.react.ref_kin[r][k]*random.uniform(-1,1)*incert_r[k]
+
                 elif self.mech.react.type[r] == "falloff_reaction"\
+                or self.mech.react.type[r] == "pdep_arrhenius"\
                 or self.mech.react.type[r] == "chemically_activated_reaction"\
-                or self.mech.react.type[r] == "chebyshev"\
-                or self.mech.react.type[r] == "pdep_arrhenius":
+                or self.mech.react.type[r] == "chebyshev":
                     for k1 in range(len(self.mech.react.kin[r])):
                         for k2 in range(len(self.mech.react.kin[r][k1])):
+#                            if k2==0:
                             self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
-                              +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-1,1)*incert_r[k2]
-#                            if k2==0: # avoid negative pre-exponential factor
-#                                self.mech.react.kin[r][k1][k2]=(self.mech.react.kin[r][k1][k2])
+                            +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-1,1)*incert_r[k2]
+#                            else:
+#                                self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
+#                                +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-1,1)*incert_r[k2]
 
 
     def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0):
@@ -675,11 +742,38 @@ class Population:
     def __init__(self,conditions_list,mech_data,red_data_list,ref_results_list,\
                  size_pop):
 
+        optim_param = red_data_list[0].optim_param
+        mp          = optim_param.main_path
+
+
         self.population = []
 
+        # option to import modified mecanisms in the first population
+        if optim_param.import_mech:
+            rand_kin = optim_param.import_mech
+            cur_path = os.getcwd()
+            os.chdir(mp+'/../_kinetic_mech/'+optim_param.import_mech)
+            list_files = os.listdir()
+            list_mech = []
+            for _file in list_files:
+                if '.cti' in _file:
+                    list_mech.append(cdef.Mech_data(_file))
+                    print('Imported mechanism: ' + _file)
+            os.chdir(cur_path)
+
         for ind in range(size_pop):
+            # if import_mech, get the mecanism to import in the first population
+            try:    rand_kin = list_mech[ind]
+            except: rand_kin = True
+
             self.population.append(Chromosome(conditions_list,mech_data,\
-                                   ref_results_list,red_data_list,True))
+                                   ref_results_list,red_data_list,rand_kin))
+
+#        optim_from_values = False
+#        if optim_from_values:
+#            for ind in range(size_pop):
+#                self.get_values(red_data_list[0].optim_param,ind)
+
 
     def __getitem__(self, i):
         return self.population[i]
@@ -703,7 +797,7 @@ class Population:
             print_('individu'+str(ind)+': '+"%.3f" %(self.population[ind].fitness),mp)
             print_("\n",mp)
 
-    def compare_best_ind(self, best_ind, optim_param, verbose=0):
+    def compare_best_ind(self, best_ind, optim_param, main_path, verbose=0):
         mp = optim_param.main_path
         n_ind = optim_param.n_ind
         best_idx = self.find_best()
@@ -711,7 +805,8 @@ class Population:
         # compare the current best population ind to the previous best ind
         if self.population[best_idx].fitness > best_ind.fitness:
             best_ind = copy.deepcopy(self.population[best_idx])
-#            best_ind.mech.write_new_mech("optim_mech.cti")
+            os.chdir(mp+'/GA')
+            best_ind.mech.write_new_mech("optim_mech.cti")
             if verbose >= 3:
                 print_("New best_ind: "+"%.3f" %(best_ind.fitness),mp)
             new_best_ind = True
@@ -787,23 +882,27 @@ class Population:
 
     def fitness_eval_newchilds(self,optim_param,conditions_list,ref_results_list):
 
+        mp          = optim_param.main_path
+        num_cores   = multiprocessing.cpu_count()
+        child_nb    = optim_param.total_Xover + optim_param.total_mut
 
-        num_cores = multiprocessing.cpu_count()
-
-        child_nb = optim_param.total_Xover + optim_param.total_mut
-
-        gas     = conditions_list[0].composition.gas
-        gas_ref = conditions_list[0].composition.gas_ref
+        gas         = conditions_list[0].composition.gas
+        gas_ref     = conditions_list[0].composition.gas_ref
 
         # saving and suppression of unpickable variables on fitness eval inputs
         for cond in range(len(conditions_list)):
             del conditions_list[cond].composition.gas
             del conditions_list[cond].composition.gas_ref
         f=[]
+        simul_time_limit = 0
         for res in range(len(ref_results_list)):
             f.append(ref_results_list[res].f)
             del ref_results_list[res].gas
             del ref_results_list[res].f
+            simul_time_limit += ref_results_list[res].simul_time
+        simul_time_limit = simul_time_limit*5*child_nb + 30
+#        simul_time_limit = simul_time_limit*5 + 30
+
 
         bar = cdef.ProgressBar(child_nb, '')
         title="New ind evaluation  "
@@ -856,9 +955,78 @@ class Population:
 #        pool.close()
 
         # Parallelisation 3 ---------------------------------------------------
-        if os.name == 'nt': multiprocessing.get_context('spawn')
-        with multiprocessing.Pool(num_cores) as p:
-            fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+#        if os.name == 'nt': multiprocessing.get_context('spawn')
+#        with multiprocessing.Pool(num_cores) as p:
+#            fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+
+
+        # Parallelisation 4   (with simulation time check) --------------------
+        #  https://pythonhosted.org/Pebble/#pools
+        fit_list = []
+        with ProcessPool() as pool:
+            sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
+            try:
+                for fit in sim_results.result():
+                    fit_list.append(fit)
+            except TimeoutError:
+                print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 5 x ref simulation time)',mp)
+                print_("TimeoutError: aborting remaining computations",mp)
+                fit_list.sort(reverse=False, key=lambda col: col[1])
+                fitness_incomplete = copy.deepcopy(fit_list)
+                list_ind_eval = []
+                for ind_fit_inc in fitness_incomplete:
+                    list_ind_eval.append(ind_fit_inc[1])
+                n_sim=len(fitness_incomplete)
+                for _i in range(child_nb):
+                    try:
+                        if _i not in list_ind_eval:
+                            fit_list.insert(_i,(0,_i))
+                    except:
+                        fit_list.append((0,_i))
+                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                sim_results.cancel()
+
+        fit_list.sort(reverse=False, key=lambda col: col[1])
+
+
+#        for _i in range(len(fit_list)):
+#            self.population[_i].fitness = fit_list[_i][0]
+
+#        if os.name == 'nt': multiprocessing.get_context('spawn')
+#        with multiprocessing.Pool(num_cores) as p:
+#            fit_list = p.map(self.fitness_eval_par, fit_eval_inp, timeout=5)
+#            p.start()
+#            p.join(1)
+#
+#            # If thread is active
+#            if p.is_alive():
+#                print_("foo is running... let's kill it...")
+#                # Terminate foo
+#                p.terminate()
+#                # Cleanup
+#                p.join()
+
+
+#        if __name__ == '__main__':
+#            # Start foo as a process
+#        #    p = multiprocessing.Process(target=simul_flame, name="Foo", args=())
+#            p = multiprocessing.Process(target=simul_flame, args=())
+#
+#            p.start()
+#
+#            # Wait a maximum of 10 seconds for foo
+#            # Usage: join([timeout in seconds])
+#            p.join(10)
+#
+#            # If thread is active
+#            if p.is_alive():
+#                print("foo is running... let's kill it...")
+#
+#                # Terminate foo
+#                p.terminate()
+#                # Cleanup
+#                p.join()
+
 
 
 
@@ -881,8 +1049,7 @@ class Population:
 
     def fitness_eval_newpop(self,optim_param,conditions_list,ref_results_list):
 
-
-        num_cores = multiprocessing.cpu_count()
+        mp          = optim_param.main_path
 
         n_ind = optim_param.n_ind
 #        print('total_Xover: '+str(optim_param.total_Xover))
@@ -897,10 +1064,13 @@ class Population:
             del conditions_list[cond].composition.gas
             del conditions_list[cond].composition.gas_ref
         f=[]
+        simul_time_limit = 0
         for res in range(len(ref_results_list)):
             f.append(ref_results_list[res].f)
             del ref_results_list[res].gas
             del ref_results_list[res].f
+            simul_time_limit += ref_results_list[res].simul_time
+        simul_time_limit = simul_time_limit*3
 
         bar = cdef.ProgressBar(n_ind, '')
         title="New pop evaluation  "
@@ -917,7 +1087,7 @@ class Population:
         os.chdir("GA")
 
 
-#        # byposs parallelisation for debugging -------------------------------
+#        # bypass parallelisation for debugging -------------------------------
 #        if 'Dagaut' in conditions_list[0].main_path:
 #            fit_i = []
 #            mech = conditions_list[0].mech
@@ -933,8 +1103,9 @@ class Population:
 #            for ind in range(n_ind):
 #                fit_i.append(self.fitness_eval(conditions_list,optim_param,ref_results_list,ind),ind)
 #        else:
-#        # byposs parallelisation for debugging -------------------------------
+#        # bypass parallelisation for debugging -------------------------------
         # Fitness calculation
+        num_cores   = multiprocessing.cpu_count()
         if os.name == 'nt': multiprocessing.get_context('spawn')
         with multiprocessing.Pool(num_cores) as p:
             fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
@@ -943,6 +1114,8 @@ class Population:
 
         for _i in range(len(fit_i)):
             self.population[_i].fitness = fit_i[_i][0]
+
+
 
         bar.update(n_ind,title)
         print('\n')
@@ -1628,10 +1801,6 @@ def get_diff_refopt(mech_data_ref,mech_data_opt,Tmin=300,Tmax=2000):
                             elif i==1: diff_rn.append(diff_r)
                             elif i==2: diff_rEa.append(diff_r)
                     _rnumber = mech_data_opt.react.number[r_opt]
-                    if diff_rA[-1]>8:
-                        print('A  reaction: '+str(_rnumber+1))
-                    if diff_rEa[-1]>5: print('Ea reaction: '+str(_rnumber+1))
-                    if diff_rn[-1]>5:  print('n  reaction: '+str(_rnumber+1))
 
                     A  = mech_data_ref.react.kin[r_ref][0]
                     n  = mech_data_ref.react.kin[r_ref][1]

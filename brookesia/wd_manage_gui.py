@@ -18,6 +18,20 @@ import os
 WD_n      = sys.argv[1]
 WD_p      = sys.argv[2]
 root_path = sys.argv[3]
+if os.name != 'nt': # for Linux or Mac
+    pers_config_path = '~/.Brookesia'
+    try:
+        os.chdir(os.path.expanduser(pers_config_path))
+    except:
+        os.chdir(os.path.expanduser('~'))
+        try:
+            os.mkdir('.Brookesia')
+        except:
+            a=False
+        os.chdir('.Brookesia')
+        pers_config_path = os.getcwd()
+else: # for windows
+    pers_config_path = root_path
 
 
 class Files_windows(QtWidgets.QWidget):
@@ -58,18 +72,23 @@ WD_name = sys.argv[2]
 
 WD_path = 'False' ; WD_name = 'False'
 if WD_p=='True':
-    os.chdir(root_path)
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
     fs = open('wd_activ.txt', 'r')
     txt = fs.readline()
     previous_WD_path = txt.split(';')[1]
-    os.chdir(previous_WD_path)
-    os.chdir('../')
+    try:
+        os.chdir(previous_WD_path)
+        os.chdir('../')
+    except:
+        a = False
     WD_path = QtWidgets.QFileDialog.getExistingDirectory(A, "Select the new working directory", options=options)
 
 if WD_n=='True':
     WD_name, ok = QtWidgets.QInputDialog.getText(A, 'Text Input Dialog', 'Enter the new name:')
 
-os.chdir(root_path)
+try:    os.chdir(pers_config_path)
+except: os.chdir(os.path.expanduser(pers_config_path))
 fd = open('wd_manage.txt', 'w')
 fd.write(WD_name + ';' + WD_path)
 timer.sleep(0.2)
