@@ -84,7 +84,8 @@ def main_redopt_algo(filename,WD_path,version):
         try:    copyfile('_kinetic_mech/'+mech_prev_red,mp+'/'+mech_prev_red)
         except: copyfile(mech_prev_red,mp+'/'+mech_prev_red.split('/')[-1])
     try:    copyfile('_conditions_input/'+filename,mp+'/Conditions_redopt.inp')
-    except: copyfile(filename,mp+'/'+filename.split('/')[-1])
+    #except: copyfile(filename,mp+'/'+filename.split('/')[-1])
+    except: copyfile(filename,mp+'/Conditions_redopt.inp')
     if os.path.isfile('_uncertainties/uncertainties.csv'):
         copyfile('_uncertainties/uncertainties.csv',mp+'/uncertainties.csv')
     if os.path.isfile('_uncertainties/new_values.csv'):
@@ -452,7 +453,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         # -----------------------------------------------------
                         #         Simulation with the reduced mechanism
                         # -----------------------------------------------------
-                        print(3*conditions.simul_param.ref_simul_time+30)
                         # -----   1. interpretation of the new mech
                         if verbose<8:
                         # supress console output during the simulation
@@ -471,19 +471,44 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         p = multiprocessing.Process(target=comp.red_computation,\
                                               args=(conditions, red_data.red_op.gas,\
                                                     active_sp_pm,active_r_pm,return_list))
-                        p.start()
-                        # Wait and stop the simulation if the calculation time is excessively long
-                        p.join(3*conditions.simul_param.ref_simul_time+30)
-                        # If thread is active
-                        if p.is_alive():
-                            print_("  Warning: An excessive calculation time have been detected. The simulation is stopped",mp)
-                            p.terminate()
-                            p.join()      # Cleanup
+
                         try:
-                            red_results_loop = return_list[0]
-                            simulation_done = True
-                        except: # if the simulation has been stopped
-                            simulation_done = False
+                            p.start()
+                            # Wait and stop the simulation if the calculation time is excessively long
+                            p.join(3*conditions.simul_param.ref_simul_time+300)
+                            # If thread is active
+                            if p.is_alive():
+                                print_("  Warning: An excessive calculation time have been detected. The simulation is stopped",mp)
+                                p.terminate()
+                                p.join()      # Cleanup
+                            try:
+                                red_results_loop = return_list[0]
+                                simulation_done = True
+                            except: # if the simulation has been stopped
+                                simulation_done = False
+
+                        except:
+                            try:
+                                red_results_loop = comp.red_computation(\
+                                            conditions, red_data.red_op.gas,\
+                                            active_sp_pm,active_r_pm)
+                                simulation_done = True
+                            except:
+                                simulation_done = False
+
+#                        p.start()
+#                        # Wait and stop the simulation if the calculation time is excessively long
+#                        p.join(3*conditions.simul_param.ref_simul_time+30)
+#                        # If thread is active
+#                        if p.is_alive():
+#                            print_("  Warning: An excessive calculation time have been detected. The simulation is stopped",mp)
+#                            p.terminate()
+#                            p.join()      # Cleanup
+#                        try:
+#                            red_results_loop = return_list[0]
+#                            simulation_done = True
+#                        except: # if the simulation has been stopped
+#                            simulation_done = False
 
 
                         # -----   3. Error estimation
@@ -555,6 +580,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_cre[best_ICsp]=True
                                         sp_inter[idx] += 1
                                 stop_T_red = True
+                                for sp in conditions.error_param.sp_T:
+                                    idx = tspc.index(sp)
+                                    eps_stop[idx] = True; eps[idx]=eps_prev[idx]
 
                     # Error threshold on Sl
                     if conditions.error_param.Sl_check and 'free_flame' in conditions.config:
@@ -589,6 +617,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_cre[best_ICsp]=True
                                         if not sp_inter_flag[idx]: sp_inter[idx]+=1; sp_inter_flag[idx]=True
                                 stop_Sl_red = True
+                                for sp in conditions.error_param.sp_Sl:
+                                    idx = tspc.index(sp)
+                                    eps_stop[idx] = True; eps[idx]=eps_prev[idx]
 
                     # Error threshold on K
                     if conditions.error_param.K_check \
@@ -621,6 +652,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_cre[best_ICsp]=True
                                         if not sp_inter_flag[idx]: sp_inter[idx]+=1; sp_inter_flag[idx]=True
                                 stop_K_red = True
+                                for sp in conditions.error_param.sp_K:
+                                    idx = tspc.index(sp)
+                                    eps_stop[idx] = True; eps[idx]=eps_prev[idx]
+
 
 
                     # Error threshold on Ignition time
@@ -659,6 +694,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_cre[best_ICsp]=True
                                         if not sp_inter_flag[idx]: sp_inter[idx]+=1; sp_inter_flag[idx]=True
                                 stop_ig_red = True
+                                for sp in conditions.error_param.sp_ig:
+                                    idx = tspc.index(sp)
+                                    eps_stop[idx] = True; eps[idx]=eps_prev[idx]
 
                     # Error threshold on Species
                     for idx in range(red_data.n_tspc):
@@ -690,7 +728,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         best_ICsp = list(OIC_sp_tsp).index(max(OIC_sp_tsp))
                                         eps_cre[best_ICsp]=True
                                         if not sp_inter_flag[idx]: sp_inter[idx]+=1; sp_inter_flag[idx]=True
-
                                 eps_stop[idx] = True; eps[idx]=eps_prev[idx]
 
 
@@ -773,7 +810,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_stop[idx] = True; eps[idx]=eps_prev[idx]
                                     else:
                                         eps_evol[idx] = 'increase'
-                    elif first_try:
+                    elif True in first_try:
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
                                 for sp in conditions.error_param.sp_T:
@@ -980,7 +1017,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             eps_continue = True
 
                     if not eps_continue_0: # if previous case was about to stop
-                        if eps_continue:   # if it has to continue
+                        if eps_continue \
+                        or (cross_red_error and red_data.red_op.inter_sp_inter and 'CSP' not in red_method):   # if it has to continue
                             eps_continue_0 = True
                         else:
                             eps_continue_bis = False # stop the reduction
@@ -988,7 +1026,11 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if not eps_continue:   # if it has to stop
                             eps_continue_0 = False
                     # stop if # at every targets
-                    if False not in eps_stop: eps_continue_bis=False
+                    if False not in eps_stop:
+                        eps_continue_bis=False
+#                    elif (cross_red_error and red_data.red_op.inter_sp_inter and 'CSP' not in red_method):
+#                        for i in range(red_data.n_tspc):
+
 
                     if max_eps_config == eps \
                     or not eps_continue_bis\
@@ -1003,11 +1045,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if red_data.red_op.inter_sp_inter and not eps_stop[idx] and 'CSP' not in red_method:
                             print_('\n    Main coupled species:'+tspc[best_ICsp]+\
                                   ' -> eps(-): '+'%0.3f' %(eps[best_ICsp]),mp)
-                            cross_red_error = False
                         elif red_data.red_op.inter_sp_inter and eps_stop[idx] and 'CSP' not in red_method:
                             print_('\n    Main coupled species:'+tspc[best_ICsp]+\
                                   ' -> eps(#): '+'%0.3f' %(eps[best_ICsp]),mp)
-                            cross_red_error = False
+                        cross_red_error = False
 
 
 
@@ -2231,7 +2272,7 @@ def get_reduction_parameters(filename):
         print('\n\n\n#=============================================\n')
         print('#           Operators\n')
         print('#=============================================\n\n')
-        print('for simulation only, write: ')
+        print('If you only want to do simulations, write: ')
         print('operator        = NULL \n')
 
     while txt[0] != '':
@@ -2274,13 +2315,11 @@ def get_reduction_parameters(filename):
                     if txt[0] == 'n_gen':               n_gen              = int(txt[1])
                     if txt[0] == 'n_it':                n_gen              = int(txt[1])
                     if txt[0] == 'n_indiv':             n_indiv            = int(txt[1])
-                    if txt[0] == 'error_fitness':       error_fitness      = clean_txt(txt[1])
                     if txt[0] == 'Arrh_max_variation':  Arrh_max_variation = txt2list_float(txt[1])
                     if txt[0] == 'optim_on_meth':       optim_on_meth      = clean_txt(txt[1])
                     if txt[0] == 'nb_r2opt':            nb_r2opt           = float(txt[1])
                     if txt[0] == 'reactions2opt':       reactions2opt      = txt2list_int(txt[1])
                     if txt[0] == 'import_mech':         import_mech        = clean_txt(txt[1])
-
                     if txt[0] == 'sub_mech_sel':        sub_mech_sel       = txt2list_string(txt[1])
 
                     # genetic algorithm options
@@ -2299,12 +2338,21 @@ def get_reduction_parameters(filename):
                     if txt[0] == 'inertia_max_i'\
                     or txt[0] == 'inertia_i':           inertia_i          = float(txt[1])
                     if txt[0] == 'inertia_max_endi'\
-                    or txt[0] == 'inertia_end':         inertia_end        = float(txt[1])
+                    or txt[0] == 'inertia_end':         inertia_end         = float(txt[1])
                     if txt[0] == 'cognitive_accel_i':   cognitive_accel_i   = float(txt[1])
                     if txt[0] == 'score':               score_integ         = str2bool(txt[1])
                     if txt[0] == 'cognitive_accel_end': cognitive_accel_end = float(txt[1])
                     if txt[0] == 'social_accel_i':      social_accel_i      = float(txt[1])
                     if txt[0] == 'social_accel_end':    social_accel_end    = float(txt[1])
+                    # Fitness parameters
+                    if txt[0] == 'error_fitness':       error_fitness       = clean_txt(txt[1])
+                    if txt[0] == 'fitness_weight_T':    fitness_weight_T    = float(txt[1])
+                    if txt[0] == 'fitness_weight_ig':   fitness_weight_ig   = float(txt[1])
+                    if txt[0] == 'fitness_weight_Sl':   fitness_weight_Sl   = float(txt[1])
+                    if txt[0] == 'fitness_weight_K':    fitness_weight_K    = float(txt[1])
+                    if txt[0] == 'fitness_weight_sp':   fitness_weight_sp   = txt2list_float(txt[1])
+                    if txt[0] == 'fitness_weight_cond': fitness_weight_cond = txt2list_float(txt[1])
+
 
             else:
                 optim = 'False'
@@ -2344,7 +2392,6 @@ def get_reduction_parameters(filename):
                         red_data.optim_param = cdef.Optim_param(tspc, n_tspc)
                         if 'n_gen'              in locals(): red_data.optim_param.n_gen              = n_gen
                         if 'n_indiv'            in locals(): red_data.optim_param.n_ind              = n_indiv
-                        if 'error_fitness'      in locals(): red_data.optim_param.error_fitness      = error_fitness
                         if 'Arrh_max_variation' in locals(): red_data.optim_param.Arrh_max_variation = Arrh_max_variation
                         if 'optim_on_meth'      in locals(): red_data.optim_param.optim_on_meth      = optim_on_meth
                         if 'nb_r2opt'           in locals(): red_data.optim_param.nb_r2opt           = nb_r2opt
@@ -2391,6 +2438,14 @@ def get_reduction_parameters(filename):
                         if 'cognitive_accel_end' in locals(): red_data.optim_param.cognitive_accel_end = cognitive_accel_end
                         if 'social_accel_i'      in locals(): red_data.optim_param.social_accel_i      = social_accel_i
                         if 'social_accel_end'    in locals(): red_data.optim_param.social_accel_end    = social_accel_end
+                        # Fitness options
+                        if 'error_fitness'       in locals(): red_data.optim_param.error_fitness      = error_fitness
+                        if 'fitness_weight_T'    in locals(): red_data.optim_param.coeff_T            = fitness_weight_T
+                        if 'fitness_weight_ig'   in locals(): red_data.optim_param.coeff_ig           = fitness_weight_ig
+                        if 'fitness_weight_Sl'   in locals(): red_data.optim_param.coeff_Sl           = fitness_weight_Sl
+                        if 'fitness_weight_K'    in locals(): red_data.optim_param.coeff_K            = fitness_weight_K
+                        if 'fitness_weight_sp'   in locals(): red_data.optim_param.coeff_s            = fitness_weight_sp
+                        if 'fitness_weight_cond' in locals(): red_data.optim_param.coeff_cond         = fitness_weight_cond
 
 
             if 'eps'                in locals(): del eps
@@ -2406,7 +2461,6 @@ def get_reduction_parameters(filename):
             if 'ttol_sensi'         in locals(): del ttol_sensi
             if 'n_gen'              in locals(): del n_gen
             if 'n_indiv'            in locals(): del n_indiv
-            if 'error_fitness'      in locals(): del error_fitness
             if 'Arrh_max_variation' in locals(): del Arrh_max_variation
             if 'optim_on_meth'      in locals(): del optim_on_meth
             if 'nb_r2opt'           in locals(): del nb_r2opt
@@ -2430,6 +2484,13 @@ def get_reduction_parameters(filename):
             if 'cognitive_accel_end' in locals(): del cognitive_accel_end
             if 'social_accel_i'      in locals(): del social_accel_i
             if 'social_accel_end'    in locals(): del social_accel_end
+            if 'error_fitness'       in locals(): del error_fitness
+            if 'fitness_weight_T'    in locals(): del fitness_weight_T
+            if 'fitness_weight_ig'   in locals(): del fitness_weight_ig
+            if 'fitness_weight_Sl'   in locals(): del fitness_weight_Sl
+            if 'fitness_weight_K'    in locals(): del fitness_weight_K
+            if 'fitness_weight_sp'   in locals(): del fitness_weight_sp
+            if 'fitness_weight_cond' in locals(): del fitness_weight_cond
 
             save_op = False
 

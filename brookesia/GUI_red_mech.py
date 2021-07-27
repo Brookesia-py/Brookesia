@@ -19,11 +19,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+global version
+version = '1.7.0'
+
 # =============================================================================
 #  default options
 # =============================================================================
 
-version = '1.6.0'
 
 d_verbose               = 4
 d_show_plots            = False
@@ -123,7 +125,7 @@ d_SA_ISI                = True
 d_DRG_eps               = 0.01
 d_DRG_deps              = 0.01
 d_DRG_pt_num            = 10.0
-d_DRG_tgt_error         = 30.0
+d_DRG_tgt_error         = 30
 d_DRG_ISI               = True
 
 # CSP
@@ -151,20 +153,20 @@ d_GA_ind                = 20
 d_GA_A                  = 15
 d_GA_n                  = 5
 d_GA_Ea                 = 5
-d_GA_meth               = True
+d_GA_meth               = False
 d_GA_meth_fract         = 30
 d_GA_meth_pts           = 20
+d_tgt_fitness           = 1
 
 
-
-d_GA_selection_operator = 'Roulette' # Roulette Rank Geometric_norm Elitism
+d_GA_selection_operator = 'Geometric_norm' # Roulette Rank Geometric_norm Elitism
 d_GA_sel_opt            = '0.2'
 d_GA_Xover_op_1         = True       # Simple Xover
 d_GA_Xover_op_2         = True       # Multiple Xover
 d_GA_Xover_op_3         = True       # Arithmetic Xover
 d_GA_Xover_op_4         = True       # Heuristic Xover
-d_GA_Xover_int_1        = '20'
-d_GA_Xover_int_2        = '20'
+d_GA_Xover_int_1        = '10'
+d_GA_Xover_int_2        = '10'
 d_GA_Xover_int_3        = '20'
 d_GA_Xover_int_4        = '20'
 d_GA_Xover_opt_1        = ''
@@ -175,8 +177,8 @@ d_GA_mut_op_1           = True       # Uniform mutation
 d_GA_mut_op_2           = True       # Non-uniform mutation
 d_GA_mut_op_3           = True       # Boundary mutation
 d_GA_mut_int_1          = '10'
-d_GA_mut_int_2          = '40'
-d_GA_mut_int_3          = '20'
+d_GA_mut_int_2          = '15'
+d_GA_mut_int_3          = '15'
 d_GA_mut_opt_1          = ''
 d_GA_mut_opt_2          = '3'
 d_GA_mut_opt_3          = ''
@@ -194,7 +196,6 @@ d_PSO_cogn_i            = 1.6
 d_PSO_cogn_end          = 2.0
 d_PSO_social_i          = 0.5
 d_PSO_social_end        = 2.0
-
 
 
 
@@ -231,12 +232,15 @@ condition_tab_removed = False
 # manage load cond
 global load_prev_cond
 load_prev_cond = False
-
 # flag opt_num
 global opt_num
 opt_num = 0
+global optimization_adv_options
+optimization_adv_options = []
+global opt_react
+opt_react = []
+global mech_win
 
-#
 ## Screen dimensions
 #app = QtWidgets.QApplication(sys.argv)
 #
@@ -775,10 +779,10 @@ class Ui_MainWindow(object):
         self.label_Red_method_sp_4  = []
         self.num_DRG_pt_num         = []
         self.groupBox_3             = []
-        self.num_DRG_tgt_error   = []
+        self.num_DRG_tgt_error      = []
         self.pB_DRG_apply2all       = []
         self.pB_GA_drg              = []
-        self.pB_PSO_drg              = []
+        self.pB_PSO_drg             = []
         self.cB_ISI_drg             = []
         self.tableWidget_DRG        = []
 
@@ -861,7 +865,7 @@ class Ui_MainWindow(object):
 # =============================================================================
 
         self.GA                     = []
-        self.opt_num                = []
+#        self.opt_num                = []
         self.AG_group_gen_ind       = []
         self.label_SA_espi_3        = []
         self.num_GA_gen             = []
@@ -875,9 +879,11 @@ class Ui_MainWindow(object):
         self.label_SA_Arrh_1        = []
         self.label_SA_Arrh_3        = []
         self.num_GA_Ea              = []
+        self.scrollArea_opt         = []
+        self.scroll_opt_Contents    = []
         self.GA_Box_Selection       = []
         self.Box_GA_Selection       = []
-        self.GA_group5              = []
+#        self.GA_group5              = []
         self.scrollArea_subM        = []
         self.scrollArea_subM_contents = []
         self.cB_GA_meth             = []
@@ -931,7 +937,10 @@ class Ui_MainWindow(object):
         self.label_GA_mut_prob      = []
         self.num_GA_mut_prob        = []
         self.pB_GA_remove           = []
-        self.Gb_GA_fitness          = []
+        self.pB_GA_adv_opt          = []
+        self.pB_GA_prev_mech        = []
+        self.pB_GA_react2mod        = []
+#        self.Gb_GA_fitness          = []
         self.rB_GA_fit_1            = []
         self.rB_GA_fit_2            = []
         self.PSO_Box_Param          = []
@@ -951,7 +960,17 @@ class Ui_MainWindow(object):
         self.label_pso_param_min    = []
         self.label_pso_param_im     = []
         self.label_pso_param_fm     = []
-
+        self.tableWidget_optim      = []
+#        self.num_tgt_fitness        = []
+        self.tableWidget_optim_cd   = []
+#        self.num_cond_fitness       = []
+        self.GA_Box_Fit_pond        = []
+        self.GA_group_opt_react     = []
+        self.label_reaction_sel     = []
+        self.cB_opt_react           = []
+        self.label_kmech_folder     = []
+        self.kmech_folder           = []
+        opt_react              = []
 
 #        self.progress = QtWidgets.QWidget()
 #        self.progress.setObjectName("progress")
@@ -1010,7 +1029,7 @@ class Ui_MainWindow(object):
         self.text_MP_Sl.setPlainText(_translate("MainWindow", d_sp_Sl))
         self.text_MP_K.setPlainText(_translate("MainWindow", d_sp_K))
         self.cB_tsp_T.setText(_translate("MainWindow", "Temperature"))
-        self.cB_tsp_igt.setText(_translate("MainWindow", "Ignition time"))
+        self.cB_tsp_igt.setText(_translate("MainWindow", "Ignition delay time"))
         self.cB_tsp_Sl.setText(_translate("MainWindow", "Laminar flame speed"))
         self.cB_tsp_K.setText(_translate("MainWindow", "Extinction strain rate"))
         self.Gb_MP_reduction.setTitle(_translate("MainWindow", "Reduction methods"))
@@ -1215,6 +1234,36 @@ class Ui_MainWindow(object):
         else:
             self.label_flame_folder[num_case].setGeometry(QtCore.QRect(600*sz_w, 65*sz_h, 400*sz_w, 18*sz_h))
 
+
+
+    def get_candidate_mech_folder(self, num_case):
+        global sz_w
+        global sz_h
+        global load_prev_cond
+
+#        if load_prev_cond:
+#            appear_opt =False ; load_prev_cond = False  # momentarily prevent the opening of the interface
+
+#        if appear_opt:
+        try:
+            A=Files_windows()
+            options = QtWidgets.QFileDialog.Options()
+            options |= QtWidgets.QFileDialog.DontUseNativeDialog
+            self.kmech_folder[num_case] = QtWidgets.QFileDialog.getExistingDirectory(A, "Select kinetic mechanism folder", "_kinetic_mech/4_optimization/", options=options)
+            _translate = QtCore.QCoreApplication.translate
+            font = QtGui.QFont();font.setBold(True);font.setItalic(False);font.setWeight(75)
+
+            self.label_kmech_folder[num_case].setText(_translate("MainWindow", 'Folder name:  ' + self.kmech_folder[num_case].split(os.getcwd()+'/_kinetic_mech/4_optimization/')[1]))
+            self.label_kmech_folder[num_case].setGeometry(QtCore.QRect(50*sz_w, 555*sz_h, 230*sz_w, 18*sz_h))
+        except:
+            self.kmech_folder[num_case] = False
+            self.label_kmech_folder[num_case].setGeometry(QtCore.QRect(30*sz_w, -5450*sz_h, 230*sz_w, 18*sz_h))
+
+#        else:
+#            self.label_kmech_folder[num_case].setGeometry(QtCore.QRect(600*sz_w, 65*sz_h, 400*sz_w, 18*sz_h))
+
+
+
     def select_wd_bis(self):
 
         # configuration path
@@ -1290,14 +1339,16 @@ class Ui_MainWindow(object):
         else:                       _idx = idx
 
         idx_opt, idx_DRG, idx_SA = -1, -1, -1
-        for i in range(_idx-1):
-            if self.list_operator[i]=='opt':
-                idx_opt+=1
-            elif 'DRG' in self.list_operator[i]:
-                idx_DRG+=1
-            elif 'SA' in self.list_operator[i]:
-                idx_SA+=1
-
+        for i in range(_idx):
+            try:
+                if self.list_operator[i]=='opt':
+                    idx_opt+=1
+                elif 'DRG' in self.list_operator[i]:
+                    idx_DRG+=1
+                elif 'SA' in self.list_operator[i]:
+                    idx_SA+=1
+            except:
+                False
 
         # remove current operator
         current_operator = self.list_operator[_idx-2]
@@ -1308,8 +1359,6 @@ class Ui_MainWindow(object):
         elif 'opt' in current_operator:
             self.remove_opt(idx_opt)
 
-
-
         # remove optimization, if needed
         if len(self.list_operator)>_idx-1:
             next_operator = self.list_operator[_idx-1]
@@ -1319,7 +1368,6 @@ class Ui_MainWindow(object):
             self.tablet.removeTab(idx+1)
             del self.list_operator[_idx-1]
             self.remove_opt(idx_opt)
-
 
         self.tablet.removeTab(idx)
         del self.list_operator[_idx-2]
@@ -1411,9 +1459,11 @@ class Ui_MainWindow(object):
         del self.label_SA_Arrh_1[idx_opt]
         del self.label_SA_Arrh_3[idx_opt]
         del self.num_GA_Ea[idx_opt]
+        del self.scrollArea_opt[idx_opt]
+        del self.scroll_opt_Contents[idx_opt]
         del self.GA_Box_Selection[idx_opt]
         del self.Box_GA_Selection[idx_opt]
-        del self.GA_group5[idx_opt]
+#        del self.GA_group5[idx_opt]
         del self.scrollArea_subM[idx_opt]
         del self.scrollArea_subM_contents[idx_opt]
         del self.cB_GA_meth[idx_opt]
@@ -1465,7 +1515,7 @@ class Ui_MainWindow(object):
         del self.label_GA_mut_prob[idx_opt]
         del self.num_GA_mut_prob[idx_opt]
         del self.pB_GA_remove[idx_opt]
-        del self.Gb_GA_fitness[idx_opt]
+#        del self.Gb_GA_fitness[idx_opt]
         del self.rB_GA_fit_1[idx_opt]
         del self.rB_GA_fit_2[idx_opt]
         del self.PSO_Box_Param[idx_opt]
@@ -1485,8 +1535,23 @@ class Ui_MainWindow(object):
         del self.label_pso_param_min[idx_opt]
         del self.label_pso_param_im[idx_opt]
         del self.label_pso_param_fm[idx_opt]
-
-
+        del self.GA_Box_Fit_pond[idx_opt]
+        del self.tableWidget_optim[idx_opt]
+        del self.tableWidget_optim_cd[idx_opt]
+#        del self.num_tgt_fitness[idx_opt]
+#        del self.num_cond_fitness[idx_opt]
+        del self.GA_group_opt_react[idx_opt]
+        del self.label_reaction_sel[idx_opt]
+        del self.cB_opt_react[idx_opt]
+        del self.label_kmech_folder[idx_opt]
+        del self.kmech_folder[idx_opt]
+        del self.pB_GA_adv_opt[idx_opt]
+        del self.pB_GA_prev_mech[idx_opt]
+        del self.pB_GA_react2mod[idx_opt]
+#        del self.opt_num[idx_opt]
+        del self.opt_meth[idx_opt]
+        global opt_react
+        del opt_react[idx_opt]
 
 
     def DRG_clic(self,_option):
@@ -1542,7 +1607,6 @@ class Ui_MainWindow(object):
         self.num_DRG_pt_num[-1].setProperty("value", d_DRG_pt_num)
 
         self.update_error_table()
-
         self.num_DRG_tgt_error.append(QtWidgets.QDoubleSpinBox(self.groupBox_3[-1]))
         self.num_DRG_tgt_error[-1].setGeometry(QtCore.QRect(40*sz_w, 260*sz_h, 61*sz_w, 32*sz_h))
         self.num_DRG_tgt_error[-1].setDecimals(0)
@@ -2110,7 +2174,6 @@ class Ui_MainWindow(object):
                         item = self.tableWidget_DRG[tw].item(r, col)
                         item.setText(_translate("MainWindow", str(txt[r])))
                 else:
-                    txt = 30; n_sp = 0
                     for r in range(len(tspc)):
                         if   tspc[r] == 'T':    txt = max_error_T
                         elif tspc[r] == 'Ig_t': txt = max_error_ig
@@ -2175,7 +2238,6 @@ class Ui_MainWindow(object):
                         item = self.tableWidget_SA[tw].item(r, col)
                         item.setText(_translate("MainWindow", str(txt[r])))
                 else:
-                    txt = 30; n_sp = 0
                     for r in range(len(tspc)):
                         if   tspc[r] == 'T':    txt = max_error_T
                         elif tspc[r] == 'Ig_t': txt = max_error_ig
@@ -2239,7 +2301,6 @@ class Ui_MainWindow(object):
                         item = self.tableWidget_CSP[tw].item(r, col)
                         item.setText(_translate("MainWindow", str(txt[r])))
                 else:
-                    txt = 30; n_sp = 0
                     for r in range(len(tspc)):
                         if   tspc[r] == 'T':    txt = max_error_T
                         elif tspc[r] == 'Ig_t': txt = max_error_ig
@@ -2253,6 +2314,233 @@ class Ui_MainWindow(object):
                         self.tableWidget_CSP[tw].setItem(r, col, item)
                         item = self.tableWidget_CSP[tw].item(r, col)
                         item.setText(_translate("MainWindow", str(txt)))
+
+
+        # update optim table
+        for tw in range(len(self.tableWidget_optim)):
+            # get actual data
+            sp_name,max_error_sp = [],[]
+            max_error_T, max_error_ig, max_error_Sl, max_error_K = 1,1,1,1
+            for r in range(self.tableWidget_optim[tw].rowCount()):
+                if self.tableWidget_optim[tw].item(r, 0).text()=='T':
+                    max_error_T  = self.tableWidget_optim[tw].item(r, 1).text()
+                elif self.tableWidget_optim[tw].item(r, 0).text()=='Ig_t':
+                    max_error_ig = self.tableWidget_optim[tw].item(r, 1).text()
+                elif self.tableWidget_optim[tw].item(r, 0).text()=='Sl':
+                    max_error_Sl = self.tableWidget_optim[tw].item(r, 1).text()
+                elif self.tableWidget_optim[tw].item(r, 0).text()=='K':
+                    max_error_K  = self.tableWidget_optim[tw].item(r, 1).text()
+                else:
+                    sp_name.append(self.tableWidget_optim[tw].item(r, 0).text())
+                    max_error_sp.append(self.tableWidget_optim[tw].item(r, 1).text())
+
+            # construction of the new table
+            self.tableWidget_optim[tw].setColumnCount(2)
+            self.tableWidget_optim[tw].setRowCount(len(tspc))
+
+            _translate = QtCore.QCoreApplication.translate
+            # row titles :
+            for r in range(len(tspc)):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_optim[tw].setVerticalHeaderItem(r, item)
+                item = self.tableWidget_optim[tw].verticalHeaderItem(r)
+                item.setText(_translate("MainWindow", str(r+1)))
+            # column titles :
+            col_title = ["Target","Weight"]
+            for col in range(2):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_optim[tw].setHorizontalHeaderItem(col, item)
+                item = self.tableWidget_optim[tw].horizontalHeaderItem(col)
+                item.setText(_translate("MainWindow", col_title[col]))
+            # fill the table
+            for col in range(2):
+                if col==0:
+                    txt = tspc
+                    for r in range(len(tspc)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim[tw].setItem(r, col, item)
+                        item = self.tableWidget_optim[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt[r])))
+                else:
+                    for r in range(len(tspc)):
+                        if   tspc[r] == 'T':    txt = max_error_T
+                        elif tspc[r] == 'Ig_t': txt = max_error_ig
+                        elif tspc[r] == 'Sl':   txt = max_error_Sl
+                        elif tspc[r] == 'K':    txt = max_error_K
+                        else:
+                            for i in range(len(sp_name)):
+                                if tspc[r] == sp_name[i]:
+                                    txt    = max_error_sp[i]
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim[tw].setItem(r, col, item)
+                        item = self.tableWidget_optim[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt)))
+
+
+    def update_cond_fit(self):
+        global sz_w
+        global sz_h
+
+
+        # update optim table
+        for tw in range(len(self.tableWidget_optim_cd)):
+            # get actual data
+            prev_cond_name,fit_cond = [],[]
+            for r in range(self.tableWidget_optim_cd[tw].rowCount()):
+                prev_cond_name.append(self.tableWidget_optim_cd[tw].item(r, 0).text())
+                fit_cond.append(self.tableWidget_optim_cd[tw].item(r, 1).text())
+
+            # ---- construction of the new table ----
+            # conditions number
+            case_name = [] ; dbl_cn = False
+            for case in range(len(self.condition_activated)):
+                if self.condition_activated[case]:
+                    if self.rB_reactor_UV[case].isChecked(): configs   = 'reactor_UV  '
+                    elif self.rB_reactor_HP[case].isChecked(): configs = 'reactor_HP  '
+                    elif self.rB_JSR[case].isChecked(): configs        = 'JSR         '
+                    elif self.rB_PFR[case].isChecked(): configs        = 'PFR         '
+                    elif self.rB_fflame[case].isChecked(): configs     = 'free_flame  '
+                    elif  self.rB_cfflame[case].isChecked():
+                        if self.rB_cff_diff[case].isChecked(): configs = 'diff_flame  '
+                        elif self.rB_cff_pp[case].isChecked(): configs = 'pp_flame    '
+                        elif self.rB_cff_tp[case].isChecked(): configs = 'tp_flame    '
+
+                    if not self.rB_cfflame[case].isChecked():
+#                        fuel.append(self.fuel_1[case].document().toPlainText())
+#                        oxidant.append(self.oxidant_1[case].document().toPlainText())
+#                        diluent.append(self.Diluent_1[case].document().toPlainText())
+#                        diluent_ratio.append(self.Diluent_2[case].document().toPlainText())
+                        T_min  = float(self.Tmin[case].document().toPlainText())
+                        T_max  = float(self.Tmax[case].document().toPlainText())
+                        T_incr = float(self.Tincr[case].document().toPlainText())
+                        if T_incr==0: T_incr=T_max-T_min+T_max*5
+                        Ts = list(np.arange(T_min, T_max+T_incr/2, T_incr))
+                        P_min  = float(self.Pmin[case].document().toPlainText())
+                        P_max  = float(self.Pmax[case].document().toPlainText())
+                        P_incr = float(self.Pincr[case].document().toPlainText())
+                        if P_incr==0: P_incr=P_max-P_min+P_max*5
+                        Ps = list(np.arange(P_min, P_max+P_incr/2, P_incr))
+                        phi_min  = float(self.eqmin[case].document().toPlainText())
+                        phi_max  = float(self.eqmax[case].document().toPlainText())
+                        phi_incr = float(self.eqincr[case].document().toPlainText())
+                        if phi_incr==0: phi_incr=phi_max-phi_min+phi_max*5
+                        phis = list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr))
+                        mdots_1 = False
+                    else: # counterflow flame configuration
+                        P_min  = float(self.df_Pmin[case].document().toPlainText())
+                        P_max  = float(self.df_Pmax[case].document().toPlainText())
+                        P_incr = float(self.df_Pincr[case].document().toPlainText())
+                        Ps = list(np.arange(P_min, P_max+P_incr/2, P_incr))
+                        # Burner 1
+#                        fuel.append(self.df_fuel_1[case].document().toPlainText())
+#                        oxidant.append(self.df_oxidant_1[case].document().toPlainText())
+#                        diluent.append(self.df_Diluent_1[case].document().toPlainText())
+#                        diluent_ratio.append(self.df_Diluent_r_1[case].document().toPlainText())
+                        try:
+                            Ts = [float(self.df_T_1[case].document().toPlainText())]
+                        except:     #else:
+                            Ts = [300]
+                        try:
+                            if 'diff_flame' not in configs:
+                                phi_min  = float(self.df_eqmin_1[case].document().toPlainText())
+                                phi_max  = float(self.df_eqmax_1[case].document().toPlainText())
+                                phi_incr = float(self.df_eqincr_1[case].document().toPlainText())
+                                if phi_incr==0: phis.append([phi_min])
+                                else: phis = list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr))
+                            else: phis = ['']
+                        except:
+                            phis = ['']
+                        try:
+                            mdot_min  = float(self.df_mdot1_1[case].document().toPlainText())
+                            mdot_max  = float(self.df_mdot2_1[case].document().toPlainText())
+                            if 'diff' in configs[-1]:
+                                mdot_incr  = float(self.df_mdot4_1[case].document().toPlainText())
+                            elif self.df_mdot3_1[case].text() == 'error':
+                                mdot_incr  = 0
+                            else:
+                                mdot_incr  = float(self.df_mdot3_1[case].text())
+                            if mdot_incr==0: mdot_incr=mdot_max-mdot_min+mdot_max*5
+                            mdots_1 = list(np.arange(mdot_min, mdot_max+mdot_min/2, mdot_incr))
+                        except:     #else:
+                            mdots_1 = ['']
+
+
+                    # Conditions name
+                    for phi in phis:
+                        for P in Ps:
+                            if 'JSR' not in configs:
+                                for T in Ts:
+                                    if mdots_1:
+                                        for mdot in mdots_1:
+                                            if 'diff_flame' not in configs:
+                                                try:
+                                                    case_name.append(configs+' phi='+str(phi)+' T='+str(round(T))+'K p='+str(round(P))+'Pa mdot='+str(round(mdot))+'kg/m2/s')
+                                                except:
+                                                    case_name.append(configs+' phi='+str(phi)+' T='+str(round(T))+'K p='+str(round(P))+'Pa mdot='+str(mdot)+'kg/m2/s')
+                                            else:
+                                                try:
+                                                    case_name.append(configs+' T='+str(round(T))+'K p='+str(round(P))+'Pa mdot='+str(round(mdot))+'kg/m2/s')
+                                                except:
+                                                    case_name.append(configs+' T='+str(round(T))+'K p='+str(round(P))+'Pa mdot='+str(mdot)+'kg/m2/s')
+                                    else:
+                                        case_name.append(configs+' phi='+str(phi)+' T='+str(round(T))+'K p='+str(round(P))+'Pa')
+                            else:
+                                case_name.append(configs+' phi='+str(phi)+' T='+str(round(T_min))+'-'+str(round(T_max))+'K p='+str(round(P))+'Pa')
+
+                    # check if the case_name already exist
+                    for _case in range(len(case_name)-1):
+                        if case_name[-1] == case_name[_case]:
+                            dbl_cn = True
+
+            num_cond = len(case_name)
+            self.tableWidget_optim_cd[tw].setColumnCount(2)
+            self.tableWidget_optim_cd[tw].setRowCount(num_cond)
+
+            _translate = QtCore.QCoreApplication.translate
+
+            # row titles :
+            for r in range(num_cond):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_optim_cd[tw].setVerticalHeaderItem(r, item)
+                item = self.tableWidget_optim_cd[tw].verticalHeaderItem(r)
+                item.setText(_translate("MainWindow", str(r+1)))
+            # column titles :
+            col_title = ["Condition","Weight"]
+            for col in range(2):
+                item = QtWidgets.QTableWidgetItem()
+                self.tableWidget_optim_cd[tw].setHorizontalHeaderItem(col, item)
+                item = self.tableWidget_optim_cd[tw].horizontalHeaderItem(col)
+                item.setText(_translate("MainWindow", col_title[col]))
+            # fill the table
+            for col in range(2):
+                if col==0:
+                    for r in range(num_cond):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim_cd[tw].setItem(r, col, item)
+                        item = self.tableWidget_optim_cd[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(case_name[r])))
+                else:
+                    for r in range(num_cond):
+                        if dbl_cn: # if there is (at least) twice the same case_name
+                                   # -> consider only the order of occurence to fill previous settings
+                            try:     txt = fit_cond[r]
+                            except:  txt = 1
+                        else:
+                            # -> fill previous settings with the corresponding case name
+                            txt = 1
+                            for i in range(len(prev_cond_name)):
+                                if case_name[r] == prev_cond_name[i]:
+                                    txt = fit_cond[i]
+                                    break
+                                else:
+                                    txt = 1
+
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim_cd[tw].setItem(r, col, item)
+                        item = self.tableWidget_optim_cd[tw].item(r, col)
+                        item.setText(_translate("MainWindow", str(txt)))
+            self.tableWidget_optim_cd[tw].setColumnWidth(0, 330);
+
 
 
     def change_error_table(self):
@@ -2339,6 +2627,7 @@ class Ui_MainWindow(object):
         global sz_w
         global sz_h
         global opt_num
+        global optimization_adv_options
 
         idx = self.tablet.currentIndex()
         add_GA = True
@@ -2350,6 +2639,7 @@ class Ui_MainWindow(object):
         for i in range(_idx-1):
             if self.list_operator[i]=='opt':
                 idx_opt+=1
+        opt_num = idx_opt
 
         if not self.reference_mechanism:
             add_GA = False
@@ -2366,11 +2656,22 @@ class Ui_MainWindow(object):
             self.GA[idx_opt].setObjectName("GA")
 
             self.tablet.insertTab(idx+1,self.GA[idx_opt],"")
-            opt_num+=1
-            self.opt_num.insert(idx_opt,opt_num)
+#            self.opt_num.insert(idx_opt,opt_num)
+
+            self.scrollArea_opt.insert(idx_opt,QtWidgets.QScrollArea(self.GA[idx_opt]))
+            self.scrollArea_opt[idx_opt].setGeometry(QtCore.QRect(0, 0, 767*sz_w, 581*sz_h))
+            self.scrollArea_opt[idx_opt].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+            self.scrollArea_opt[idx_opt].setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            self.scrollArea_opt[idx_opt].setWidgetResizable(False)
+            self.scrollArea_opt[idx_opt].setObjectName("scrollArea_opt_"+str(idx_opt))
+            self.scroll_opt_Contents.insert(idx_opt,QtWidgets.QWidget())
+            self.scroll_opt_Contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 765*sz_w, 565*sz_h))
+            self.scroll_opt_Contents[idx_opt].setObjectName("opt_scroll_"+str(idx_opt))
+            self.scrollArea_opt[idx_opt].setWidget(self.scroll_opt_Contents[idx_opt])
+            optimization_adv_options.insert(idx_opt,False)
 
             # gen / ind number
-            self.AG_group_gen_ind.insert(idx_opt,QtWidgets.QFrame(self.GA[idx_opt]))
+            self.AG_group_gen_ind.insert(idx_opt,QtWidgets.QFrame(self.scroll_opt_Contents[idx_opt]))
             self.AG_group_gen_ind[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 20*sz_h, 290*sz_w, 91*sz_h))
             self.AG_group_gen_ind[idx_opt].setFrameShape(QtWidgets.QFrame.StyledPanel)
             self.AG_group_gen_ind[idx_opt].setFrameShadow(QtWidgets.QFrame.Raised)
@@ -2400,109 +2701,9 @@ class Ui_MainWindow(object):
 
 
             # -------------------
-            # Sub mech Selection
-            self.label_scroll_subM.insert(idx_opt,QtWidgets.QLabel(self.GA[idx_opt]))
-            self.label_scroll_subM[idx_opt].setGeometry(QtCore.QRect(80*sz_w, 120*sz_h, 200*sz_w, 18*sz_h))
-            self.label_scroll_subM[idx_opt].setObjectName("label_scroll_subM")
-            self.label_scroll_subM[idx_opt].setText(_translate("MainWindow", "Sub-mechanism selection"))
-
-
-            self.scrollArea_subM.insert(idx_opt,QtWidgets.QScrollArea(self.GA[idx_opt]))
-            self.scrollArea_subM[idx_opt].setGeometry(QtCore.QRect(20*sz_w,140*sz_h, 290*sz_w, 101*sz_h))
-            self.scrollArea_subM[idx_opt].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            self.scrollArea_subM[idx_opt].setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            self.scrollArea_subM[idx_opt].setWidgetResizable(False)
-            self.scrollArea_subM[idx_opt].setObjectName("scrollAreasubM")
-            self.scrollArea_subM_contents.insert(idx_opt,QtWidgets.QWidget())
-            self.scrollArea_subM_contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 265*sz_w, 101*sz_h))
-            self.scrollArea_subM_contents[idx_opt].setObjectName("scrollArea_subM_contents")
-            self.scrollArea_subM[idx_opt].setWidget(self.scrollArea_subM_contents[idx_opt])
-
-    #        self.scrollArea_subM.setWidget(self.GA_groupsubM)
-            self.GA_label_subM.insert(idx_opt,QtWidgets.QLabel(self.scrollArea_subM_contents[idx_opt]))
-            self.GA_label_subM[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 65*sz_h, 191*sz_w, 18*sz_h))
-            self.GA_label_subM[idx_opt].setObjectName("label_Red_method_sp_5")
-
-
-
-
-            # column 1: H2 CO
-            self.cB_sub_H.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-            self.cB_sub_H[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
-            self.cB_sub_H[idx_opt].setObjectName("cB_sub_H")
-            self.cB_sub_H[idx_opt].setText(_translate("MainWindow", "H2"))
-            self.cB_sub_H[idx_opt].setChecked(True)
-
-            self.cB_sub_CO.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-            self.cB_sub_CO[idx_opt].setObjectName("cB_sub_CO")
-            self.cB_sub_CO[idx_opt].setText(_translate("MainWindow", "CO"))
-            if True in self.mech_data.react.subm_CO:
-                self.cB_sub_CO[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 35*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_CO[idx_opt].setChecked(True)
-
-            else:
-                self.cB_sub_CO[idx_opt].setGeometry(QtCore.QRect(-100*sz_w, 30*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_CO[idx_opt].setChecked(True)
-
-
-
-
-            # column 2: Nitrogen sulfur silane chemistry
-            mv_y = 0
-
-            # N
-            self.cB_sub_N.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-            self.cB_sub_N[idx_opt].setObjectName("cB_sub_N")
-            self.cB_sub_N[idx_opt].setText(_translate("MainWindow", "N"))
-            if max(self.mech_data.react.subm_N)>0:
-                self.cB_sub_N[idx_opt].setGeometry(QtCore.QRect(80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_N[idx_opt].setChecked(True)
-                mv_y +=2
-            else:
-                self.cB_sub_N[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_N[idx_opt].setChecked(False)
-
-            # S
-            self.cB_sub_S.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-            self.cB_sub_S[idx_opt].setObjectName("cB_sub_S")
-            self.cB_sub_S[idx_opt].setText(_translate("MainWindow", "S"))
-            if max(self.mech_data.react.subm_S)>0:
-                self.cB_sub_S[idx_opt].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_S[idx_opt].setChecked(True)
-                mv_y +=25
-            else :
-                self.cB_sub_S[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_S[idx_opt].setChecked(False)
-
-            # Si
-            self.cB_sub_Si.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-            self.cB_sub_Si[idx_opt].setObjectName("cB_sub_Si")
-            self.cB_sub_Si[idx_opt].setText(_translate("MainWindow", "Si"))
-            if max(self.mech_data.react.subm_Si)>0:
-                self.cB_sub_Si[idx_opt].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_Si[idx_opt].setChecked(True)
-            else:
-                self.cB_sub_Si[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_Si[idx_opt].setChecked(False)
-
-
-            # column 3: C1-Cx
-            self.cB_sub_C.insert(idx_opt,[])
-            max_subm_C = max(self.mech_data.react.subm_C)
-            for sC in range(max_subm_C):
-                self.cB_sub_C[idx_opt].append(QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
-                self.cB_sub_C[idx_opt][-1].setGeometry(QtCore.QRect(150*sz_w, (10+25*sC)*sz_h, 50*sz_w, 22*sz_h))
-                self.cB_sub_C[idx_opt][-1].setObjectName("cB_sub_C"+str(sC))
-                self.cB_sub_C[idx_opt][-1].setText(_translate("MainWindow", "C"+str(sC+1)))
-                self.cB_sub_C[idx_opt][-1].setChecked(True)
-            if max_subm_C>3:
-                self.scrollArea_subM[idx_opt].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-                self.scrollArea_subM_contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 250*sz_w, (max_subm_C+1)*28*sz_h))#(sC+1)*28))
-
-            # -------------------
             # Arrhenius
-            self.AG_group_Arrh.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
-            self.AG_group_Arrh[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 250*sz_h, 290*sz_w, 91*sz_h))
+            self.AG_group_Arrh.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
+            self.AG_group_Arrh[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 120*sz_h, 290*sz_w, 91*sz_h))
             self.AG_group_Arrh[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
             self.AG_group_Arrh[idx_opt].setObjectName("AG_group_Arrh")
             self.AG_group_Arrh[idx_opt].setTitle(_translate("MainWindow", "Arrhenius parameters maximal variation (%)"))
@@ -2542,29 +2743,10 @@ class Ui_MainWindow(object):
             self.num_GA_Ea[idx_opt].setProperty("value", d_GA_Ea)
 
 
-            # -------------------
-            # Optimization on method
-            self.GA_group5.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
-            self.GA_group5[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 355*sz_h, 290*sz_w, 101*sz_h))
-            self.GA_group5[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
-            self.GA_group5[idx_opt].setObjectName("GA_group5")
-            self.cB_GA_meth.insert(idx_opt,QtWidgets.QCheckBox(self.GA_group5[idx_opt]))
-            self.cB_GA_meth[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
-            self.cB_GA_meth[idx_opt].setObjectName("checkBox_2")
-            self.GA_label_51.insert(idx_opt,QtWidgets.QLabel(self.GA_group5[idx_opt]))
-            self.GA_label_51[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 65*sz_h, 200*sz_w, 18*sz_h))
-            self.GA_label_51[idx_opt].setObjectName("label_Red_method_sp_5")
-            self.num_GA_meth_fract.insert(idx_opt,QtWidgets.QDoubleSpinBox(self.GA_group5[idx_opt]))
-            self.num_GA_meth_fract[idx_opt].setGeometry(QtCore.QRect(215*sz_w, 60*sz_h, 61*sz_w, 32*sz_h))
-            self.num_GA_meth_fract[idx_opt].setDecimals(0)
-            self.num_GA_meth_fract[idx_opt].setMaximum(100.0)
-            self.num_GA_meth_fract[idx_opt].setSingleStep(5.0)
-            self.num_GA_meth_fract[idx_opt].setObjectName("num_GA_meth_fract")
-            self.num_GA_meth_fract[idx_opt].setProperty("value", d_GA_meth_fract)
 
             # -------------------
             # Selection
-            self.GA_Box_Selection.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
+            self.GA_Box_Selection.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
             self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
             self.GA_Box_Selection[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_Selection[idx_opt].setObjectName("GA_Box_Selection")
@@ -2576,9 +2758,9 @@ class Ui_MainWindow(object):
             self.Box_GA_Selection[idx_opt].addItem("")
             self.Box_GA_Selection[idx_opt].addItem("")
             self.Box_GA_Selection[idx_opt].addItem("")
-            self.Box_GA_Selection[idx_opt].setItemText(0, _translate("MainWindow", "Roulette"))
-            self.Box_GA_Selection[idx_opt].setItemText(1, _translate("MainWindow", "Rank"))
-            self.Box_GA_Selection[idx_opt].setItemText(2, _translate("MainWindow", "Geometric_norm"))
+            self.Box_GA_Selection[idx_opt].setItemText(1, _translate("MainWindow", "Roulette"))
+            self.Box_GA_Selection[idx_opt].setItemText(2, _translate("MainWindow", "Rank"))
+            self.Box_GA_Selection[idx_opt].setItemText(0, _translate("MainWindow", "Geometric_norm"))
             self.Box_GA_Selection[idx_opt].setItemText(3, _translate("MainWindow", "Elitism"))
 #            self.Box_GA_Selection[idx_opt].setItemText(4, _translate("MainWindow", "Tournament"))
             self.txt_GA_sel_opt.insert(idx_opt,QtWidgets.QPlainTextEdit(self.GA_Box_Selection[idx_opt]))
@@ -2593,7 +2775,7 @@ class Ui_MainWindow(object):
 
             # -------------------
             # Xover
-            self.GA_Box_Xover.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
+            self.GA_Box_Xover.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
             self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 130*sz_h, 420*sz_w, 190*sz_h)) #321
             self.GA_Box_Xover[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_Xover[idx_opt].setObjectName("GA_Box_Xover")
@@ -2655,13 +2837,26 @@ class Ui_MainWindow(object):
             self.label_GA_Xover_opt[idx_opt].setGeometry(QtCore.QRect(3200*sz_w, 30*sz_h, 71*sz_w, 18*sz_h))
             self.label_GA_Xover_opt[idx_opt].setObjectName("label_GA_Xover_opt")
             self.label_GA_Xover_opt[idx_opt].setText(_translate("MainWindow", "Options"))
-            self.pB_GA_remove.insert(idx_opt,QtWidgets.QPushButton(self.GA[idx_opt]))
-            self.pB_GA_remove[idx_opt].setGeometry(QtCore.QRect(670*sz_w, 20*sz_h, 80*sz_w, 70*sz_h))
+
+
+            # -------------------
+            # Remove
+            self.pB_GA_remove.insert(idx_opt,QtWidgets.QPushButton(self.scroll_opt_Contents[idx_opt]))
+            self.pB_GA_remove[idx_opt].setGeometry(QtCore.QRect(665*sz_w, 15*sz_h, 80*sz_w, 40*sz_h))
             self.pB_GA_remove[idx_opt].setObjectName("pB_GA_remove")
 
             # -------------------
+            # Advanced options
+            self.pB_GA_adv_opt.insert(idx_opt,QtWidgets.QPushButton(self.scroll_opt_Contents[idx_opt]))
+            self.pB_GA_adv_opt[idx_opt].setGeometry(QtCore.QRect(665*sz_w, 60*sz_h, 80*sz_w, 60*sz_h))
+            self.pB_GA_adv_opt[idx_opt].setObjectName("pB_GA_adv_options")
+            self.pB_GA_adv_opt[idx_opt].setText(_translate("MainWindow", "Display \nadvanced \noptions"))
+            self.pB_GA_adv_opt[idx_opt].clicked.connect(lambda: self.opt_adv_options(opt_meth))
+
+
+            # -------------------
             # Mutation
-            self.GA_Box_mut.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
+            self.GA_Box_mut.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
             self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
             self.GA_Box_mut[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
             self.GA_Box_mut[idx_opt].setObjectName("GA_Box_mut")
@@ -2748,7 +2943,7 @@ class Ui_MainWindow(object):
 
             # -------------------
             # PSO options
-            self.PSO_Box_Param.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
+            self.PSO_Box_Param.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
 #            self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 130*sz_h, 420*sz_w, 250*sz_h)) #321
             self.PSO_Box_Param[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
             self.PSO_Box_Param[idx_opt].setObjectName("PSO_Box_Param")
@@ -2860,29 +3055,73 @@ class Ui_MainWindow(object):
             self.Inertia_score[idx_opt].toggled.connect(self.PSO_score_appear)
 
 
+            # -------------------
+            # Fitness ponderations
+            self.GA_Box_Fit_pond.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
+            self.GA_Box_Fit_pond[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 570*sz_h, 700*sz_w, 280*sz_h)) #321
+            self.GA_Box_Fit_pond[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
+            self.GA_Box_Fit_pond[idx_opt].setObjectName("GA_Box_Fit_pond")
+            self.GA_Box_Fit_pond[idx_opt].setTitle(_translate("MainWindow", "Fitness Calculation"))
+
+            # Fitness / target table
+            self.tableWidget_optim.append(QtWidgets.QTableWidget(self.GA_Box_Fit_pond[idx_opt]))
+            self.tableWidget_optim[-1].setGeometry(QtCore.QRect(10*sz_w, 60*sz_h, 241*sz_w, 228*sz_h))
+            self.tableWidget_optim[-1].setObjectName("tableWidget_optim")
+            self.update_error_table()
+
+            # Fitness / conditions table
+            self.tableWidget_optim_cd.append(QtWidgets.QTableWidget(self.GA_Box_Fit_pond[idx_opt]))
+            self.tableWidget_optim_cd[-1].setGeometry(QtCore.QRect(260*sz_w, 60*sz_h, 460*sz_w, 228*sz_h))
+            self.tableWidget_optim_cd[-1].setColumnWidth(0, 300);
+            self.tableWidget_optim_cd[-1].setObjectName("tableWidget_optim")
+            self.update_cond_fit()
+
+            # -------------------
+            # Fitness calculation
+#            self.Gb_GA_fitness.insert(idx_opt,QtWidgets.QGroupBox(self.GA_Box_Fit_pond[idx_opt]))
+#            self.Gb_GA_fitness[idx_opt].setGeometry(QtCore.QRect(-20*sz_w, -4700, 290*sz_w, 80*sz_h))
+#            self.Gb_GA_fitness[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
+#            self.Gb_GA_fitness[idx_opt].setObjectName("Gb_GA_fitness")
+#            self.Gb_GA_fitness[idx_opt].setTitle(_translate("MainWindow", "Fitness calculation"))
+
+            self.rB_GA_fit_1.insert(idx_opt,QtWidgets.QRadioButton(self.GA_Box_Fit_pond[idx_opt]))
+            self.rB_GA_fit_1[idx_opt].setGeometry(QtCore.QRect(40*sz_w, 25*sz_w, 230*sz_w, 20*sz_h))
+            self.rB_GA_fit_1[idx_opt].setObjectName("rB_GA_fit_1")
+            self.rB_GA_fit_1[idx_opt].setText(_translate("MainWindow", "average among all conditions"))
+            self.rB_GA_fit_2.insert(idx_opt,QtWidgets.QRadioButton(self.GA_Box_Fit_pond[idx_opt]))
+            self.rB_GA_fit_2[idx_opt].setGeometry(QtCore.QRect(240*sz_w, 25*sz_h, 230*sz_w, 20*sz_h))
+            self.rB_GA_fit_2[idx_opt].setObjectName("rB_GA_fit_2")
+            self.rB_GA_fit_2[idx_opt].setText(_translate("MainWindow", "maximum among all conditions"))
+            if d_GA_fit == 'mean':  self.rB_GA_fit_1[idx_opt].setChecked(True)
+            else:                   self.rB_GA_fit_2[idx_opt].setChecked(True)
+
+            self.label_SA_deps_3[idx_opt].setText(_translate("MainWindow", "Individual number"))
+
+
+
+
+
 
             self.opt_meth.insert(idx_opt,opt_meth)
 
             if opt_meth == 'GA':
                 # show GA
-                self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
-                self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 130*sz_h, 420*sz_w, 190*sz_h))
-                self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
+                self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
+                self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 130*sz_h, 420*sz_w, 190*sz_h))
+                self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
                 self.tablet.setTabText(self.tablet.indexOf(self.GA[idx_opt]), _translate("MainWindow", "GA"))
                 self.label_SA_espi_3[idx_opt].setText(_translate("MainWindow", "Generation number"))
                 # remove PSO
-                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(33000*sz_w, 130*sz_h, 420*sz_w, 250*sz_h)) #321
+                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(33000*sz_w, 130*sz_h, 420*sz_w, 250*sz_h))
             elif opt_meth == 'PSO':
                 # show PSO
-                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 130*sz_h, 420*sz_w, 250*sz_h)) #321
+                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 130*sz_h, 420*sz_w, 250*sz_h))
                 self.tablet.setTabText(self.tablet.indexOf(self.GA[idx_opt]), _translate("MainWindow", "PSO"))
                 self.label_SA_espi_3[idx_opt].setText(_translate("MainWindow", "Iteration number"))
                 # remove GA
                 self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
                 self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 130*sz_h, 420*sz_w, 190*sz_h))
                 self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(3300*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
-
-
 
             if self.Inertia_score[idx_opt].isChecked():
                 self.Inertia_min[idx_opt].setGeometry(QtCore.QRect(260*sz_w, 30*sz_h, 50*sz_w, 30*sz_h))
@@ -2904,34 +3143,146 @@ class Ui_MainWindow(object):
                 self.label_pso_param_fm[idx_opt].setGeometry(QtCore.QRect(1700*sz_w, 80*sz_h, 131*sz_w, 22*sz_h))
 
 
+            # ----------------------------------------------
+            # Selective optimization
+            self.GA_group_opt_react.insert(idx_opt,QtWidgets.QGroupBox(self.scroll_opt_Contents[idx_opt]))
+            self.GA_group_opt_react[idx_opt].setGeometry(QtCore.QRect(20*sz_w, -2200*sz_h, 290*sz_w, 290*sz_h))
+            self.GA_group_opt_react[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
+            self.GA_group_opt_react[idx_opt].setObjectName("GA_group_opt_react")
+
+            # ---- Sub mech Selection ----
+            self.label_scroll_subM.insert(idx_opt,QtWidgets.QLabel(self.GA_group_opt_react[idx_opt]))
+            self.label_scroll_subM[idx_opt].setGeometry(QtCore.QRect(80*sz_w, -1200*sz_h, 200*sz_w, 18*sz_h))
+            self.label_scroll_subM[idx_opt].setObjectName("label_scroll_subM")
+            self.label_scroll_subM[idx_opt].setText(_translate("MainWindow", "--- Sub-mechanism selection ---"))
+
+            self.scrollArea_subM.insert(idx_opt,QtWidgets.QScrollArea(self.GA_group_opt_react[idx_opt]))
+            self.scrollArea_subM[idx_opt].setGeometry(QtCore.QRect(20*sz_w,-1400*sz_h, 270*sz_w, 101*sz_h))
+            self.scrollArea_subM[idx_opt].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            self.scrollArea_subM[idx_opt].setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            self.scrollArea_subM[idx_opt].setWidgetResizable(False)
+            self.scrollArea_subM[idx_opt].setObjectName("scrollAreasubM")
+            self.scrollArea_subM_contents.insert(idx_opt,QtWidgets.QWidget())
+            self.scrollArea_subM_contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 265*sz_w, 101*sz_h))
+            self.scrollArea_subM_contents[idx_opt].setObjectName("scrollArea_subM_contents")
+            self.scrollArea_subM[idx_opt].setWidget(self.scrollArea_subM_contents[idx_opt])
+
+    #        self.scrollArea_subM.setWidget(self.GA_groupsubM)
+            self.GA_label_subM.insert(idx_opt,QtWidgets.QLabel(self.scrollArea_subM_contents[idx_opt]))
+            self.GA_label_subM[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 65*sz_h, 191*sz_w, 18*sz_h))
+            self.GA_label_subM[idx_opt].setObjectName("label_Red_method_sp_5")
+
+            # column 1: H2 CO
+            self.cB_sub_H.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+            self.cB_sub_H[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
+            self.cB_sub_H[idx_opt].setObjectName("cB_sub_H")
+            self.cB_sub_H[idx_opt].setText(_translate("MainWindow", "H2"))
+            self.cB_sub_H[idx_opt].setChecked(True)
+
+            self.cB_sub_CO.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+            self.cB_sub_CO[idx_opt].setObjectName("cB_sub_CO")
+            self.cB_sub_CO[idx_opt].setText(_translate("MainWindow", "CO"))
+            if True in self.mech_data.react.subm_CO:
+                self.cB_sub_CO[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 35*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_CO[idx_opt].setChecked(True)
+            else:
+                self.cB_sub_CO[idx_opt].setGeometry(QtCore.QRect(-100*sz_w, 30*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_CO[idx_opt].setChecked(True)
+
+
+            # column 2: Nitrogen sulfur silane chemistry
+            mv_y = 0
+
+            # N
+            self.cB_sub_N.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+            self.cB_sub_N[idx_opt].setObjectName("cB_sub_N")
+            self.cB_sub_N[idx_opt].setText(_translate("MainWindow", "N"))
+            if max(self.mech_data.react.subm_N)>0:
+                self.cB_sub_N[idx_opt].setGeometry(QtCore.QRect(80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_N[idx_opt].setChecked(True)
+                mv_y +=2
+            else:
+                self.cB_sub_N[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, 10*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_N[idx_opt].setChecked(False)
+
+            # S
+            self.cB_sub_S.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+            self.cB_sub_S[idx_opt].setObjectName("cB_sub_S")
+            self.cB_sub_S[idx_opt].setText(_translate("MainWindow", "S"))
+            if max(self.mech_data.react.subm_S)>0:
+                self.cB_sub_S[idx_opt].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_S[idx_opt].setChecked(True)
+                mv_y +=25
+            else :
+                self.cB_sub_S[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_S[idx_opt].setChecked(False)
+
+            # Si
+            self.cB_sub_Si.insert(idx_opt,QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+            self.cB_sub_Si[idx_opt].setObjectName("cB_sub_Si")
+            self.cB_sub_Si[idx_opt].setText(_translate("MainWindow", "Si"))
+            if max(self.mech_data.react.subm_Si)>0:
+                self.cB_sub_Si[idx_opt].setGeometry(QtCore.QRect(80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_Si[idx_opt].setChecked(True)
+            else:
+                self.cB_sub_Si[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, (10+mv_y)*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_Si[idx_opt].setChecked(False)
+
+            # column 3: C1-Cx
+            self.cB_sub_C.insert(idx_opt,[])
+            max_subm_C = max(self.mech_data.react.subm_C)
+            for sC in range(max_subm_C):
+                self.cB_sub_C[idx_opt].append(QtWidgets.QCheckBox(self.scrollArea_subM_contents[idx_opt]))
+                self.cB_sub_C[idx_opt][-1].setGeometry(QtCore.QRect(150*sz_w, (10+25*sC)*sz_h, 50*sz_w, 22*sz_h))
+                self.cB_sub_C[idx_opt][-1].setObjectName("cB_sub_C"+str(sC))
+                self.cB_sub_C[idx_opt][-1].setText(_translate("MainWindow", "C"+str(sC+1)))
+                self.cB_sub_C[idx_opt][-1].setChecked(True)
+            if max_subm_C>3:
+                self.scrollArea_subM[idx_opt].setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+                self.scrollArea_subM_contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 250*sz_w, (max_subm_C+1)*28*sz_h))#(sC+1)*28))
 
 
 
-            # -------------------
-            # Fitness
-            self.Gb_GA_fitness.insert(idx_opt,QtWidgets.QGroupBox(self.GA[idx_opt]))
-            self.Gb_GA_fitness[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 470*sz_h, 290*sz_w, 80*sz_h))
-            self.Gb_GA_fitness[idx_opt].setAlignment(QtCore.Qt.AlignCenter)
-            self.Gb_GA_fitness[idx_opt].setObjectName("Gb_GA_fitness")
-            self.Gb_GA_fitness[idx_opt].setTitle(_translate("MainWindow", "Fitness calculation"))
-
-            self.rB_GA_fit_1.insert(idx_opt,QtWidgets.QRadioButton(self.Gb_GA_fitness[idx_opt]))
-            self.rB_GA_fit_1[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 0, 230*sz_w, 80*sz_h))
-            self.rB_GA_fit_1[idx_opt].setObjectName("rB_GA_fit_1")
-            self.rB_GA_fit_1[idx_opt].setText(_translate("MainWindow", "average among all conditions"))
-            self.rB_GA_fit_2.insert(idx_opt,QtWidgets.QRadioButton(self.Gb_GA_fitness[idx_opt]))
-            self.rB_GA_fit_2[idx_opt].setGeometry(QtCore.QRect(10, 20*sz_h, 230, 80*sz_h))
-            self.rB_GA_fit_2[idx_opt].setObjectName("rB_GA_fit_2")
-            self.rB_GA_fit_2[idx_opt].setText(_translate("MainWindow", "maximum among all conditions"))
-            if d_GA_fit == 'mean':  self.rB_GA_fit_1[idx_opt].setChecked(True)
-            else:                   self.rB_GA_fit_2[idx_opt].setChecked(True)
-
-            self.label_SA_deps_3[idx_opt].setText(_translate("MainWindow", "Individual number"))
+            # ---- Optimization on reactions ----
+            self.label_reaction_sel.insert(idx_opt,QtWidgets.QLabel(self.GA_group_opt_react[idx_opt]))
+            self.label_reaction_sel[idx_opt].setGeometry(QtCore.QRect(75*sz_w, 150*sz_h, 200*sz_w, 18*sz_h))
+            self.label_reaction_sel[idx_opt].setObjectName("label_reaction_sel")
+            self.label_reaction_sel[idx_opt].setText(_translate("MainWindow", "--- Reactions selection ---"))
 
 
-            # Optimization on method
-            self.GA_group5[idx_opt].setTitle(_translate("MainWindow", "Optimization on method"))
-#            self.scrollArea_subM[idx_opt].setTitle(_translate("MainWindow", "Sub-Mechanism optimization "))
+            # ---- Optimization on specified reactions ----
+            self.cB_opt_react.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group_opt_react[idx_opt]))
+            self.cB_opt_react[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 170*sz_h, 250*sz_w, 22*sz_h))
+            self.cB_opt_react[idx_opt].setObjectName("checkBox_2")
+            self.cB_opt_react[idx_opt].setText(_translate("MainWindow", "Optimization based on selected reactions"))
+
+            opt_react.insert(idx_opt,[])
+            for _r in range(len(self.mech_data.react.formula)):
+                opt_react[idx_opt].append(False)
+
+            self.pB_GA_react2mod.insert(idx_opt,QtWidgets.QPushButton(self.GA_group_opt_react[idx_opt]))
+            self.pB_GA_react2mod[idx_opt].setGeometry(QtCore.QRect(40*sz_w, 195*sz_h, 200*sz_w, 25*sz_h))
+            self.pB_GA_react2mod[idx_opt].setObjectName("pB_GA_react2mod")
+            self.pB_GA_react2mod[idx_opt].setText(_translate("MainWindow", "Select reactions to optimize"))
+            self.pB_GA_react2mod[idx_opt].clicked.connect(lambda: self.opt_show_reactions(idx_opt))
+
+
+            # ---- Optimization on method ----
+            self.cB_GA_meth.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group_opt_react[idx_opt]))
+            self.cB_GA_meth[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 230*sz_h, 231*sz_w, 22*sz_h))
+            self.cB_GA_meth[idx_opt].setObjectName("checkBox_2")
+            self.GA_label_51.insert(idx_opt,QtWidgets.QLabel(self.GA_group_opt_react[idx_opt]))
+            self.GA_label_51[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 255*sz_h, 200*sz_w, 18*sz_h))
+            self.GA_label_51[idx_opt].setObjectName("label_Red_method_sp_5")
+            self.GA_label_51[idx_opt].setText(_translate("MainWindow", "Number of reactions to optimize"))
+            self.num_GA_meth_fract.insert(idx_opt,QtWidgets.QDoubleSpinBox(self.GA_group_opt_react[idx_opt]))
+            self.num_GA_meth_fract[idx_opt].setGeometry(QtCore.QRect(215*sz_w, 250*sz_h, 61*sz_w, 32*sz_h))
+            self.num_GA_meth_fract[idx_opt].setDecimals(0)
+            self.num_GA_meth_fract[idx_opt].setMaximum(100.0)
+            self.num_GA_meth_fract[idx_opt].setSingleStep(5.0)
+            self.num_GA_meth_fract[idx_opt].setObjectName("num_GA_meth_fract")
+            self.num_GA_meth_fract[idx_opt].setProperty("value", d_GA_meth_fract)
+
             if _idx != 0 and not op_null:
                 self.cB_GA_meth[idx_opt].setText(_translate("MainWindow", "Optimization based on "+self.list_operator[_idx-2]))
                 self.cB_GA_meth_DRG.insert(idx_opt,False)
@@ -2939,25 +3290,25 @@ class Ui_MainWindow(object):
                 self.cB_GA_meth_pts.insert(idx_opt,False)
                 self.GA_label_meth_pts.insert(idx_opt,False)
             else:
-                self.cB_GA_meth[idx_opt].setGeometry(QtCore.QRect(-110*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
+                self.cB_GA_meth[idx_opt].setGeometry(QtCore.QRect(-110*sz_w, 255*sz_h, 231*sz_w, 22*sz_h))
 
-                self.cB_GA_meth_DRG.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group5[idx_opt]))
-                self.cB_GA_meth_DRG[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
+                self.cB_GA_meth_DRG.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group_opt_react[idx_opt]))
+                self.cB_GA_meth_DRG[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 255*sz_h, 231*sz_w, 22*sz_h))
                 self.cB_GA_meth_DRG[idx_opt].setObjectName("cB_GA_meth_DRG")
                 self.cB_GA_meth_DRG[idx_opt].setText(_translate("MainWindow", "DRG"))
 
-                self.cB_GA_meth_SA.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group5[idx_opt]))
-                self.cB_GA_meth_SA[idx_opt].setGeometry(QtCore.QRect(70*sz_w, 30*sz_h, 231*sz_w, 22*sz_h))
+                self.cB_GA_meth_SA.insert(idx_opt,QtWidgets.QRadioButton(self.GA_group_opt_react[idx_opt]))
+                self.cB_GA_meth_SA[idx_opt].setGeometry(QtCore.QRect(70*sz_w, 255*sz_h, 231*sz_w, 22*sz_h))
                 self.cB_GA_meth_SA[idx_opt].setObjectName("cB_GA_meth_SA")
                 self.cB_GA_meth_SA[idx_opt].setText(_translate("MainWindow", "SA "))
 
-                self.GA_label_meth_pts.insert(idx_opt,QtWidgets.QLabel(self.GA_group5[idx_opt]))
-                self.GA_label_meth_pts[idx_opt].setGeometry(QtCore.QRect(150*sz_w, 30*sz_h, 90*sz_w, 18*sz_h))
+                self.GA_label_meth_pts.insert(idx_opt,QtWidgets.QLabel(self.GA_group_opt_react[idx_opt]))
+                self.GA_label_meth_pts[idx_opt].setGeometry(QtCore.QRect(150*sz_w, 255*sz_h, 90*sz_w, 18*sz_h))
                 self.GA_label_meth_pts[idx_opt].setObjectName("label_Red_method_sp_5")
                 self.GA_label_meth_pts[idx_opt].setText(_translate("MainWindow", "points: "))
 
-                self.cB_GA_meth_pts.insert(idx_opt,QtWidgets.QDoubleSpinBox(self.GA_group5[idx_opt]))
-                self.cB_GA_meth_pts[idx_opt].setGeometry(QtCore.QRect(215*sz_w, 25*sz_h, 61*sz_w, 32*sz_h))
+                self.cB_GA_meth_pts.insert(idx_opt,QtWidgets.QDoubleSpinBox(self.GA_group_opt_react[idx_opt]))
+                self.cB_GA_meth_pts[idx_opt].setGeometry(QtCore.QRect(215*sz_w,245*sz_h, 61*sz_w, 32*sz_h))
                 self.cB_GA_meth_pts[idx_opt].setDecimals(0)
                 self.cB_GA_meth_pts[idx_opt].setMaximum(100.0)
                 self.cB_GA_meth_pts[idx_opt].setSingleStep(1.0)
@@ -2965,7 +3316,18 @@ class Ui_MainWindow(object):
                 self.cB_GA_meth_pts[idx_opt].setProperty("value", d_GA_meth_pts)
 
 
-            self.GA_label_51[idx_opt].setText(_translate("MainWindow", "Number of reactions to optimize"))
+            # -------------------
+            # Integrate candidate mechanism
+            self.pB_GA_prev_mech.insert(idx_opt,QtWidgets.QPushButton(self.scroll_opt_Contents[idx_opt]))
+            self.pB_GA_prev_mech[idx_opt].setGeometry(QtCore.QRect(50*sz_w, -5250*sz_h, 220*sz_w, 25*sz_h))
+            self.pB_GA_prev_mech[idx_opt].setObjectName("pB_GA__prev_mech")
+            self.pB_GA_prev_mech[idx_opt].setText(_translate("MainWindow", "Import candidate mechanism"))
+            self.pB_GA_prev_mech[idx_opt].clicked.connect(lambda: self.get_candidate_mech_folder(idx_opt))
+
+            self.label_kmech_folder.insert(idx_opt,QtWidgets.QLabel(self.scroll_opt_Contents[idx_opt]))
+            self.label_kmech_folder[idx_opt].setGeometry(QtCore.QRect(30*sz_w, 545*sz_h, 230*sz_w, 18*sz_h))
+            self.label_kmech_folder[idx_opt].setObjectName("label_kmech_folder")
+            self.kmech_folder.insert(idx_opt,False)
 
             self.pB_GA_remove[idx_opt].setText(_translate("MainWindow", "Remove"))
             self.pB_GA_remove[idx_opt].clicked.connect(lambda: self.remove_tab('GA'))
@@ -2984,7 +3346,70 @@ class Ui_MainWindow(object):
             self.list_operator.insert(_idx-1,'opt')
 
 
+    def opt_adv_options(self, opt_meth):
+        global sz_w
+        global sz_h
+        global opt_num
+        global optimization_adv_options
+        _translate = QtCore.QCoreApplication.translate
 
+        idx = self.tablet.currentIndex()
+        if condition_tab_removed:   _idx = idx + 1
+        else:                       _idx = idx
+
+        idx_opt, idx_DRG, idx_SA = -1, -1, -1
+        for i in range(_idx-1):
+            if self.list_operator[i]=='opt':
+                idx_opt+=1
+            elif 'DRG' in self.list_operator[i]:
+                idx_DRG+=1
+            elif 'SA' in self.list_operator[i]:
+                idx_SA+=1
+
+        # hide advanced options
+        if optimization_adv_options[idx_opt]:
+            if opt_meth=='GA':
+                self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(-3300*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
+                self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(-3300*sz_w, 130*sz_h, 420*sz_w, 190*sz_h))
+                self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(-3300*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
+            if opt_meth=='PSO':
+                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(-3300*sz_w, 130*sz_h, 420*sz_w, 250*sz_h))
+            self.pB_GA_adv_opt[idx_opt].setText(_translate("MainWindow", "Display \nadvanced \noptions"))
+            self.GA_Box_Fit_pond[idx_opt].setGeometry(QtCore.QRect(-20*sz_w, -5700*sz_h, 700*sz_w, 240*sz_h))
+#            self.Gb_GA_fitness[idx_opt].setGeometry(QtCore.QRect(-20*sz_w, -4700*sz_h, 290*sz_w, 80*sz_h))
+            self.GA_group_opt_react[idx_opt].setGeometry(QtCore.QRect(20*sz_w, -2200*sz_h, 290*sz_w, 290*sz_h))
+            self.pB_GA_prev_mech[idx_opt].setGeometry(QtCore.QRect(50*sz_w, -5250*sz_h, 220*sz_w, 25*sz_h))
+            self.label_scroll_subM[idx_opt].setGeometry(QtCore.QRect(-80*sz_w, -1200*sz_h, 200*sz_w, 18*sz_h))
+            self.scrollArea_subM[idx_opt].setGeometry(QtCore.QRect(-20*sz_w,-1400*sz_h, 270*sz_w, 101*sz_h))
+            self.scroll_opt_Contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 765*sz_w, 565*sz_h))
+            optimization_adv_options[idx_opt] = False
+        # display advanced options
+        else:
+            if opt_meth=='GA':
+                self.GA_Box_Selection[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 20*sz_h, 321*sz_w, 100*sz_h))
+                self.GA_Box_Xover[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 130*sz_h, 420*sz_w, 190*sz_h))
+                self.GA_Box_mut[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 330*sz_h, 420*sz_w, 220*sz_h))
+            if opt_meth=='PSO':
+                self.PSO_Box_Param[idx_opt].setGeometry(QtCore.QRect(330*sz_w, 130*sz_h, 420*sz_w, 250*sz_h))
+            self.GA_Box_Fit_pond[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 570*sz_h, 730*sz_w, 300*sz_h))
+#            self.Gb_GA_fitness[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 600*sz_h, 290*sz_w, 80*sz_h))
+            self.label_scroll_subM[idx_opt].setGeometry(QtCore.QRect(60*sz_w, 23*sz_h, 200*sz_w, 18*sz_h))
+            self.GA_group_opt_react[idx_opt].setGeometry(QtCore.QRect(20*sz_w, 220*sz_h, 290*sz_w, 290*sz_h))
+            self.pB_GA_prev_mech[idx_opt].setGeometry(QtCore.QRect(50*sz_w, 525*sz_h, 220*sz_w, 25*sz_h))
+            self.scrollArea_subM[idx_opt].setGeometry(QtCore.QRect(10*sz_w, 40*sz_h, 270*sz_w, 101*sz_h))
+            self.pB_GA_adv_opt[idx_opt].setText(_translate("MainWindow", "Hide \nadvanced \noptions"))
+            self.scroll_opt_Contents[idx_opt].setGeometry(QtCore.QRect(0, 0, 765*sz_w, 880*sz_h))
+
+            optimization_adv_options[idx_opt] = True
+
+
+    def opt_show_reactions(self,opt_num):
+        global mech_win
+        global wind_reac_open
+
+        mech_win  = mech_windows(self.mech_data, opt_num)
+        mech_win.show()
+        self.cB_opt_react[opt_num].setChecked(True)
 
 
     def add_cases(self):
@@ -3067,6 +3492,10 @@ class Ui_MainWindow(object):
                 self.eqincr[-1].setObjectName("eqincr")
                 self.eqincr[-1].setPlainText(_translate("MainWindow", d_phi_incr))
 
+                self.eqmin[-1].textChanged.connect(self.update_cond_fit)
+                self.eqmax[-1].textChanged.connect(self.update_cond_fit)
+                self.eqincr[-1].textChanged.connect(self.update_cond_fit)
+
                 self.Tmin.append(QtWidgets.QPlainTextEdit(self.Condition_Gb[-1]))
                 self.Tmin[-1].setGeometry(QtCore.QRect(320*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
                 self.Tmin[-1].setObjectName("Tmin")
@@ -3079,6 +3508,11 @@ class Ui_MainWindow(object):
                 self.Tincr[-1].setGeometry(QtCore.QRect(450*sz_w, 120*sz_h, 60*sz_w, 31*sz_h))
                 self.Tincr[-1].setObjectName("Tincr")
                 self.Tincr[-1].setPlainText(_translate("MainWindow", "200"))
+
+                self.Tmin[-1].textChanged.connect(self.update_cond_fit)
+                self.Tmax[-1].textChanged.connect(self.update_cond_fit)
+                self.Tincr[-1].textChanged.connect(self.update_cond_fit)
+
 
                 font = QtGui.QFont()
                 font.setPointSize(8)
@@ -3097,6 +3531,11 @@ class Ui_MainWindow(object):
                 self.Pincr[-1].setObjectName("Pincr")
                 self.Pincr[-1].setFont(font)
                 self.Pincr[-1].setPlainText(_translate("MainWindow", d_P_incr))
+
+                self.Pmin[-1].textChanged.connect(self.update_cond_fit)
+                self.Pmax[-1].textChanged.connect(self.update_cond_fit)
+                self.Pincr[-1].textChanged.connect(self.update_cond_fit)
+
 
                 self.txt2.append(QtWidgets.QLabel(self.Condition_Gb[-1]))
                 self.txt7.append(QtWidgets.QLabel(self.Condition_Gb[-1]))
@@ -3451,6 +3890,7 @@ class Ui_MainWindow(object):
                 self.add_cases()
 
         self.tablet.setCurrentIndex(1)
+        self.update_cond_fit()
 
 
     def remove_conditions(self, num_case):
@@ -3474,6 +3914,7 @@ class Ui_MainWindow(object):
         self.pushButton[-1].setText(_translate("MainWindow", "add"))
         self.pushButton[-1].clicked.connect(lambda: self.add_conditions(num_case))
         self.tablet.setCurrentIndex(1)
+        self.update_cond_fit()
 
 
     def add_flame_options(self, num_case):
@@ -4087,6 +4528,7 @@ class Ui_MainWindow(object):
         self.df_mdot3_2[num_case-1].setText(_translate("MainWindow", "1"))
 
         self.pts_scatter[num_case-1].setPlainText(_translate("MainWindow", d_pts_scatter_cf))
+        self.update_cond_fit()
 
 
     def add_cf_diff_options(self,num_case): # diffusion flame conditions
@@ -4178,6 +4620,7 @@ class Ui_MainWindow(object):
         self.df_mdot4_2[num_case-1].setPlainText(_translate("MainWindow", "1"))
 
         self.pts_scatter[num_case-1].setPlainText(_translate("MainWindow", d_pts_scatter_cf))
+        self.update_cond_fit()
 
 
     def add_cf_tprem_options(self,num_case):
@@ -4234,7 +4677,7 @@ class Ui_MainWindow(object):
         self.df_G22[num_case-1].setGeometry(QtCore.QRect(-1070*sz_w, 20*sz_h, 231*sz_w, 141*sz_h))
 
         self.pts_scatter[num_case-1].setPlainText(_translate("MainWindow", d_pts_scatter_cf))
-
+        self.update_cond_fit()
 
 
     def write_parameters(self, get_fn):
@@ -4299,8 +4742,12 @@ class Ui_MainWindow(object):
         optim_on_meth       = []
         nb_r2opt            = []
         sub_mech_sel        = []
+        sub_mech_sel_mod    = []
+        reactions2opt       = []
+        restore_mech_folder = []
 
         opt_meth            = []
+        opt_mod             = []
 
         # genetic Algorithm
         selection_operator  = []
@@ -4318,7 +4765,17 @@ class Ui_MainWindow(object):
         cogn_comp           = []
         social_comp         = []
 
+        # Fitness
         error_fitness       = []
+        fitness_tgt_pond    = []
+        fitness_case_pond   = []
+        fit_pond_sp         = []
+        fit_pond_cd         = []
+        fit_pond_T          = []
+        fit_pond_igt        = []
+        fit_pond_Sl         = []
+        fit_pond_K          = []
+
 
         drg = -1 ; sa = -1 ; csp = -1 ; ga = -1
 
@@ -4440,9 +4897,46 @@ class Ui_MainWindow(object):
 
             else: #GA
                 ga+=1
-                # fitness calculation
+                # -----  fitness calculation  -----
                 if self.rB_GA_fit_1[ga].isChecked(): error_fitness.append('mean')
                 else:                                error_fitness.append('max')
+                fitness_tgt_pond.append(False) ; fitness_case_pond.append(False)
+                opt_mod.append(False)
+
+                # --  target fitness weighting
+                fit_pond_sp.append([])
+                for r in range(self.tableWidget_optim[ga].rowCount()):
+                    if self.tableWidget_optim[ga].item(r, 0).text()=='T':
+                        fit_pond_T.append(self.tableWidget_optim[ga].item(r, 1).text())
+                    elif self.tableWidget_optim[ga].item(r, 0).text()=='Ig_t':
+                        fit_pond_igt.append(self.tableWidget_optim[ga].item(r, 1).text())
+                    elif self.tableWidget_optim[ga].item(r, 0).text()=='Sl':
+                        fit_pond_Sl.append(self.tableWidget_optim[ga].item(r, 1).text())
+                    elif self.tableWidget_optim[ga].item(r, 0).text()=='K':
+                        fit_pond_K.append(self.tableWidget_optim[ga].item(r, 1).text())
+                    else:
+                        fit_pond_sp[-1].append(self.tableWidget_optim[ga].item(r, 1).text())
+                # check if pond coeff are different than 1
+                if T_check:
+                    if float(fit_pond_T[-1])   != 1:  fitness_tgt_pond[-1] = True
+                if ig_check:
+                    if float(fit_pond_igt[-1]) != 1:  fitness_tgt_pond[-1] = True
+                if Sl_check:
+                    if float(fit_pond_Sl[-1])  != 1:  fitness_tgt_pond[-1] = True
+                if K_check:
+                    if float(fit_pond_K[-1])   != 1:  fitness_tgt_pond[-1] = True
+                for fit_pond_sp_i in fit_pond_sp[-1]:
+                    if float(fit_pond_sp_i) != 1:     fitness_tgt_pond[-1] = True
+
+                # --  conditions fitness weighting
+                fit_pond_cd.append([])
+                for r in range(self.tableWidget_optim_cd[ga].rowCount()):
+                    fit_pond_cd[-1].append(self.tableWidget_optim_cd[ga].item(r, 1).text())
+                # check if pond coeff are different than 1
+                for fit_pond_cd_i in fit_pond_cd[-1]:
+                    if float(fit_pond_cd_i) != 1:     fitness_case_pond[-1] = True
+
+
 
                 n_gen.append(int(self.num_GA_gen[ga].text()))
                 n_indiv.append(int(self.num_GA_ind[ga].text()))
@@ -4453,22 +4947,36 @@ class Ui_MainWindow(object):
                 optim_on_meth.append(self.cB_GA_meth[ga].isChecked())
                 nb_r2opt.append(int(self.num_GA_meth_fract[ga].text()))
 
+                sub_mech_sel_mod.append(False)
                 sub_mech_sel.append([])
-                if self.cB_sub_H[ga].isChecked():
-                    sub_mech_sel[-1].append('H2')
-                if self.cB_sub_CO[ga].isChecked():
-                    sub_mech_sel[-1].append('CO')
+                if self.cB_sub_H[ga].isChecked():  sub_mech_sel[-1].append('H2')
+                else:                              sub_mech_sel_mod[-1] = True
+                if self.cB_sub_CO[ga].isChecked(): sub_mech_sel[-1].append('CO')
+                elif True in self.mech_data.react.subm_CO:
+                    sub_mech_sel_mod[-1] = True
                 for sC in range(len(self.cB_sub_C[ga])):
                     if self.cB_sub_C[ga][sC].isChecked():
                         sub_mech_sel[-1].append('C'+str(sC+1))
-                if self.cB_sub_N[ga].isChecked():
-                    sub_mech_sel[-1].append('N')
-                if self.cB_sub_S[ga].isChecked():
-                    sub_mech_sel[-1].append('S')
-                if self.cB_sub_Si[ga].isChecked():
-                    sub_mech_sel[-1].append('Si')
+                    else:                          sub_mech_sel_mod[-1] = True
+                if self.cB_sub_N[ga].isChecked():  sub_mech_sel[-1].append('N')
+                elif max(self.mech_data.react.subm_N)>0:
+                    sub_mech_sel_mod[-1] = True
+                if self.cB_sub_S[ga].isChecked():  sub_mech_sel[-1].append('S')
+                elif max(self.mech_data.react.subm_S)>0:
+                    sub_mech_sel_mod[-1] = True
+                if self.cB_sub_Si[ga].isChecked(): sub_mech_sel[-1].append('Si')
+                elif max(self.mech_data.react.subm_Si)>0:
+                    sub_mech_sel_mod[-1] = True
+
+                if self.cB_opt_react[ga].isChecked():
+                    reactions2opt.append([index +1 for index,value in enumerate(opt_react[ga]) if value])
+                else:
+                    reactions2opt.append([])
 
                 opt_meth.append(self.opt_meth[ga])
+
+                if self.kmech_folder[ga]:   restore_mech_folder.append(self.kmech_folder[ga])
+                else:                       restore_mech_folder.append(False)
 
                 # Genetic Algorithm options
                 selection_operator.append(self.Box_GA_Selection[ga].currentText())
@@ -4509,8 +5017,9 @@ class Ui_MainWindow(object):
 #                    mut_opt[-1].append(self.txt_GA_mut_opt_4[ga].document().toPlainText())
                 mut_intensity.append(int(self.num_GA_mut_prob[ga].text()))
 
-                # PSO options
 
+
+                # PSO options
                 inertia.append([])
                 inertia[-1].append(str(self.Inertia_score[ga].isChecked()))
                 if self.Inertia_score[ga].isChecked():
@@ -4524,6 +5033,27 @@ class Ui_MainWindow(object):
                 social_comp[-1].append(self.Social_i[ga].text())
                 social_comp[-1].append(self.Social_end[ga].text())
 
+
+                # check if there is modifications compared to the default options (in Class_def.py)
+                opt_mod[-1] = False
+                if optim_on_meth[-1]         != False            \
+                or selection_operator[-1]    != 'Geometric_norm' \
+                or selection_options[-1]     != [0.2]            \
+                or Xover_operator[-1]        != ['simple_Xover', 'multiple_Xover', 'arith_Xover', 'heuristic_Xover'] \
+                or Xover_pct[-1]             != [10,10,20,20]    \
+                or Xover_opt[-1]             != ['','','','']    \
+                or mut_operator[-1]          != ['uniform_mutation', 'non_uniform_mutation', 'boundary_mutation'] \
+                or mut_pct[-1]               != [10,15,15]       \
+                or mut_opt[-1]               != ['','3','']      \
+                or mut_intensity[-1]         != 30               \
+                or inertia[-1][0]            != 'False'          \
+                or float(inertia[-1][1].replace(',','.'))     != 0.8              \
+                or float(inertia[-1][2].replace(',','.'))     != 0.3              \
+                or float(cogn_comp[-1][0].replace(',','.'))   != 1.6              \
+                or float(cogn_comp[-1][1].replace(',','.'))   != 2.0              \
+                or float(social_comp[-1][0].replace(',','.')) != 0.5              \
+                or float(social_comp[-1][1].replace(',','.')) != 2.0:
+                    opt_mod[-1] = True
 
 
 # ================   Simulations cases   ======================================
@@ -4880,7 +5410,7 @@ class Ui_MainWindow(object):
                 fd.write('#====> Optimization\n')
                 fd.write('n_gen              = ' + str(n_gen[ag])              + '\n')
                 fd.write('n_indiv            = ' + str(n_indiv[ag])            + '\n')
-                fd.write('error_fitness      = ' + str(error_fitness[ag])      + '\n')
+
                 fd.write('Arrh_max_variation = ' + list2txt(Arrh_max_variation[ag]) + '\n')
                 if type(self.cB_GA_meth_DRG[0]) is bool:
                     if self.cB_GA_meth_DRG[0]:
@@ -4901,42 +5431,58 @@ class Ui_MainWindow(object):
                     fd.write('optim_on_meth      = SA \n')
                     fd.write('optim_on_meth_pts  = ' +  str(self.cB_GA_meth_pts[ag].text()) + '\n')
                     fd.write('nb_r2opt            = ' + str(nb_r2opt[ag])         + '\n')
-                if opt_meth[ag] == 'GA':
-                    fd.write('sub_mech_sel        = ' + list2txt(sub_mech_sel[ag])       + '\n\n')
-                    # GA options
-                    fd.write('selection_operator  = ' + str(selection_operator[ag]) + '\n')
-                    fd.write('selection_options   = ' + list2txt(selection_options[ag])  + '\n')
-                    fd.write('Xover_operator      = ' + list2txt(Xover_operator[ag])     + '\n')
-                    fd.write('Xover_pct           = ' + list2txt(Xover_pct[ag])          + '\n')
-#                    fd.write('Xover_opt           = ' + list2txt(Xover_opt[ag])          + '\n')
-                    fd.write('mut_operator        = ' + list2txt(mut_operator[ag])       + '\n')
-                    fd.write('mut_pct             = ' + list2txt(mut_pct[ag])            + '\n')
-                    fd.write('mut_opt             = ' + list2txt(mut_opt[ag])            + '\n')
-                    fd.write('mut_intensity       = ' + str(mut_intensity[ag])           + '\n')
-                if opt_meth[ag] == 'PSO':
-                    # PSO options
-                    if 'True' in inertia[ag][0]:
-                        fd.write('inertia_score       = True \n')
-                        fd.write('inertia_min         = ' + inertia[ag][1].replace(',','.')     + '\n')
-                        fd.write('inertia_max_i       = ' + inertia[ag][2].replace(',','.')     + '\n')
-                        fd.write('inertia_max_end     = ' + inertia[ag][3].replace(',','.')     + '\n')
-                    else:
-                        fd.write('inertia_score       = False \n')
-                        fd.write('inertia_i           = ' + inertia[ag][1].replace(',','.')     + '\n')
-                        fd.write('inertia_end         = ' + inertia[ag][2].replace(',','.')     + '\n')
-                    fd.write('cognitive_accel_i   = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
-                    fd.write('cognitive_accel_end = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
-                    fd.write('social_accel_i      = ' + social_comp[ag][0].replace(',','.')     + '\n')
-                    fd.write('social_accel_end    = ' + social_comp[ag][1].replace(',','.')     + '\n\n')
+                if len(reactions2opt[ag])>0:
+                    fd.write('reactions2opt       = '     + list2txt(reactions2opt[ag])          + '\n')
+                if sub_mech_sel_mod[ag]:
+                    fd.write('sub_mech_sel        = ' + list2txt(sub_mech_sel[ag])        + '\n')
+                if restore_mech_folder[ag]:
+                    fd.write('restore_mech_folder = ' + str(restore_mech_folder[ag].split('/')[-1]) + '\n')
+                if opt_mod[ag]:
+                    if opt_meth[ag] == 'GA':
+                        # GA options
+                        fd.write('selection_operator  = ' + str(selection_operator[ag]) + '\n')
+                        fd.write('selection_options   = ' + list2txt(selection_options[ag])  + '\n')
+                        fd.write('Xover_operator      = ' + list2txt(Xover_operator[ag])     + '\n')
+                        fd.write('Xover_pct           = ' + list2txt(Xover_pct[ag])          + '\n')
+    #                    fd.write('Xover_opt           = ' + list2txt(Xover_opt[ag])          + '\n')
+                        fd.write('mut_operator        = ' + list2txt(mut_operator[ag])       + '\n')
+                        fd.write('mut_pct             = ' + list2txt(mut_pct[ag])            + '\n')
+                        fd.write('mut_opt             = ' + list2txt(mut_opt[ag])            + '\n')
+                        fd.write('mut_intensity       = ' + str(mut_intensity[ag])           + '\n')
+                    if opt_meth[ag] == 'PSO':
+                        # PSO options
+                        if 'True' in inertia[ag][0]:
+                            fd.write('inertia_score       = True \n')
+                            fd.write('inertia_min         = ' + inertia[ag][1].replace(',','.')     + '\n')
+                            fd.write('inertia_max_i       = ' + inertia[ag][2].replace(',','.')     + '\n')
+                            fd.write('inertia_max_end     = ' + inertia[ag][3].replace(',','.')     + '\n')
+                        else:
+                            fd.write('inertia_score       = False \n')
+                            fd.write('inertia_i           = ' + inertia[ag][1].replace(',','.')     + '\n')
+                            fd.write('inertia_end         = ' + inertia[ag][2].replace(',','.')     + '\n')
+                        fd.write('cognitive_accel_i   = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
+                        fd.write('cognitive_accel_end = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
+                        fd.write('social_accel_i      = ' + social_comp[ag][0].replace(',','.')     + '\n')
+                        fd.write('social_accel_end    = ' + social_comp[ag][1].replace(',','.')     + '\n')
+                    fd.write('error_fitness       = ' + str(error_fitness[ag])      + '\n')
+                elif error_fitness[ag] == 'max':
+                    fd.write('error_fitness       = ' + str(error_fitness[ag])      + '\n')
                 self.cB_GA_meth_DRG.append(False)
                 self.cB_GA_meth_SA.append(False)
                 self.cB_GA_meth_pts.append(False)
                 self.GA_label_meth_pts.append(False)
+                if fitness_tgt_pond[ag]:
+                    fd.write('fitness_weight_T    = ' + str(fit_pond_T[ag])       + '\n')
+                    fd.write('fitness_weight_ig   = ' + str(fit_pond_igt[ag])     + '\n')
+                    fd.write('fitness_weight_Sl   = ' + str(fit_pond_Sl[ag])      + '\n')
+                    fd.write('fitness_weight_K    = ' + str(fit_pond_K[ag])       + '\n')
+                    fd.write('fitness_weight_sp   = ' + list2txt(fit_pond_sp[ag]) + '\n')
+                if fitness_case_pond[ag]:
+                    fd.write('fitness_weight_cond = ' + list2txt(fit_pond_cd[ag]) + '\n')
+                fd.write('\n')
         else:
             fd.write('#===========> Op: no reduction\n')
             fd.write('operator        = NULL \n')
-
-
         for red_i in range(len(self.list_operator)):
             if self.list_operator[red_i] != 'opt':
                 op+=1
@@ -4965,7 +5511,6 @@ class Ui_MainWindow(object):
                         fd.write('epsilon_abs        = ' + str(csp_exhaust_ea[op])  +  '\n')
                         fd.write('epsilon_rel        = ' + str(csp_exhaust_er[op])  +  '\n')
                     #fd.write('csp_refin_iter     = ' + str(csp_ref_num[op])  +  '\n')
-
                 if optim[op]:
                     ag+=1
                     fd.write('optim           = '  + str(opt_meth[ag])         +  '\n')
@@ -4976,40 +5521,57 @@ class Ui_MainWindow(object):
                         fd.write('#====> Particle Swarm Optimization\n')
                         fd.write('n_it                = ' + str(n_gen[ag])              + '\n')
                     fd.write('n_indiv             = ' + str(n_indiv[ag])            + '\n')
-                    fd.write('error_fitness       = ' + str(error_fitness[ag])      + '\n')
                     fd.write('Arrh_max_variation  = ' + list2txt(Arrh_max_variation[ag]) + '\n')
-                    fd.write('optim_on_meth       = ' + str(optim_on_meth[ag])      + '\n')
+
+                    if sub_mech_sel_mod[ag]:
+                        fd.write('sub_mech_sel        = ' + list2txt(sub_mech_sel[ag])           + '\n')
                     if str(optim_on_meth[ag]) != 'False':
+                        fd.write('optim_on_meth       = ' + str(optim_on_meth[ag])      + '\n')
                         fd.write('nb_r2opt            = ' + str(nb_r2opt[ag])         + '\n')
-                    fd.write('sub_mech_sel        = ' + list2txt(sub_mech_sel[ag])       + '\n')
-                    if opt_meth[ag] == 'GA':
-                        # GA options
-                        fd.write('selection_operator  = ' + str(selection_operator[ag]) + '\n')
-                        fd.write('selection_options   = ' + list2txt(selection_options[ag])  + '\n')
-                        fd.write('Xover_operator      = ' + list2txt(Xover_operator[ag])     + '\n')
-                        fd.write('Xover_pct           = ' + list2txt(Xover_pct[ag])          + '\n')
-    #                    fd.write('Xover_opt           = ' + list2txt(Xover_opt[ag])          + '\n')
-                        fd.write('mut_operator        = ' + list2txt(mut_operator[ag])       + '\n')
-                        fd.write('mut_pct             = ' + list2txt(mut_pct[ag])            + '\n')
-                        fd.write('mut_opt             = ' + list2txt(mut_opt[ag])            + '\n')
-                        fd.write('mut_intensity       = ' + str(mut_intensity[ag])           + '\n\n')
-                    elif opt_meth[ag] == 'PSO':
-                        # PSO options
-                        if 'True' in inertia[ag][0]:
-                            fd.write('inertia_score       = True \n')
-                            fd.write('inertia_min         = ' + inertia[ag][1].replace(',','.')     + '\n')
-                            fd.write('inertia_max_i       = ' + inertia[ag][2].replace(',','.')     + '\n')
-                            fd.write('inertia_max_end     = ' + inertia[ag][3].replace(',','.')     + '\n')
-                        else:
-                            fd.write('inertia_score       = False \n')
-                            fd.write('inertia_i           = ' + inertia[ag][1].replace(',','.')     + '\n')
-                            fd.write('inertia_end         = ' + inertia[ag][2].replace(',','.')     + '\n')
-                        fd.write('cognitive_accel_i   = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
-                        fd.write('cognitive_accel_end = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
-                        fd.write('social_accel_i      = ' + social_comp[ag][0].replace(',','.')     + '\n')
-                        fd.write('social_accel_end    = ' + social_comp[ag][1].replace(',','.')     + '\n\n')
+                    if len(reactions2opt[ag])>0:
+                        fd.write('reactions2opt       = '     + list2txt(reactions2opt[ag])          + '\n')
+                    if restore_mech_folder[ag]:
+                        fd.write('import_mech         = ' + str(restore_mech_folder[ag].split('/')[-1]) + '\n')
+                    if opt_mod[ag]:
+                        if opt_meth[ag] == 'GA':
+                            # GA options
+                            fd.write('selection_operator  = ' + str(selection_operator[ag])      + '\n')
+                            fd.write('selection_options   = ' + list2txt(selection_options[ag])  + '\n')
+                            fd.write('Xover_operator      = ' + list2txt(Xover_operator[ag])     + '\n')
+                            fd.write('Xover_pct           = ' + list2txt(Xover_pct[ag])          + '\n')
+        #                    fd.write('Xover_opt           = ' + list2txt(Xover_opt[ag])          + '\n')
+                            fd.write('mut_operator        = ' + list2txt(mut_operator[ag])       + '\n')
+                            fd.write('mut_pct             = ' + list2txt(mut_pct[ag])            + '\n')
+                            fd.write('mut_opt             = ' + list2txt(mut_opt[ag])            + '\n')
+                            fd.write('mut_intensity       = ' + str(mut_intensity[ag])           + '\n')
+                        elif opt_meth[ag] == 'PSO':
+                            # PSO options
+                            if 'True' in inertia[ag][0]:
+                                fd.write('inertia_score       = True \n')
+                                fd.write('inertia_min         = ' + inertia[ag][1].replace(',','.')     + '\n')
+                                fd.write('inertia_max_i       = ' + inertia[ag][2].replace(',','.')     + '\n')
+                                fd.write('inertia_max_end     = ' + inertia[ag][3].replace(',','.')     + '\n')
+                            else:
+                                fd.write('inertia_score       = False \n')
+                                fd.write('inertia_i           = ' + inertia[ag][1].replace(',','.')     + '\n')
+                                fd.write('inertia_end         = ' + inertia[ag][2].replace(',','.')     + '\n')
+                            fd.write('cognitive_accel_i   = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
+                            fd.write('cognitive_accel_end = ' + cogn_comp[ag][0].replace(',','.')       + '\n')
+                            fd.write('social_accel_i      = ' + social_comp[ag][0].replace(',','.')     + '\n')
+                            fd.write('social_accel_end    = ' + social_comp[ag][1].replace(',','.')     + '\n')
+                        fd.write('error_fitness       = ' + str(error_fitness[ag])      + '\n')
 
-
+                    elif error_fitness[ag] == 'max':
+                        fd.write('error_fitness       = ' + str(error_fitness[ag])      + '\n')
+                    if fitness_tgt_pond[ag]:
+                        if T_check:  fd.write('fitness_weight_T    = ' + str(fit_pond_T[ag])       + '\n')
+                        if ig_check: fd.write('fitness_weight_ig   = ' + str(fit_pond_igt[ag])     + '\n')
+                        if Sl_check: fd.write('fitness_weight_Sl   = ' + str(fit_pond_Sl[ag])      + '\n')
+                        if K_check:  fd.write('fitness_weight_K    = ' + str(fit_pond_K[ag])       + '\n')
+                        fd.write('fitness_weight_sp   = ' + list2txt(fit_pond_sp[ag]) + '\n')
+                    if fitness_case_pond[ag]:
+                        fd.write('fitness_weight_cond = ' + list2txt(fit_pond_cd[ag]) + '\n')
+                    fd.write('\n')
         fd.close()
 
 
@@ -5512,10 +6074,10 @@ class Ui_MainWindow(object):
         while '> Op:' not in txt[-1] and txt[0] != '':
             txt = fs.readline().split('=')
 
-        global condition_tab_removed
+        global condition_tab_removed ; global opt_react
 
-        # get data
-        red_data_list = [] ; save_op = False ; op_n=0
+        # reduction/optimization operator
+        red_data_list = [] ; save_op = False ; op_n=0 ; opt_react = []
         while txt[0] != '':
             while '> Op:' not in txt[-1] and txt[0] != '':
                 txt[0]=txt[0].replace(' ','')
@@ -5556,10 +6118,10 @@ class Ui_MainWindow(object):
                     if txt[0] == 'n_gen':               n_gen              = int(txt[1])
                     if txt[0] == 'n_it':                n_gen              = int(txt[1])
                     if txt[0] == 'n_indiv':             n_indiv            = int(txt[1])
-                    if txt[0] == 'error_fitness':       error_fitness      = genf.clean_txt(txt[1])
                     if txt[0] == 'Arrh_max_variation':  Arrh_max_variation = genf.txt2list_float(txt[1])
                     if txt[0] == 'optim_on_meth':       optim_on_meth      = genf.clean_txt(txt[1])
                     if txt[0] == 'nb_r2opt':            nb_r2opt           = int(txt[1])
+                    if txt[0] == 'reactions2opt':       reactions2opt      = genf.txt2list_int(txt[1])
                     if txt[0] == 'selection_operator':  selection_operator = genf.clean_txt(txt[1])
                     if txt[0] == 'selection_options':   selection_options  = genf.clean_txt(txt[1])
                     if txt[0] == 'Xover_operator':      Xover_operator     = genf.txt2list_string(txt[1])
@@ -5577,11 +6139,18 @@ class Ui_MainWindow(object):
                     if txt[0] == 'inertia_max_endi'\
                     or txt[0] == 'inertia_end':         inertia_end        = float(txt[1])
                     if txt[0] == 'cognitive_accel_i':   cognitive_accel_i   = float(txt[1])
-                    if txt[0] == 'score':               score_integ         = str2bool(txt[1])
+                    if txt[0] == 'score':               score_integ         = genf.str2bool(txt[1])
                     if txt[0] == 'cognitive_accel_end': cognitive_accel_end = float(txt[1])
                     if txt[0] == 'social_accel_i':      social_accel_i      = float(txt[1])
                     if txt[0] == 'social_accel_end':    social_accel_end    = float(txt[1])
-
+                    if txt[0] == 'error_fitness':       error_fitness       = genf.clean_txt(txt[1])
+                    if txt[0] == 'fitness_weight_T':    fitness_weight_T    = genf.clean_txt(txt[1])
+                    if txt[0] == 'fitness_weight_ig':   fitness_weight_ig   = genf.clean_txt(txt[1])
+                    if txt[0] == 'fitness_weight_K':    fitness_weight_K    = genf.clean_txt(txt[1])
+                    if txt[0] == 'fitness_weight_sp':
+                        fitness_weight_sp = genf.txt2list_float(txt[1])
+                        while len(fitness_weight_sp)<n_tspc: fitness_weight_sp.append(fitness_weight_sp[-1])
+                    if txt[0] == 'fitness_weight_cond': fitness_weight_cond = genf.txt2list_float(txt[1])
 
 
                 txt = fs.readline().split('=')
@@ -5857,6 +6426,13 @@ class Ui_MainWindow(object):
                             if 'C'+str(sC+1) in sub_mech_sel: self.cB_sub_C[-1][sC].setChecked(True)
                             else:                             self.cB_sub_C[-1][sC].setChecked(False)
                         del sub_mech_sel
+
+                    if 'reactions2opt' in locals():
+                        for _r in range(len(self.mech_data.react.formula)):
+                            if _r-1 in reactions2opt:
+                                opt_react[-1][_r] = True
+
+
                     if 'error_fitness'      in locals():
                         if error_fitness=='mean': self.rB_GA_fit_1[-1].setChecked(True)
                         else:                     self.rB_GA_fit_2[-1].setChecked(True)
@@ -5865,11 +6441,11 @@ class Ui_MainWindow(object):
                     # GA options
                     if 'selection_operator' in locals():
                         if selection_operator=='Roulette':
-                            self.Box_GA_Selection[-1].setCurrentIndex(0)
-                        if selection_operator=='Rank':
                             self.Box_GA_Selection[-1].setCurrentIndex(1)
-                        if selection_operator=='Geometric_norm':
+                        if selection_operator=='Rank':
                             self.Box_GA_Selection[-1].setCurrentIndex(2)
+                        if selection_operator=='Geometric_norm':
+                            self.Box_GA_Selection[-1].setCurrentIndex(0)
                         if selection_operator=='Elitism':
                             self.Box_GA_Selection[-1].setCurrentIndex(3)
                         del selection_operator
@@ -5954,6 +6530,183 @@ class Ui_MainWindow(object):
 
 
 
+                    # --- Fit_weighting
+                    if 'fitness_weight_sp' not in locals():
+                        fitness_weight_sp = []
+                    while len(fitness_weight_sp)<n_tspc: fitness_weight_sp.append(1)
+                    fitness_weight   = copy.deepcopy(fitness_weight_sp)
+
+                    if T_check:
+                        if 'fitness_weight_T'  in locals():  fitness_weight.insert(0,fitness_weight_T);  del fitness_weight_T
+                        else:                          fitness_weight.insert(0,1)
+                    if ig_check:
+                        if 'fitness_weight_ig' in locals(): fitness_weight.insert(0,fitness_weight_ig); del fitness_weight_ig
+                        else:                          fitness_weight.insert(0,1)
+                    if Sl_check:
+                        if 'fitness_weight_Sl' in locals(): fitness_weight.insert(0,fitness_weight_Sl); del fitness_weight_Sl
+                        else:                          fitness_weight.insert(0,1)
+                    if K_check:
+                        if 'fitness_weight_K'  in locals():  fitness_weight.insert(0,fitness_weight_K); del fitness_weight_K
+                        else:                          fitness_weight.insert(0,1)
+
+                    self.tableWidget_optim[-1].setColumnCount(2)
+                    self.tableWidget_optim[-1].setRowCount(len(tspc_red))
+
+                    _translate = QtCore.QCoreApplication.translate
+                    # row titles :
+                    for r in range(len(tspc_red)):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim[-1].setVerticalHeaderItem(r, item)
+                        item = self.tableWidget_optim[-1].verticalHeaderItem(r)
+                        item.setText(_translate("MainWindow", str(r+1)))
+                    # column titles :
+                    col_title = ["Target","Weight"]
+                    for col in range(2):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim[-1].setHorizontalHeaderItem(col, item)
+                        item = self.tableWidget_optim[-1].horizontalHeaderItem(col)
+                        item.setText(_translate("MainWindow", col_title[col]))
+
+                    # fill the table
+                    for col in range(2):
+                        if col==0: txt = copy.deepcopy(tspc_red)
+                        else:      txt = copy.deepcopy(fitness_weight)
+                        for r in range(len(tspc_red)):
+                            item = QtWidgets.QTableWidgetItem()
+                            self.tableWidget_optim[-1].setItem(r, col, item)
+                            item = self.tableWidget_optim[-1].item(r, col)
+                            item.setText(_translate("MainWindow", str(txt[r])))
+
+                    idx_tab = self.tablet.indexOf(self.GA[-1])
+                    self.tablet.setCurrentIndex(idx_tab)
+
+
+
+                    # ---- construction of the new table ----
+                    # conditions number
+                    case_name = [] ; dbl_cn = False
+                    for case in range(len(self.condition_activated)):
+                        if self.condition_activated[case]:
+                            if self.rB_reactor_UV[case].isChecked(): configs   = 'reactor_UV  '
+                            elif self.rB_reactor_HP[case].isChecked(): configs = 'reactor_HP  '
+                            elif self.rB_JSR[case].isChecked(): configs        = 'JSR         '
+                            elif self.rB_PFR[case].isChecked(): configs        = 'PFR         '
+                            elif self.rB_fflame[case].isChecked(): configs     = 'free_flame  '
+                            elif  self.rB_cfflame[case].isChecked():
+                                if self.rB_cff_diff[case].isChecked(): configs = 'diff_flame  '
+                                elif self.rB_cff_pp[case].isChecked(): configs = 'pp_flame    '
+                                elif self.rB_cff_tp[case].isChecked(): configs = 'tp_flame    '
+
+                            if not self.rB_cfflame[case].isChecked():
+        #                        fuel.append(self.fuel_1[case].document().toPlainText())
+        #                        oxidant.append(self.oxidant_1[case].document().toPlainText())
+        #                        diluent.append(self.Diluent_1[case].document().toPlainText())
+        #                        diluent_ratio.append(self.Diluent_2[case].document().toPlainText())
+                                T_min  = float(self.Tmin[case].document().toPlainText())
+                                T_max  = float(self.Tmax[case].document().toPlainText())
+                                T_incr = float(self.Tincr[case].document().toPlainText())
+                                if T_incr==0: T_incr=T_max-T_min+T_max*5
+                                Ts = list(np.arange(T_min, T_max+T_incr/2, T_incr))
+                                P_min  = float(self.Pmin[case].document().toPlainText())
+                                P_max  = float(self.Pmax[case].document().toPlainText())
+                                P_incr = float(self.Pincr[case].document().toPlainText())
+                                if P_incr==0: P_incr=P_max-P_min+P_max*5
+                                Ps = list(np.arange(P_min, P_max+P_incr/2, P_incr))
+                                phi_min  = float(self.eqmin[case].document().toPlainText())
+                                phi_max  = float(self.eqmax[case].document().toPlainText())
+                                phi_incr = float(self.eqincr[case].document().toPlainText())
+                                if phi_incr==0: phi_incr=phi_max-phi_min+phi_max*5
+                                phis = list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr))
+
+                                mdots_1 = False
+                            else: # counterflow flame configuration
+                                P_min  = float(self.df_Pmin[case].document().toPlainText())
+                                P_max  = float(self.df_Pmax[case].document().toPlainText())
+                                P_incr = float(self.df_Pincr[case].document().toPlainText())
+                                Ps.append(list(np.arange(P_min, P_max+P_incr/2, P_incr)))
+                                # Burner 1
+        #                        fuel.append(self.df_fuel_1[case].document().toPlainText())
+        #                        oxidant.append(self.df_oxidant_1[case].document().toPlainText())
+        #                        diluent.append(self.df_Diluent_1[case].document().toPlainText())
+        #                        diluent_ratio.append(self.df_Diluent_r_1[case].document().toPlainText())
+                                Ts = self.df_T_1[case].document().toPlainText()
+                                phi_min  = float(self.df_eqmin_1[case].document().toPlainText())
+                                phi_max  = float(self.df_eqmax_1[case].document().toPlainText())
+                                phi_incr = float(self.df_eqincr_1[case].document().toPlainText())
+                                if phi_incr==0: phis.append([phi_min])
+                                else: phis = list(np.arange(phi_min, phi_max+phi_incr/2, phi_incr))
+                                mdot_min  = float(self.df_mdot1_1[case].document().toPlainText())
+                                mdot_max  = float(self.df_mdot2_1[case].document().toPlainText())
+                                if 'diff' in configs[-1]:
+                                    mdot_incr  = float(self.df_mdot4_1[case].document().toPlainText())
+                                elif self.df_mdot3_1[case].text() == 'error':
+                                    mdot_incr  = 0
+                                else:
+                                    mdot_incr  = float(self.df_mdot3_1[case].text())
+                                if mdot_incr==0: mdot_incr=mdot_max-mdot_min+mdot_max*5
+                                mdots_1 = list(np.arange(mdot_min, mdot_max+mdot_min/2, mdot_incr))
+                            # Conditions name
+                            for phi in phis:
+                                for P in Ps:
+                                    if 'JSR' not in configs:
+                                        for T in Ts:
+                                            if mdots_1:
+                                                for mdot in mdots_1:
+                                                    case_name.append(configs+' phi='+str(phi)\
+                                                                     +' T='+str(np.round(float(T)))\
+                                                                     +'K p='+str(np.round(float(P)))\
+                                                                     +'Pa m_dot='+str(np.round(float(mdot)))+'kg/m2/s')
+                                            else:
+                                                case_name.append(configs+' phi='+str(phi)\
+                                                                 +' T='+str(np.round(float(T)))\
+                                                                 +'K p='+str(np.round(float(P)))+'Pa')
+                                    else:
+                                        case_name.append(configs+' phi='+str(phi)\
+                                                         +' T='+str(np.round(float(T_min)))+'-'\
+                                                         +str(np.round(float(T_max)))+'K p='+str(np.round(float(P)))+'Pa')
+
+                            # check if the case_name already exist
+                            for _case in range(len(case_name)-1):
+                                if case_name[-1] == case_name[_case]:
+                                    dbl_cn = True
+
+                    num_cond = len(case_name)
+
+                    self.tableWidget_optim_cd[-1].setColumnCount(2)
+                    self.tableWidget_optim_cd[-1].setRowCount(num_cond)
+
+                    _translate = QtCore.QCoreApplication.translate
+                    # row titles :
+                    for r in range(num_cond):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim_cd[-1].setVerticalHeaderItem(r, item)
+                        item = self.tableWidget_optim_cd[-1].verticalHeaderItem(r)
+                        item.setText(_translate("MainWindow", str(r+1)))
+                    # column titles :
+                    col_title = ["Condition","Weight"]
+                    for col in range(2):
+                        item = QtWidgets.QTableWidgetItem()
+                        self.tableWidget_optim_cd[-1].setHorizontalHeaderItem(col, item)
+                        item = self.tableWidget_optim_cd[-1].horizontalHeaderItem(col)
+                        item.setText(_translate("MainWindow", col_title[col]))
+
+                    # fill the table
+                    if 'fitness_weight_cond' not in locals():
+                        fitness_weight_cond = []
+                    while len(fitness_weight_cond)<num_cond: fitness_weight_cond.append(1)
+
+                    for col in range(2):
+                        if col==0: txt = copy.deepcopy(case_name)
+                        else:      txt = copy.deepcopy(fitness_weight_cond)
+                        for r in range(num_cond):
+                            item = QtWidgets.QTableWidgetItem()
+                            self.tableWidget_optim_cd[-1].setItem(r, col, item)
+                            item = self.tableWidget_optim_cd[-1].item(r, col)
+                            item.setText(_translate("MainWindow", str(txt[r])))
+
+                    idx_tab = self.tablet.indexOf(self.GA[-1])
+                    self.tablet.setCurrentIndex(idx_tab)
+
                 del optim
                 save_op = False
 
@@ -5962,6 +6715,7 @@ class Ui_MainWindow(object):
 
 
     def run_reduction(self):
+        global version
         self.write_parameters(False)
         genf.main_redopt_algo('last_condition.inp',self.WD_path,version)
 
@@ -5995,9 +6749,6 @@ def get_wd_folder(WD_p=True, WD_n=True):
     return WD_path, WD_name
 
 
-
-
-
 def list2txt(_list):
     _txt = str(_list)
     _txt  = _txt.replace('[','')
@@ -6025,6 +6776,101 @@ class Files_windows(QtWidgets.QWidget):
         self.show()
 
 
+class mech_windows(QtWidgets.QMainWindow):
+    def __init__(self,mech_data,opt_n,parent=None):
+
+        super(mech_windows, self).__init__(parent)
+        _translate = QtCore.QCoreApplication.translate
+        global sz_w
+        global sz_h
+        global opt_react
+        global wind_reac_open
+        global opt_react
+        wind_reac_open = True
+
+        self.setObjectName("Reactions to modify")
+        self.resize(790*sz_w, 671*sz_h)
+        self.scrollArea_meca = QtWidgets.QScrollArea(self)
+        self.scrollArea_meca.setGeometry(QtCore.QRect(0, 0, 767*sz_w, 581*sz_h))
+        self.scrollArea_meca.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scrollArea_meca.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scrollArea_meca.setWidgetResizable(False)
+        self.scrollArea_meca.setObjectName("scrollArea_opt")
+        self.scroll_meca_Contents = QtWidgets.QWidget(self)
+        self.scroll_meca_Contents.setGeometry(QtCore.QRect(0, 0, 765*sz_w, 20+len(mech_data.react.formula)*15.02*sz_h))
+        self.scroll_meca_Contents.setObjectName("mec_scroll")
+        self.scrollArea_meca.setWidget(self.scroll_meca_Contents)
+        self.cB_opt_r = []
+        if len(opt_react[opt_n])!=len(mech_data.react.formula):
+            opt_react[opt_n] = []
+            for _r in range(len(mech_data.react.formula)):
+                opt_react[opt_n].append(False)
+
+        for _r in range(len(mech_data.react.formula)):
+            self.cB_opt_r.append(QtWidgets.QCheckBox(self.scroll_meca_Contents))
+            self.cB_opt_r[_r].setGeometry(QtCore.QRect(10*sz_w, 10*sz_h+15*sz_h*_r, 600*sz_w, 22*sz_h))
+            self.cB_opt_r[_r].setObjectName("cB_opt_"+str(_r))
+            self.cB_opt_r[_r].setText(_translate("MainWindow", '(' + str(_r+1) + ')   ' +  mech_data.react.formula[_r]))
+            self.cB_opt_r[_r].setChecked(opt_react[opt_n][_r])
+
+        self.pB_cancel = QtWidgets.QPushButton(self)
+        self.pB_cancel.setGeometry(QtCore.QRect(110*sz_w, 600*sz_h, 100*sz_w, 25*sz_h))
+        self.pB_cancel.setObjectName("pB_cancel")
+        self.pB_cancel.setText(_translate("MainWindow", "Cancel"))
+        self.pB_cancel.clicked.connect(lambda: self.cancel_mod(opt_n))
+
+        self.pB_clear = QtWidgets.QPushButton(self)
+        self.pB_clear.setGeometry(QtCore.QRect(220*sz_w, 600*sz_h, 100*sz_w, 25*sz_h))
+        self.pB_clear.setObjectName("pB_clear")
+        self.pB_clear.setText(_translate("MainWindow", "Clear"))
+        self.pB_clear.clicked.connect(lambda: self.clear_win(opt_n))
+
+        self.pB_close = QtWidgets.QPushButton(self)
+        self.pB_close.setGeometry(QtCore.QRect(330*sz_w, 600*sz_h, 100*sz_w, 25*sz_h))
+        self.pB_close.setObjectName("pB_close")
+        self.pB_close.setText(_translate("MainWindow", "Close"))
+        self.pB_close.clicked.connect(self.close_win)
+
+        self.pB_saveandexit = QtWidgets.QPushButton(self)
+        self.pB_saveandexit.setGeometry(QtCore.QRect(440*sz_w, 600*sz_h, 100*sz_w, 25*sz_h))
+        self.pB_saveandexit.setObjectName("pB_saveandexit")
+        self.pB_saveandexit.setText(_translate("MainWindow", "Save and exit"))
+        self.pB_saveandexit.clicked.connect(lambda: self.saveandexit(opt_n))
+
+
+    def close_win(self):
+        global wind_reac_open
+        wind_reac_open = False
+        self.close()
+
+    def cancel_mod(self,opt_n):
+        global opt_react
+        for _r in range(len(self.cB_opt_r)):
+            self.cB_opt_r[_r].setChecked(opt_react[opt_n][_r])
+
+    def clear_win(self,opt_n):
+        global opt_react
+        for _r in range(len(self.cB_opt_r)):
+            self.cB_opt_r[_r].setChecked(False)
+
+    def saveandexit(self,opt_n):
+        global opt_react
+        global wind_reac_open
+
+        for _r in range(len(self.cB_opt_r)):
+            if self.cB_opt_r[_r].isChecked():
+                opt_react[opt_n][_r] = True
+            else:
+                opt_react[opt_n][_r] = False
+
+        wind_reac_open = False
+        self.close()
+
+#    def closeEvent(self, event):
+#         print("Close")
+
+
+
 def display_gui(WD_path, WD_name, root_path):
 #if __name__ == "__main__":
     import sys
@@ -6034,4 +6880,6 @@ def display_gui(WD_path, WD_name, root_path):
     ui.setupUi(MainWindow, WD_path, WD_name, root_path)
     MainWindow.show()
     sys.exit(app.exec_())
+
+
 

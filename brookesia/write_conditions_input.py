@@ -155,7 +155,7 @@ inter_sp_inter  = True
 #===========> Op: DRG_r
 operator        = DRG_r
 eps             = 0.02
-delta_eps       = 0.0
+delta_eps       = 0.01
 n_points        = 10.0
 max_error_sp    = 30.0, 30.0, 30.0
 max_error_T     = 30.0
@@ -576,7 +576,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = CSP_C0_r_ff
-mech              = C0_H2_Law.cti
+mech              = C0_Konnov.cti
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -654,7 +654,7 @@ time_resolution = 1e-7
 main_path         = 8_C1_CSPr_b
 mech              = C1_GRI30.cti
 verbose           = 4
-show_plots        = True
+show_plots        = False
 write_ck          = True
 tspc              = CH4, CO2, CO, OH
 T_check           = True

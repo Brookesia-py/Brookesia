@@ -283,6 +283,7 @@ class conditions :
         self.import_data = False
         self.conc_unit   = "volumic_concentration" # molar_fraction
         self.mech_prev_red = False
+        self.fit_coeff     = 1
 
 
 
@@ -383,7 +384,7 @@ class Errors:
         mp = conditions.main_path
 
         # main variables
-        gas_ref           = conditions.composition.gas
+        gas_ref           = conditions.composition.gas_ref
 #        gas_red           = red_data.gas_loop
         tspc              = red_data.tspc
         n_tspc            = red_data.n_tspc
@@ -2367,9 +2368,11 @@ class Mech_data:
 
 class Optim_param :
     def __init__(self, tsp, n_tspc, n_gen=20,n_ind=50, \
-         selection_operator=1,      selection_options=[],   \
-         Xover_operator=[1,2,3,4], Xover_pct = [15,30,30,30],   \
-         mut_operator=[2,3,4], mut_pct=[15,30,30], mut_intensity=[30], mut_option=[3],\
+         selection_operator='Geometric_norm',      selection_options=[0.2],   \
+         Xover_operator=['simple_Xover', 'multiple_Xover', 'arith_Xover', 'heuristic_Xover'], \
+         Xover_pct = [10,10,20,20],   \
+         mut_operator=['uniform_mutation', 'non_uniform_mutation', 'boundary_mutation'], \
+         mut_pct=[10,15,15], mut_intensity=30, mut_option=[0,3,0],\
          optim_on_meth='False', Arrh_max_variation=10,nb_r2opt=30):
 
 
@@ -2385,13 +2388,13 @@ class Optim_param :
         self.mut_intensity        = mut_intensity
         self.mut_option           = mut_option
         # PSO options
-        self.inertia_score        = True
+        self.inertia_score        = False
         self.inertia_min          = 0.2
-        self.inertia_i            = 1.5
-        self.inertia_end          = 0.4
-        self.cognitive_accel_i    = 1.7
-        self.cognitive_accel_end  = 0.9
-        self.social_accel_i       = 0
+        self.inertia_i            = 0.8
+        self.inertia_end          = 0.3
+        self.cognitive_accel_i    = 1.6
+        self.cognitive_accel_end  = 2.0
+        self.social_accel_i       = 0.5
         self.social_accel_end     = 2
 
 
@@ -2410,6 +2413,7 @@ class Optim_param :
         self.coeff_ig             = 1
         self.coeff_Sl             = 1
         self.coeff_K              = 1
+        self.coeff_cond           = False
         self.genVec               = []
         self.best_fitness         = []
         self.mean_fitness         = []
@@ -2992,28 +2996,30 @@ class ProgressBar:
 
     def update(self, val,val2=''):
 
-        # format
-        if val > self.valmax: val = self.valmax
+        # progress bar deactivated on Windows
+        if os.name != 'nt':
+            # format
+            if val > self.valmax: val = self.valmax
 
-        # process
-        perc  = np.round((float(val) / float(self.valmax)) * 100)
-        scale = 100.0 / float(self.maxbar)
-        bar   = int(perc / scale)
+            # process
+            perc  = np.round((float(val) / float(self.valmax)) * 100)
+            scale = 100.0 / float(self.maxbar)
+            bar   = int(perc / scale)
 
-        # render
-        out = '\r%2s %s [%s%s] %3d %% %s' % (self.title, str(val2),'=' * bar, ' ' * (self.maxbar - bar), perc,'      ')
+            # render
+            out = '\r%2s %s [%s%s] %3d %% %s' % (self.title, str(val2),'=' * bar, ' ' * (self.maxbar - bar), perc,'      ')
 
-        try:
-            get_ipython().profile
-            sys.stdout.write(out)
-            #Extinction du curseur
-            # not on Mac
-            if platform.system()!='Darwin':
-                os.system('setterm -cursor off')
-            #Rafraichissement de la barre
-            sys.stdout.flush()
-        except Exception:
-            pass
+            try:
+                get_ipython().profile
+                sys.stdout.write(out)
+                #Extinction du curseur
+                # not on Mac
+                if platform.system()!='Darwin':
+                    os.system('setterm -cursor off')
+                #Rafraichissement de la barre
+                sys.stdout.flush()
+            except Exception:
+                pass
 
 
 

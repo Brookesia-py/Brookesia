@@ -610,7 +610,7 @@ class Chromosome:
         if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
         # --------------------------------------------------------------------------------
 
-        qoi_tot = [] ; pond=0
+        qoi_tot = [] ; pond=0 ; qoi_tot_mean=0
         for i in range(len(conditions_list)):
 
             # -------------------------------
@@ -635,27 +635,41 @@ class Chromosome:
             errors = cdef.Errors(conditions,ref_results,Opt_results,\
                                  optim_param)
 
+            # Condition fitness weighting
+            if optim_param.coeff_cond:  coeff_cond = optim_param.coeff_cond[i]
+            else:                       coeff_cond = 1
+
             for sp in range(optim_param.n_tspc):
                 if errors.qoi_s[sp]:
-                    qoi_tot.append(errors.qoi_s[sp])
-                    pond+=optim_param.coeff_s[sp]
+                    pond_i = optim_param.coeff_s[sp]*coeff_cond
+                    qoi_tot_mean += errors.qoi_s[sp]*pond_i
+                    qoi_tot.append(errors.qoi_s[sp]*min(1,np.ceil(pond_i)))
+                    pond+=pond_i
             if 'JSR' not in conditions.config and T_check  and errors.qoi_T:
-                qoi_tot.append(errors.qoi_T)
-                pond+=optim_param.coeff_T
+                pond_i = optim_param.coeff_T*coeff_cond
+                qoi_tot_mean += errors.qoi_T*pond_i
+                qoi_tot.append(errors.qoi_T*min(1,np.ceil(pond_i)))
+                pond+=pond_i
             if 'reactor' in conditions.config and ig_check and errors.qoi_ig:
-                qoi_tot.append(errors.qoi_ig)
-                pond+=optim_param.coeff_ig
+                pond_i = optim_param.coeff_ig*coeff_cond
+                qoi_tot_mean += errors.qoi_ig*pond_i
+                qoi_tot.append(errors.qoi_ig*min(1,np.ceil(pond_i)))
+                pond+=pond_i
             if 'free_flame' in conditions.config and Sl_check and errors.qoi_Sl:
-                qoi_tot.append(errors.qoi_Sl)
-                pond+=optim_param.coeff_Sl
+                pond_i = optim_param.coeff_Sl*coeff_cond
+                qoi_tot_mean += errors.qoi_Sl*pond_i
+                qoi_tot.append(errors.qoi_Sl*min(1,np.ceil(pond_i)))
+                pond+=pond_i
             if ('diff_flame' in conditions.config or 'pp_flame' in conditions.config) and K_check and errors.qoi_K:
-                qoi_tot.append(errors.qoi_K)
-                pond+=optim_param.coeff_K
+                pond_i = optim_param.coeff_K*coeff_cond
+                qoi_tot_mean += errors.qoi_K*pond_i
+                qoi_tot.append(errors.qoi_K*min(1,np.ceil(pond_i)))
+                pond+=pond_i
 
         if 'no data' in qoi_tot:  qoi_tot.remove('no data')
         if conditions.error_param.error_type_fit == 'mean':
 #             self.fitness = 1/(np.sum(qoi_tot)/pond)
-             fitness = 1/(np.sum(qoi_tot)/pond)
+             fitness = 1/(qoi_tot_mean/pond)
         elif conditions.error_param.error_type_fit == 'max':
              fitness = 1/np.max(qoi_tot)
 
