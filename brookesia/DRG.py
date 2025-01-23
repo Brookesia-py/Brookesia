@@ -19,12 +19,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import os
 import numpy as np
 import time as timer
 import brookesia.Class_def as cdef
 from  brookesia.Class_def import print_
 import multiprocessing
-import os
+import cantera as ct
+# multiprocessing.set_start_method('spawn')
 
 
 
@@ -40,7 +42,7 @@ def dic_par(dic_par_arg_i):
     ns              = dic_par_arg[0]
     nr              = dic_par_arg[1]
     react_activ     = dic_par_arg[2]
-    spec_activ            = dic_par_arg[3]
+    spec_activ      = dic_par_arg[3]
     nu              = dic_par_arg[4]
 #    nu_f            = dic_par_arg[5]
 #    nu_r            = dic_par_arg[6]
@@ -117,8 +119,12 @@ def dic(red_data,mech_data,results):
     ns = gas_ref.n_species                      # number of species
     nr = gas_ref.n_reactions                    # number of elementary reactions
     # stoechiometric coefficients : direct, reverse, net
-    nu_f = gas_ref.reactant_stoich_coeffs()
-    nu_r = gas_ref.product_stoich_coeffs()
+    if int(ct.__version__[0])>2:
+        nu_f = gas_ref.reactant_stoich_coeffs
+        nu_r = gas_ref.product_stoich_coeffs
+    else:
+        nu_f = gas_ref.reactant_stoich_coeffs()
+        nu_r = gas_ref.product_stoich_coeffs()
     nu = nu_f - nu_r
 
     kronecker = np.zeros((ns,nr))
@@ -152,6 +158,8 @@ def dic(red_data,mech_data,results):
 
     dic=[]
     if os.name == 'nt': multiprocessing.get_context('spawn')
+    # print('\n\n\n\n\n\============================================\n' + __name__ + '\n\n\n\n')
+    # if __name__ == "__main__":
     with multiprocessing.Pool(num_cores) as p:
         dic=p.map(dic_par, dic_par_arg_i)
 
@@ -179,7 +187,7 @@ def dic(red_data,mech_data,results):
 
     del interactionCoefficients
 
-    if red_data.write_results:
+    if red_data.red_op.write_results:
         write_sensitivities(red_data,results,drg_i)
 
     return red_data
@@ -209,8 +217,12 @@ def ric(red_data, mech_data, red_results):
 
     n_tsp     = len(tsp_idx)
 
-    nu_f = gas_ref.reactant_stoich_coeffs()
-    nu_r = gas_ref.product_stoich_coeffs()
+    if int(ct.__version__[0])>2:
+        nu_f = gas_ref.reactant_stoich_coeffs
+        nu_r = gas_ref.product_stoich_coeffs
+    else:
+        nu_f = gas_ref.reactant_stoich_coeffs()
+        nu_r = gas_ref.product_stoich_coeffs()
     nu = nu_f - nu_r
 
     r_interCoeff =  np.zeros((n_tsp,n_r_ref))
@@ -579,8 +591,12 @@ def reactionWithdrawal(mech_data,red_data,red_method,eps_r,conditions,active_spe
     n_sp_ref  = gas_ref.n_species
     n_r_ref   = gas_ref.n_reactions
 
-    nu_f =gas_ref.reactant_stoich_coeffs()
-    nu_r =gas_ref.product_stoich_coeffs()
+    if int(ct.__version__[0])>2:
+        nu_f = gas_ref.reactant_stoich_coeffs
+        nu_r = gas_ref.product_stoich_coeffs
+    else:
+        nu_f = gas_ref.reactant_stoich_coeffs()
+        nu_r = gas_ref.product_stoich_coeffs()
 #    nu = nu_f-nu_r
 
 
@@ -721,9 +737,8 @@ def reactionWithdrawal(mech_data,red_data,red_method,eps_r,conditions,active_spe
                                 break
 
     # check threebody exception (+AR) (+HE) etc.
-    for r in range(len(mech_data.react.formula)):
-        if mech_data.react.type[r]=="falloff_reaction" \
-        and type(mech_data.react.tbe[r]) is str:
+    for r in range(len(mech_data.react.equation)):
+        if type(mech_data.react.tbe[r]) is str:
             for sp in range(len(mech_data.spec.name)):
                 if mech_data.react.tbe[r]==mech_data.spec.name[sp]\
                 and not active_species[sp]:

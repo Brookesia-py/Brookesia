@@ -28,10 +28,12 @@ import time as timer
 import os
 import sys
 import pandas as pd
+from contextlib import redirect_stdout
 
 def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                                           # act_sp and act_r used if previous red mech given
     mp = conditions.main_path
+    path_lm = '/dev/null' ; path_w = 'nul'
 
     # set language parameters (for xml cantera files)
     import locale as lc
@@ -52,7 +54,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         # Main variables
         gas            = conditions.composition.gas
         tol_ss         = conditions.simul_param.tol_ss
-        tol_ts         = conditions.simul_param.tol_ts
+        tol_ts         = [conditions.simul_param.rtol_ts, conditions.simul_param.atol_ts]
         xmax           = conditions.simul_param.end_sim
 
         if not conditions.exp_data:
@@ -71,8 +73,13 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
         loglevel = 0
         gas.TPX = conditions.state_var.T,conditions.state_var.P,conditions.composition.X
+        try:
+            gas.transport_model = conditions.simul_param.transport_model
+        except :
+            gas.transport_model = "mixture-averaged"
+            print_('Error: Unrecognized transport model "' + conditions.simul_param.transport_model + '"',mp)    
         if 'free' in conditions.config:
-            f = ct.FreeFlame(gas, flam_initial_grid)
+            f = ct.FreeFlame(gas, width=xmax)
             f.inlet.X = conditions.composition.X
             f.inlet.T = conditions.state_var.T
             f.flame.P = conditions.state_var.P
@@ -85,13 +92,16 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             T_prof = np.array(conditions.simul_param.T_profile)
             f.flame.set_fixed_temp_profile(z,T_prof)
         try:
-            gas.transport_model = conditions.simul_param.transport_model
             f.transport_model = conditions.simul_param.transport_model
         except :
-            print_("Unrecognized transport model. Proceeding with Mix model : ",mp)
-            f.transport_model = "Mix"
-        f.flame.set_steady_tolerances(default=tol_ss)
-        f.flame.set_transient_tolerances(default=tol_ts)
+            print_("Proceeding with mixture-averaged model : ",mp)
+            f.transport_model = "mixture-averaged"
+            tol_ts = [1.0e-3, 1.0e-6]  # [rtol atol] for time stepping
+
+        f.flame.set_steady_tolerances(default=[1.0e-5, 1.0e-8])
+        f.flame.set_transient_tolerances(default=[1.0e-3, 1.0e-6])
+        f.set_max_jac_age(10, 10)
+        f.set_time_step(1e-5, [2, 5, 10, 20])
 
 
         simul_success = False
@@ -108,50 +118,67 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
             flame_file = False
             for _file in os.listdir('.'):
-                if conditions.num in _file[0:3]:
-                    flame_file = _file
-                    break
-            if flame_file:
-                if verbose >2:
-                    print_('Restored file: ' + flame_file, mp)
-                    # -----
-                    # supress console output during the simulation
-                if verbose<9:
-                    old_stdout = sys.stdout ; old_stderr = sys.stderr
-                    with open(os.devnull, "w") as devnull:
-                        sys.stdout = devnull ; sys.stderr = devnull
-                # -----
-
                 try:
-                    try:
-                        f.restore(flame_file, 'ref_solution')
-                    except:
-                        f.restore(flame_file, 'solution')
-
-                    os.chdir(conditions.main_path)
-
-                    f.solve(auto = False, loglevel = 0, refine_grid = False)
-                    simul_success = True
-
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 6:
-                        print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+                    if int(conditions.num.split('_')[0]) == int(_file.split('_')[0]):
+                        flame_file = _file
+                        break
                 except:
-                    simul_success = False
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 3:
-                        print("\n     WARNING: No solution found starting from the restored file\n",mp)
+                    a=0
+            if flame_file:
+                if int(ct.__version__[0])>2 and flame_file[-4 :]=='.xml':
+                    print_('Error: Restoring from XML no longer supported with cantera >= 3.0.',mp)
+                else:
+                    if verbose >2:
+                        print_('Restored file: ' + flame_file, mp)
+                        # -----
+                        # supress console output during the simulation
+                    # if verbose<9:
+                    #     old_stdout = sys.stdout ; old_stderr = sys.stderr
+                    #     with open(os.devnull, "w") as devnull:
+                    #         sys.stdout = devnull ; sys.stderr = devnull
+                    # -----
+    
+                    try:
+                        if verbose<9: 
+                            with open(path_lm, 'w') as fnull:  
+                                with redirect_stdout(fnull):
+                                    try: 
+                                        f.restore(flame_file, 'ref_solution')
+                                    except:
+                                        f.restore(flame_file, 'solution')
+                        else:
+                            try: 
+                                f.restore(flame_file, 'ref_solution')
+                            except:
+                                f.restore(flame_file, 'solution')
+
+                        os.chdir(conditions.main_path)
+    
+                        f.solve(auto = False, loglevel = 0, refine_grid = False)
+                        simul_success = True
+    
+                        # ---- restore console output
+                        # if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                        
+                        if verbose >= 6:
+                            print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+                    except:
+                        simul_success = False
+                        # ---- restore console output
+                        # if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+                        if verbose >= 3:
+                            print("\n     WARNING: No solution found starting from the restored file\n")
 
         if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
             # Grid refinement
             ##  energy disabled
+            if verbose >= 3 and conditions.simul_param.restore_flame:
+                print("Try from scratch with progressive mesh refinement ")
             f.energy_enabled = False
-            f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
+            f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
     #        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
             f.solve(loglevel, refine_grid)
-            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            if verbose >=5 : print_("(energy disabled) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
             ##  energy enabled
             if 'burner' not in conditions.config:
@@ -159,17 +186,22 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 _auto            = True
             else: _auto = False
 
-            f.set_refine_criteria(ratio = 7.0, slope = 1, curve = 1)
-            f.solve(loglevel, auto = _auto)
-            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
+            f.solve(loglevel)
+            if verbose >=5 : print_("(energy enabled 1) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            f.set_refine_criteria(ratio = 5.0, slope = 0.5, curve = 0.5)
-            f.solve(loglevel, auto = _auto)
-            if verbose >=5 : print_("Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            f.set_refine_criteria(ratio = 10.0, slope = 0.9, curve = 0.9)
+            f.solve(loglevel)
+            if verbose >=5 : print_("(energy enabled 2) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
+            f.set_refine_criteria(ratio=2.0, slope=0.5, curve=0.5)
             #f.set_refine_criteria(ratio=4.0, slope=0.4, curve=0.4, prune=0.01)
 
+            f.solve(loglevel)
+            if verbose >=5 : print_("(energy enabled 3)  Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+
+
+            f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
             f.solve(loglevel, auto = _auto)
             if verbose >=2 : print_("1- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
@@ -178,6 +210,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             curve_ff = conditions.simul_param.curve_ff
             prune_ff = conditions.simul_param.prune_ff
             f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
+            f.flame.set_steady_tolerances(default=tol_ss)
+            f.flame.set_transient_tolerances(default=tol_ts)
             f.solve(loglevel, refine_grid)
             if verbose >=2 : print_("2- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
@@ -221,7 +255,11 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.Sl      = f.u[0]
+        try:
+            results.Sl      = f.u[0]          # for cantera version <= 2.4
+        except:
+            results.Sl      = f.velocity[0]
+
         results.f       = f
         results.r_rate  = r_rate
 
@@ -233,16 +271,19 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         if 'Flame_ref_results' not in os.listdir():
             os.mkdir('Flame_ref_results')
         os.chdir('Flame_ref_results')
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'ff_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            + end_file
         else:
             fn = conditions.num+'ff_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            + end_file
+
         f.save(fn,'ref_solution')
         os.chdir(conditions.main_path)
 
@@ -257,7 +298,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         # Main variables
         gas   = conditions.composition.gas
         tol_ss         = conditions.simul_param.tol_ss
-        tol_ts         = conditions.simul_param.tol_ts
+        tol_ts         = [conditions.simul_param.rtol_ts, conditions.simul_param.atol_ts]
 
         width = conditions.simul_param.end_sim
 
@@ -350,32 +391,34 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     # -----
                     # supress console output during the simulation
                 if verbose<9:
-                    old_stdout = sys.stdout ; old_stderr = sys.stderr
-                    with open(os.devnull, "w") as devnull:
-                        sys.stdout = devnull ; sys.stderr = devnull
-                # -----
-
-                try:
+                    with open(path_lm, 'w') as fnull:  
+                        with redirect_stdout(fnull):
+                            try:
+                                try:
+                                    f.restore(flame_file, 'ref_solution')
+                                except:
+                                    f.restore(flame_file, 'solution')
+                                os.chdir(conditions.main_path)
+                                f.solve(auto = False, loglevel = 0, refine_grid = False)
+                                simul_success = True
+                            except:
+                                simul_success = False
+                else:
                     try:
-                        f.restore(flame_file, 'ref_solution')
+                        try:
+                            f.restore(flame_file, 'ref_solution')
+                        except:
+                            f.restore(flame_file, 'solution')
+                        os.chdir(conditions.main_path)
+                        f.solve(auto = False, loglevel = 0, refine_grid = False)
+                        simul_success = True
                     except:
-                        f.restore(flame_file, 'solution')
+                        simul_success = False
 
-                    os.chdir(conditions.main_path)
-
-                    f.solve(auto = False, loglevel = 0, refine_grid = False)
-                    simul_success = True
-
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 6:
-                        print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
-                except:
-                    simul_success = False
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 3:
-                        print("\n     WARNING: No solution found starting from the restored file\n",mp)
+                if not simul_success and verbose >= 3:
+                    print("\n     WARNING: No solution found starting from the restored file\n",mp)
+                if simul_success and verbose >= 6:
+                    print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
 
 
         if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
@@ -477,16 +520,18 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         os.chdir('Flame_ref_results')
         if 'diff' in conditions.config: phi = 'diff'
         else: phi = '%.2f' %conditions.composition.phi
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'cf_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            + end_file
         else:
             fn = conditions.num+'cf_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            + end_file
         f.save(fn,'ref_solution')
 
 
@@ -514,12 +559,11 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
             # Restore initial solution
             if verbose<8:
-                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-            f.restore(fn, 'ref_solution')
-            if verbose<8: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
-
-
+                with open(path_lm, 'w') as fnull:  
+                    with redirect_stdout(fnull):
+                        f.restore(fn, 'ref_solution')
+            else:
+                f.restore(fn, 'ref_solution')
 
             strain_accuracy = conditions.error_param.strain_accuracy
             if conditions.simul_param.par_ind: Ki = conditions.simul_param.par_ind
@@ -546,13 +590,13 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
                     # supress console output during the simulation
                     if verbose<9:
-                        old_stdout = sys.stdout ; old_stderr = sys.stderr
-                        with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                    if first_it: f.restore(fn, 'ref_solution')
-                    else:        f.restore(fnKi, 'solution')
-
-#                    if n!=0: f.restore(fn, 'solution')
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+                        with open(path_lm, 'w') as fnull:  
+                            with redirect_stdout(fnull):
+                                if first_it: f.restore(fn, 'ref_solution')
+                                else:        f.restore(fnKi, 'solution')
+                    else:
+                        if first_it: f.restore(fn, 'ref_solution')
+                        else:        f.restore(fnKi, 'solution')
                     n += 1
 
                     # Create an initial guess based on the previous solution
@@ -563,19 +607,33 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     f.fuel_inlet.mdot *= strain_factor ** exp_mdot_a
                     f.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
                     # Update velocities
-                    f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
-                    f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
-                    # Update pressure curvature
+                    try:
+                        # for cantera version < 2.5
+                        f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
+                        f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
+                    except:
+                        f.set_profile('velocity', normalized_grid, f.velocity * strain_factor ** exp_u_a)
+                        f.set_profile('spread_rate', normalized_grid, f.spread_rate * strain_factor ** exp_V_a)
+
+                    # Update pressure curvature (=(1/r)(dP/dr))
                     f.set_profile('lambda', normalized_grid, f.L * strain_factor ** exp_lam_a)
                     try:
                         # Try solving the flame
                         f.solve(loglevel=0)
                         if verbose<9:
-                            old_stdout = sys.stdout ; old_stderr = sys.stderr
-                            with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                        f.save(fnKi,'solution')
-                        first_it = False
-                        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+                            with open(path_lm, 'w') as fnull:  
+                                with redirect_stdout(fnull):
+                                    if int(ct.__version__[0])>2:
+                                        f.save(fnKi,'solution',overwrite=True)
+                                    else:
+                                        f.save(fnKi,'solution')
+                                    first_it = False
+                        else:
+                            if int(ct.__version__[0])>2:
+                                f.save(fnKi,'solution',overwrite=True)
+                            else:
+                                f.save(fnKi,'solution')
+                            first_it = False
                         strain_factor=1+it_strain ;
                         if not restart_sim:
                             strain_rate = f.strain_rate('max') # the maximum axial strain rate
@@ -614,7 +672,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
         gas         = conditions.composition.gas
         tol_ss      = conditions.simul_param.tol_ss
-        tol_ts      = conditions.simul_param.tol_ts
+        tol_ts      = [conditions.simul_param.rtol_ts, conditions.simul_param.atol_ts]
         width       = conditions.simul_param.end_sim
 
         ratio = conditions.simul_param.ratio_ff
@@ -663,32 +721,43 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     # -----
                     # supress console output during the simulation
                 if verbose<9:
-                    old_stdout = sys.stdout ; old_stderr = sys.stderr
-                    with open(os.devnull, "w") as devnull:
-                        sys.stdout = devnull ; sys.stderr = devnull
-                # -----
+                    with open(path_lm, 'w') as fnull:  
+                        with redirect_stdout(fnull):
+                            try:
+                                try:
+                                    f.restore(flame_file, 'ref_solution')
+                                except:
+                                    f.restore(flame_file, 'solution')
 
-                try:
+                                try:
+                                    os.chdir(conditions.main_path)
+                                    f.solve(auto = False, loglevel = 0, refine_grid = False)
+                                    simul_success = True
+                                except:
+                                    simul_success = False
+                            except:
+                                simul_success = False
+                else:
                     try:
-                        f.restore(flame_file, 'ref_solution')
+                        try:
+                            f.restore(flame_file, 'ref_solution')
+                        except:
+                            f.restore(flame_file, 'solution')
+
+                        try:
+                            os.chdir(conditions.main_path)
+                            f.solve(auto = False, loglevel = 0, refine_grid = False)
+                            simul_success = True
+                        except:
+                            simul_success = False
                     except:
-                        f.restore(flame_file, 'solution')
-
-                    os.chdir(conditions.main_path)
-
-                    f.solve(auto = False, loglevel = 0, refine_grid = False)
-                    simul_success = True
-
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 6:
-                        print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
-                except:
-                    simul_success = False
-                    # ---- restore console output
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                    if verbose >= 3:
-                        print("\n     WARNING: No solution found starting from the restored file\n",mp)
+                        simul_success = False
+                        
+                if simul_success and verbose >= 6:
+                    print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+                elif not simul_success and verbose >= 3:
+                    print("\n     WARNING: No solution found starting from the restored file\n",mp)
+                # -----
 
 
         if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
@@ -774,16 +843,18 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         if 'Flame_ref_results' not in os.listdir():
             os.mkdir('Flame_ref_results')
         os.chdir('Flame_ref_results')
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            +end_file
         else:
             fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            +end_file
         f.save(fn,'ref_solution')
 
 
@@ -827,8 +898,9 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             # create a reactor network for performing time integration
             sim = ct.ReactorNet([r1])
 
-            sim.rtol = conditions.simul_param.tol_ts[0]
-            sim.atol = conditions.simul_param.tol_ts[1]
+            sim.rtol = conditions.simul_param.rtol_ts
+            sim.atol = conditions.simul_param.atol_ts
+
 
             # approximate a time step to achieve a similar resolution as in the next method
             t_total = length / u_0
@@ -896,15 +968,16 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
         else:
 
-            init_points = int(conditions.simul_param.tign_nPoints)     # max number of time step
+            init_points = int(conditions.simul_param.tign_nPoints)      # max number of time step
             n_pts       = conditions.simul_param.n_pts
             delta_npts  = conditions.simul_param.delta_npts
             t_max_coeff = conditions.simul_param.t_max_coeff
-            Scal_ref    = conditions.simul_param.Scal_ref  # Scalar selected for the time vector computation
+            t_max_s     = conditions.simul_param.t_max_s
+            Scal_ref    = conditions.simul_param.Scal_ref               # Scalar selected for the time vector computation
             grad_curv_ratio = conditions.simul_param.grad_curv_ratio
             tmax_react  = conditions.simul_param.t_max_react
 
-        #   Auto ignition time Detection
+            #   Auto ignition time Detection
                  # Record the scalar evolution and check ignition
                  # with H2O variation (considered if variation >20%)
             time1 = timer.time()
@@ -915,8 +988,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
                 reactor = ct.IdealGasConstPressureReactor(gas)
             sim = ct.ReactorNet([reactor])
-            sim.rtol = conditions.simul_param.tol_ts[0]
-            sim.atol = conditions.simul_param.tol_ts[1]
+            sim.rtol = conditions.simul_param.rtol_ts
+            sim.atol = conditions.simul_param.atol_ts
             time_init = tmax_react
             timeVec_ignit = []
             for i in range(init_points):
@@ -953,7 +1026,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     H2O[n] = 0
                     dH2O[n-1] = np.abs(X_Scal[n]-X_Scal[n-1]) *0.5
 
-            idx_maxgrad = np.where(dH2O==max(dH2O)) #find max grad index
+            idx_maxgrad = np.where(dH2O==max(dH2O)) # find max grad index
             tign = timeVec_ignit[idx_maxgrad[0][0]]
             if verbose >=4:
                 if H2O[0]*1.2>H2O[-1] or tign>0.97*timeVec_ignit[-1]:
@@ -963,8 +1036,11 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'µs',mp)
 
 
-        # Computing the time vector according to the selected scalar variation
-            tmax = min(tmax_react,t_max_coeff*tign)
+            # Computing the time vector according to the selected scalar variation
+            if t_max_s is not False:
+                tmax = t_max_s
+            else:
+                tmax = min(tmax_react,t_max_coeff*tign)
 
 
             # Grad and curve vectors calculation
@@ -984,7 +1060,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 print_("grad and curve calculation done",mp)
 
             time_stepping_calc=True; pt_coeff=2e5
-            coeff_dtmax = n_pts/10 ; coeff_dtmin = n_pts*2
+            # coeff_dtmax = n_pts/10 ; dtmin = tmax/(n_pts*200)
+            dtmax = tmax/(n_pts/20) ; dtmin = tmax/(n_pts*200)
             time_stepping_calc_try=0
             while time_stepping_calc:
                 # time stepping
@@ -996,10 +1073,10 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     idx = min((np.abs(timeVec_ignit-timeVec[-1])).argmin()-2,len(grad_vect)-1)
                     dt = (tmax/(n_pts*pt_coeff))/(abs((grad_vect[idx]/np.sum(np.abs([grad_vect])))*
                          grad_curv_ratio+curv_vect[idx]/np.sum(np.abs([curv_vect]))*(1-grad_curv_ratio)))
-                    if dt<(tign/coeff_dtmin):
-                        timeVec.append(timeVec[-1]+tign/200)
-                    elif dt>(tign/coeff_dtmax):
-                        timeVec.append(timeVec[-1]+tign/5)
+                    if dt<dtmin: #dt<(tign/coeff_dtmin)
+                        timeVec.append(timeVec[-1]+dtmin)
+                    elif dt>dtmax: #(tign/coeff_dtmax)
+                        timeVec.append(timeVec[-1]+dtmax)
                     else:
                         timeVec.append(timeVec[-1]+dt)
 
@@ -1014,16 +1091,18 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     if time_stepping_calc_try>50:  time_stepping_calc=False
                     if pt_coeff<1e-5:
                         print_("Warning : larger time steps imposed for the calculation",mp)
-                        pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
+                        # pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
+                        pt_coeff = 2e5 ; dtmax = dtmax/4                        
                     if pt_coeff>1e20:
                         print_("Warning : smaller time steps imposed for the calculation",mp)
-                        pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
+                        # pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
+                        pt_coeff = 2e5 ; dtmin = dtmin*4
             if verbose>3:
                 print_("    - time vector contains: "+str(len(timeVec))+" points",mp)
 
 
 
-        # Data computation
+            # Data computation
             gas.TPX = init
             if conditions.config == 'reactor_UV' :
                 reactor = ct.IdealGasReactor(gas)
@@ -1078,6 +1157,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             z1 = np.zeros_like(timeVec)
             u1 = np.zeros_like(timeVec)
 
+            hr="ok"
             for n in range(1,len(timeVec)):
                 sim.advance(timeVec[n])
                 T.append(reactor.T)
@@ -1114,39 +1194,46 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     kr.append(gas.reverse_rate_constants)
                     r_rate.append(gas.net_rates_of_progress)
 
-#                conc.append(reactor.thermo.concentrations.tolist())
-#                kf.append(gas.forward_rate_constants)
-#                kr.append(gas.reverse_rate_constants)
-#                r_rate.append(gas.net_rates_of_progress)
-
-                target_ign_.append(gas.X[target_ign_idx])
 
                 if 'PFR' in conditions.config:
                     u1[n] = mass_flow_rate1 / area / reactor.thermo.density
                     dt = timeVec[n]-timeVec[n-1]
                     z1[n] = z1[n - 1] + u1[n] * dt
 
-                # heat release calculation
-                hr="ok"
+
+            # ignition time calculation
+            gas.TPX = init
+            if conditions.config == 'reactor_UV' :
+                reactor = ct.IdealGasReactor(gas)
+            elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
+                reactor = ct.IdealGasConstPressureReactor(gas)
+            sim = ct.ReactorNet([reactor])
+            time_r,temp = [0],[gas.T]
+            while sim.time < timeVec[-1]:
+                sim.step()
+                time_r.append(sim.time)
+                temp.append(reactor.T)
+                target_ign_.append(gas.X[target_ign_idx])
                 try:
                     heat_release.append(-np.dot(gas.net_rates_of_progress,\
                                                gas.delta_enthalpy))
                 except:
-                    if n==1:
-                        print_("warning: heat release calculation issues",mp)
+                    if hr=="ok":
+                        print_("Warning: heat release calculation issues",mp)
+                        print_("   Ignition delay time calculated according to the maximum fuel concentration gradient",mp)
                         hr="no_heat_release"
-            # ignition time calculation
-               # 1- based on heat release (default)
+
+            # 1- based on heat release (default)
             if hr!= "no_heat_release":
-                ign_time_hr = timeVec[heat_release.index(max(heat_release))]
+                ign_time_hr = time_r[heat_release.index(max(heat_release))]
             else: ign_time_hr=False
-            ign_time_hr = timeVec[heat_release.index(max(heat_release))]
-               # 2- based on fuel gradients (if heat relase calculation troubles)
-            for t in range(len(timeVec)-3):
-                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(timeVec[t+2]-timeVec[t]))
-            ign_time_sp = timeVec[grad_fuel.index(max(grad_fuel))+2]
+               # 2- based on fuel gradients (if heat relase calculation issues)
+            for t in range(len(time_r)-3):
+                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
+            ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
             if 'PFR' in conditions.config:
                 ign_dist_sp = z1[grad_fuel.index(max(grad_fuel))+2]
+
 
             time2 = timer.time()
             if verbose>3:
@@ -1240,6 +1327,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             reactorNetwork     = ct.ReactorNet([stirredReactor])
             tic = timer.time()
 
+
             # Re-run the isothermal simulations
             t = 0
             while t < maxSimulationTime:
@@ -1328,6 +1416,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
     verbose    = conditions.simul_param.verbose
     mp = conditions.main_path
+    path_lm = '/dev/null' ; path_w = 'nul'
 
     # simulation time start
     tic_sim = timer.time()
@@ -1338,14 +1427,20 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         # Main variables
         gas_ref    = conditions.composition.gas_ref
         tol_ss     = conditions.simul_param.tol_ss
-        tol_ts     = conditions.simul_param.tol_ts
+        tol_ts     = [conditions.simul_param.rtol_ts, conditions.simul_param.atol_ts]
 
         if 'free' in conditions.config:
             grid      = list(conditions.simul_param.pts_scatter)
             f         = ct.FreeFlame(gas_red, grid)
+            f.inlet.X = conditions.composition.X
+            f.inlet.T = conditions.state_var.T
+            f.flame.P = conditions.state_var.P
         elif 'burner' in conditions.config:
             grid             = list(conditions.simul_param.pts_scatter_i)
             f                = ct.BurnerFlame(gas_red,grid)
+            f.burner.X    = conditions.composition.X                   
+            f.burner.T    = conditions.simul_param.T_profile[0]
+            f.burner.P     = conditions.state_var.P            
             f.burner.mdot    = conditions.simul_param.mdot    #mass flow rate per unit area [kg/m^2/s]
             f.energy_enabled = False
             f.flame.set_fixed_temp_profile(np.array(grid)/max(grid),conditions.simul_param.T_profile)
@@ -1363,43 +1458,46 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         # Get saved results
         os.chdir(conditions.main_path)
         os.chdir('Flame_ref_results')
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'ff_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            +end_file
         else:
             fn = conditions.num+'ff_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            +end_file
 
 
         # --------------------     Simulation     ----------------------
 
         # supress console output during the simulation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull:
-                sys.stdout = devnull ; sys.stderr = devnull
-        f.restore(fn, 'ref_solution')
+        if verbose<9: 
+            with open(path_lm, 'w') as fnull:  
+                with redirect_stdout(fnull):
+                    f.restore(fn, 'ref_solution')
+        else:
+            f.restore(fn, 'ref_solution')
+    
 
         os.chdir(conditions.main_path)
 
         try:
             f.solve(auto = False, loglevel = 0, refine_grid = False)
             simul_success = True
-
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            if verbose >= 6:
-                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
         except:
             simul_success = False
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+            
+        if simul_success:
+            if verbose >= 6:
+                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+        else:
             if verbose >= 3:
                 print("\n     WARNING: No solution found\n",mp)
+
         grid = f.flame.grid
 
         # ------------------     end of simulation     --------------------
@@ -1431,7 +1529,11 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
-        results.Sl = f.u[0]
+        try:
+            results.Sl      = f.u[0]          # for cantera version <= 2.4
+        except:
+            results.Sl      = f.velocity[0]
+
         results.f  = f
         results.r_rate = r_rate
 
@@ -1446,39 +1548,47 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         # Get saved results
         os.chdir(conditions.main_path)
         os.chdir('Flame_ref_results')
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            +end_file
         else:
             fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            +end_file
 
 
         # supress console output during the simulation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull:
-                sys.stdout = devnull ; sys.stderr = devnull
+        # if verbose<9:
+        #     old_stdout = sys.stdout ; old_stderr = sys.stderr
+        #     with open(os.devnull, "w") as devnull:
+        #         sys.stdout = devnull ; sys.stderr = devnull
 
-        f.restore(fn, 'ref_solution')
+        if verbose<9: 
+            with open(path_lm, 'w') as fnull:  
+                with redirect_stdout(fnull):
+                    f.restore(fn, 'ref_solution')
+        else:
+            f.restore(fn, 'ref_solution')
+
+
+        # f.restore(fn, 'ref_solution')
 
         # Initialize and solve
         try:
             f.solve(auto = False, loglevel = 0, refine_grid = False)
             simul_success = True
-
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            if verbose >= 6:
-                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
         except:
             simul_success = False
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+            
+        if simul_success:
+            if verbose >= 6:
+                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+        else:
             if verbose >= 3:
                 print("\n     WARNING: No solution found\n",mp)
 
@@ -1539,16 +1649,18 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         os.chdir('Flame_ref_results')
         if 'diff' in conditions.config: phi = 'diff'
         else: phi = '%.2f' %conditions.composition.phi
+        if '.cti' in conditions.mech:      end_file = '.xml'
+        else:                              end_file = '.yaml'
         if conditions.state_var.P>10000:
             fn = conditions.num+'cf_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
-            +'.xml'
+            +end_file
         else:
             fn = conditions.num+'cf_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+phi\
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)\
-            +'.xml'
+            +end_file
 
 #        # Define a limit for the maximum temperature below which the flame is
 #        # considered as extinguished and the computation is aborted
@@ -1561,29 +1673,55 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             return 0.
         f.set_interrupt(interrupt_extinction)
 
-        # supress console output during the simulation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull:
-                sys.stdout = devnull ; sys.stderr = devnull
+        # # supress console output during the simulation
+        # if verbose<9:
+        #     old_stdout = sys.stdout ; old_stderr = sys.stderr
+        #     with open(os.devnull, "w") as devnull:
+        #         sys.stdout = devnull ; sys.stderr = devnull
 
-        f.restore(fn, 'ref_solution')
+        # f.restore(fn, 'ref_solution')
+
+        if verbose<9: 
+            with open(path_lm, 'w') as fnull:  
+                with redirect_stdout(fnull):
+                    f.restore(fn, 'ref_solution')
+        else:
+            f.restore(fn, 'ref_solution')
+
+
+        # f.restore(fn, 'ref_solution')
 
         # Initialize and solve
         try:
             f.solve(auto = False, loglevel = 0, refine_grid = False)
             simul_success = True
-
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            if verbose >= 6:
-                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
         except:
             simul_success = False
-            # restore console output
-            if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+            
+        if simul_success:
+            if verbose >= 6:
+                print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+        else:
             if verbose >= 3:
                 print("\n     WARNING: No solution found\n",mp)
+
+
+
+        # # Initialize and solve
+        # try:
+        #     f.solve(auto = False, loglevel = 0, refine_grid = False)
+        #     simul_success = True
+
+        #     # restore console output
+        #     if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+        #     if verbose >= 6:
+        #         print_("     Problem solved on ["+str(f.flame.n_points)+"] point grid",mp)
+        # except:
+        #     simul_success = False
+        #     # restore console output
+        #     if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+        #     if verbose >= 3:
+        #         print("\n     WARNING: No solution found\n",mp)
 
         grid = f.flame.grid
 
@@ -1613,17 +1751,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                 else:
                     kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
             kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
-#
-#            # saving kf and kr values
-#            kf_x=[];kr_x=[];r_red=0
-#            for r in range(len(act_r)):
-#                if act_r[r]:
-#                        kf_x.append(gas_red.forward_rate_constants[r_red])
-#                        kr_x.append(gas_red.reverse_rate_constants[r_red])
-#                        r_red+=1
-#                else:
-#                    kf_x.append(0); kr_x.append(0)
-#            kf.append(kf_x); kr.append(kr_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
@@ -1674,12 +1801,15 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                         it_n = max_it*2
                         break
                     # supress console output during the simulation
-                    if verbose<9:
-                        old_stdout = sys.stdout ; old_stderr = sys.stderr
-                        with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                    if first_it: f.restore(fn, 'ref_solution')
-                    else:        f.restore(fnKi, 'solution')
-                    if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+                    if verbose<9: 
+                        with open(path_lm, 'w') as fnull:  
+                            with redirect_stdout(fnull):
+                                if first_it: f.restore(fn, 'ref_solution')
+                                else:        f.restore(fnKi, 'solution')
+                    else:
+                        if first_it: f.restore(fn, 'ref_solution')
+                        else:        f.restore(fnKi, 'solution')
+            
 
                     # Create an initial guess based on the previous solution
                     # Update grid
@@ -1689,18 +1819,30 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                     f.fuel_inlet.mdot     *= strain_factor ** exp_mdot_a
                     f.oxidizer_inlet.mdot *= strain_factor ** exp_mdot_a
                     # Update velocities
-                    f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
-                    f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
+                    try:
+                        # for cantera version < 2.5
+                        f.set_profile('u', normalized_grid, f.u * strain_factor ** exp_u_a)
+                        f.set_profile('V', normalized_grid, f.V * strain_factor ** exp_V_a)
+                    except:
+                        f.set_profile('velocity', normalized_grid, f.velocity * strain_factor ** exp_u_a)
+                        f.set_profile('spread_rate', normalized_grid, f.spread_rate * strain_factor ** exp_V_a)
                     # Update pressure curvature
                     f.set_profile('lambda', normalized_grid, f.L * strain_factor ** exp_lam_a)
                     try:
                         # Try solving the flame
                         f.solve(loglevel=0)
-                        if verbose<9:
-                            old_stdout = sys.stdout ; old_stderr = sys.stderr
-                            with open(os.devnull,"w") as devnull: sys.stdout=devnull;sys.stderr=devnull
-                        f.save(fnKi,'solution')
-                        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr      # restore console output
+                        if verbose<9: 
+                            with open(path_lm, 'w') as fnull:  
+                                with redirect_stdout(fnull):
+                                    if int(ct.__version__[0])>2:
+                                        f.save(fnKi,'solution',overwrite=True)
+                                    else:
+                                        f.save(fnKi,'solution')
+                        else:
+                            if int(ct.__version__[0])>2:
+                                f.save(fnKi,'solution',overwrite=True)
+                            else:
+                                f.save(fnKi,'solution')
                         strain_factor=1+it_strain ;
                         first_it = False
                         if not restart_sim:
@@ -1766,8 +1908,8 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             reactor = ct.IdealGasConstPressureReactor(gas_red)
 
         sim = ct.ReactorNet([reactor])
-        sim.rtol = conditions.simul_param.tol_ts[0]
-        sim.atol = conditions.simul_param.tol_ts[1]
+        sim.rtol = conditions.simul_param.rtol_ts
+        sim.atol = conditions.simul_param.atol_ts
 
 
         T = [] ; P = [] ; conc = [] ; kf = [] ; kr = [] ; r_rate = []
@@ -1811,23 +1953,24 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
         for n in range(1,len(timeVec)):
             time = timeVec[n]
-
             # supress console output during the simulation
-            if verbose<9:
-                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                with open(os.devnull, "w") as devnull:
-                    sys.stdout = devnull ; sys.stderr = devnull
-            try:
-                sim.advance(time)
-                simul_success = True
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            except:
-                simul_success = False
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                if verbose >= 3:
-                    print("\n     WARNING: No solution found\n",mp)
+            if verbose<9: 
+                with open(path_lm, 'w') as fnull:  
+                    with redirect_stdout(fnull):
+                        try:
+                            sim.advance(time)
+                            simul_success = True
+                        except:
+                            simul_success = False
+            else:
+                try:
+                    sim.advance(time)
+                    simul_success = True
+                except:
+                    simul_success = False
+                        
+            if not simul_success and verbose >= 3:
+                print("\n     WARNING: No solution found\n",mp)
 
             # compute velocity and transform into space
             if 'PFR' in conditions.config:
@@ -1847,7 +1990,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                 else:
                     conc_t.append(0)
             conc.append(conc_t)
-            target_ign_.append(gas_red.X[target_ign_idx])
 
             # saving kf and kr values
             kf_t=[];kr_t=[];r_rate_t=[];r_red=0
@@ -1871,15 +2013,18 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 #                else:
 #                    kf_t.append(0); kr_t.append(0)
 #            kf.append(kf_t); kr.append(kr_t)
+
+#            target_ign_.append(gas_red.X[target_ign_idx])
+
             # heat release calculation
-            hr="ok"
-            try:
-                heat_release.append(-np.dot(gas_red.net_rates_of_progress,\
-                                           gas_red.delta_enthalpy))
-            except:
-                if n==1:
-                    print_("warning: heat release calculation issues",mp)
-                    hr="no_heat_release"
+#            hr="ok"
+#            try:
+#                heat_release.append(-np.dot(gas_red.net_rates_of_progress,\
+#                                           gas_red.delta_enthalpy))
+#            except:
+#                if n==1:
+#                    print_("warning: heat release calculation issues",mp)
+#                    hr="no_heat_release"
 
         # define time and position at the beginning (-> 0):
         if 'PFR' in conditions.config and not conditions.simul_param.PFR_auto_time:
@@ -1888,20 +2033,40 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
 
         # ignition time calculation
-           # 1- based on heat release (default)
-        if hr!= "no_heat_release":
-            ign_time_hr = timeVec[heat_release.index(max(heat_release))]
-        else: ign_time_hr=False
-           # 2- based on fuel (if heat relase calculation troubles)
-        for t in range(len(timeVec)-3):
-            try:
-                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(timeVec[t+2]-timeVec[t]))
-            except:
-                print('t:'+str(t))
-                print('len timeVec:'+str(len(timeVec)))
-                print('target_ing:'+str(len(target_ign_)))
 
-        ign_time_sp = timeVec[grad_fuel.index(max(grad_fuel))+2]
+        X_red = conditions.composition.X
+        gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
+        if conditions.config == 'reactor_UV' :
+            reactor = ct.IdealGasReactor(gas_red)
+        elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
+            reactor = ct.IdealGasConstPressureReactor(gas_red)
+        sim = ct.ReactorNet([reactor])
+        sim.rtol = conditions.simul_param.rtol_ts
+        sim.atol = conditions.simul_param.atol_ts
+        time_r,temp = [],[]
+        while sim.time < timeVec[-1]:
+            sim.step()
+            time_r.append(sim.time)
+            temp.append(reactor.T)
+            target_ign_.append(gas_red.X[target_ign_idx])
+            hr="ok"
+            try:
+                heat_release.append(-np.dot(gas_red.net_rates_of_progress,\
+                                           gas_red.delta_enthalpy))
+            except:
+                if hr=="ok":
+                    print_("Warning: heat release calculation issues",mp)
+                    print_("   Ignition delay time calculated according to the maximum fuel concentration gradient",mp)
+                    hr="no_heat_release"
+
+        # 1- based on heat release (default)
+        if hr!= "no_heat_release":
+            ign_time_hr = time_r[heat_release.index(max(heat_release))]
+        else: ign_time_hr=False
+           # 2- based on fuel gradients (if heat relase calculation issues)
+        for t in range(len(time_r)-3):
+            grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
+        ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
 
 
         results = cdef.Sim_Results(conditions, gas_red, list(timeVec), list(T),\
@@ -1990,34 +2155,41 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             reactorNetwork     = ct.ReactorNet([stirredReactor])
 
             # supress console output during the simulation
-            if verbose<9:
-                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                with open(os.devnull, "w") as devnull:
-                    sys.stdout = devnull ; sys.stderr = devnull
+            # supress console output during the simulation
+            if verbose<9: 
+                with open(path_lm, 'w') as fnull:  
+                    with redirect_stdout(fnull):
+                        try:
+                            # Re-run the isothermal simulations
+                            t = 0
+                            simul_success = True
+                            while t < maxSimulationTime:
+                                toc = timer.time()
+                                if (toc-tic_sim) > (5*conditions.simul_param.ref_simul_time+30):  # if calculation time becomes too long
+                                    simul_success = False
+                                    t = maxSimulationTime + 1
+                                else:
+                                    t = reactorNetwork.step()
+                        except:
+                            simul_success = False
+            else:
+                try:
+                    # Re-run the isothermal simulations
+                    t = 0
+                    simul_success = True
+                    while t < maxSimulationTime:
+                        toc = timer.time()
+                        if (toc-tic_sim) > (5*conditions.simul_param.ref_simul_time+30):  # if calculation time becomes too long
+                            simul_success = False
+                            t = maxSimulationTime + 1
+                        else:
+                            t = reactorNetwork.step()
+                except:
+                    simul_success = False
 
-            try:
-                # Re-run the isothermal simulations
-                t = 0
-                simul_success = True
-                while t < maxSimulationTime:
-                    toc = timer.time()
-                    if (toc-tic_sim) > (5*conditions.simul_param.ref_simul_time+30):  # if calculation time becomes too long
-                        simul_success = False
-                        t = maxSimulationTime + 1
-                        if verbose >= 3:
-                            print("\n     WARNING: No solution found\n")
-                            print(str(toc_sim-tic_sim))
-                    else:
-                        t = reactorNetwork.step()
+            if not simul_success and verbose >= 3:
+                print("\n     WARNING: No solution found\n",mp)
 
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-            except:
-                simul_success = False
-                # restore console output
-                if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-                if verbose >= 3:
-                    print("\n     WARNING: No solution found\n",mp)
 
             state = np.hstack([stirredReactor.thermo.P,
                                stirredReactor.mass,

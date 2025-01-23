@@ -8,7 +8,7 @@ def write_conditions():
 #           Main parameters
 #=============================================
 main_path         = TEST_1_reactor
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -103,7 +103,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = TEST_2_JSR
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -188,7 +188,7 @@ mut_intensity       = 30
 #           Main parameters
 #=============================================
 main_path         = TEST_3_Freeflame_pts
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -285,7 +285,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = TEST_4_diff_pts
-mech              = C0_Konnov.cti
+mech              = C0_Konnov.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -392,7 +392,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = TEST_5_pp_pts
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -498,7 +498,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = TEST_6_import_Sl
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 ext_results_file  = C2H6_Sl_red.csv
 conc_units        = Molar_fraction
 verbose           = 4
@@ -576,7 +576,7 @@ mut_intensity       = 20
 #           Main parameters
 #=============================================
 main_path         = CSP_C0_r_ff
-mech              = C0_Konnov.cti
+mech              = C0_Konnov.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True
@@ -652,7 +652,7 @@ time_resolution = 1e-7
 #           Main parameters
 #=============================================
 main_path         = 8_C1_CSPr_b
-mech              = C1_GRI30.cti
+mech              = C1_GRI30.yaml
 verbose           = 4
 show_plots        = False
 write_ck          = True

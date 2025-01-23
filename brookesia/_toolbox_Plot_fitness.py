@@ -12,6 +12,7 @@ def plot_fitness(c_path):
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     import os
+    import numpy as np
     
     linestyles = [(0, ()),       #'solid'                                   0
             (0, (5, 1)),            #('densely dashed',      ),                1
@@ -47,8 +48,14 @@ def plot_fitness(c_path):
 
     line = fs.readline()
 
+    non_opt_fit=0
     while line!='':
         #print(line)
+        if 'Non optimized reduced mechanism fitness:' in line:
+            non_opt_fit = float(line.split('fitness:')[1])
+            worst_list.append(non_opt_fit)
+            best_list.append(non_opt_fit)
+            mean_list.append(non_opt_fit)
         #  recuperation des donnees
         if 'worst ind' in line:
             worst_list.append(float(line.split('worst ind:')[1].split('best ind:')[0]))
@@ -59,8 +66,10 @@ def plot_fitness(c_path):
         
     fit_evol    = [worst_list,best_list,mean_list]
     list_legend = ['Worst fitness','Best fitness','Mean fitness']
-    gen = range(len(fit_evol[0])) 
-
+    gen = list(range(len(fit_evol[0])-1)) 
+    gen.insert(1,0.01)
+    
+    fit_max = (best_list[-1] * 1.1) 
     os.chdir('Plots')
 
     # Tracer graph   
@@ -72,7 +81,7 @@ def plot_fitness(c_path):
             
         axes.set_xlabel('Iteration number')
         axes.set_ylabel("Fitness")
-        
+        axes.set_ylim(0, fit_max)
         axes.legend(list_legend[1:])
         fig.show()
         fig.savefig("Fitness.png",dpi=300)

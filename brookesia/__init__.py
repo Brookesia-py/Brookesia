@@ -24,7 +24,7 @@
 #==============================================================================
 global version
 
-version = '1.7.1'
+version = '1.8.4'
 __version__ = version
 
 #==============================================================================
@@ -83,10 +83,37 @@ def run_reduction(filename):
     genf.main_redopt_algo(filename,WD_path,version)
     os.chdir(WD_path)
 
-def convert4chemkin(mech):
+def test_examples():
+    global version
+#    global WD_path
+    gc.collect()
+    genf.main_redopt_algo('1_reactor.inp',WD_path,version)
+    genf.main_redopt_algo('2_JSR.inp',WD_path,version)
+    genf.main_redopt_algo('3_Freeflame.inp',WD_path,version)
+    genf.main_redopt_algo('4_diff.inp',WD_path,version)
+    genf.main_redopt_algo('5_pp.inp',WD_path,version)
+    genf.main_redopt_algo('6_import_Sl.inp',WD_path,version)
+    os.chdir(WD_path)
+
+def convert_2_chemkin(mech):
+    #os.chdir('/media/matynia/Home/matynia/Documents/Recherche/Combustion/Modelisation_Simulation/Mécanismes_base_de_données/__CTI_REF_dev/')
     global version
     mech_data = cdef.Mech_data(mech)
     mech_data.write_chemkin_mech(mech,version)
+
+def convert_2_yaml(mech):
+    #os.chdir('/media/matynia/Home/matynia/Documents/Recherche/Combustion/Modelisation_Simulation/Mécanismes_base_de_données/__CTI_REF_dev/')
+    global version
+    mech_data = cdef.Mech_data(mech)
+    mech_data.write_yaml_mech(mech)
+
+def convert_2_cti(mech):
+    #os.chdir('/media/matynia/Home/matynia/Documents/Recherche/Combustion/Modelisation_Simulation/Mécanismes_base_de_données/__CTI_REF_dev/')
+    global version
+    mech_data = cdef.Mech_data(mech)
+    mech_data.write_new_mech(mech)
+
+
 
 def gui():
 #    global WD_path
@@ -221,7 +248,6 @@ def select_wd():
         data = {'working_dir_name':[WD_name],
                 'directory': [WD_path]}
         workdir_table = pd.DataFrame(data=data)
-#        os.chdir(root_path)
         workdir_table.to_csv('working_dir.txt', sep=';')
 
     os.chdir(WD_path)

@@ -57,8 +57,8 @@ Window_f = QtWidgets.QMainWindow()
 
 _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
 _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
-sz_w = _width/1366
-sz_h = _height/768
+sz_w = int(_width/1366)
+sz_h = int(_height/768)
 
 Window_f.setObjectName("Brookesia")
 Window_f.resize(790*sz_w, 671*sz_h)

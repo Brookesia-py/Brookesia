@@ -37,15 +37,18 @@ from shutil import copyfile
 import time as timer
 import cantera as ct
 
-import random as random
+import random
 import copy
 #import gc
 import operator
 import csv
 
-
+import warnings
+#warnings.filterwarnings("ignore") # suppress warnings with exponential calculation
+import pdb  # pdb.set_trace()
 
 def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
+
 
     verbose     = conditions_list[0].simul_param.verbose
     optim_param = red_data_list[0].optim_param
@@ -60,16 +63,6 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     if not os.path.exists("GA"): os.mkdir("GA")
     os.chdir("GA")
 
-    # Reference ind
-    ref_ind = Chromosome(conditions_list,mech_data,\
-                         ref_results_list,red_data_list,False)
-    ref_ind.fitness = ref_ind.fitness_eval(conditions_list,optim_param,ref_results_list)
-
-
-    if verbose >= 1 :
-        print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
-    best_ind = copy.deepcopy(ref_ind)
-#    best_ind.mech.write_new_mech("optim_mech.cti")
 
     # Population creation, composed of:
     # 1- selected individuals
@@ -83,21 +76,38 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     size_tot   = int(size_ind + size_Xover + size_mut)
     pop = Population(conditions_list,mech_data,red_data_list,ref_results_list,\
                      size_tot)
+
+    pop2keep = pop.def_pop2keep()
+
+    # Reference ind
+    mech_data = pop.get_uncertainty(mech_data,optim_param,conditions_list)
+    ref_ind = Chromosome(conditions_list,mech_data,\
+                         ref_results_list,red_data_list,False)
+    ref_ind.fitness = ref_ind.fitness_eval(conditions_list,optim_param,ref_results_list,0,True)
+    if verbose >= 1 :
+        print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
+    best_ind = copy.deepcopy(ref_ind)
+
+
+    # Population evaluation:
     pop.fitness_eval_newpop(optim_param,conditions_list,ref_results_list)
+
 
     # Find new best ind and save the mech,
     # if not, replace worst ind of the current pop by the previous best ind
     best_ind,new_best_ind = pop.compare_best_ind(best_ind,optim_param,verbose)
 
+
     gen=0
     # save and display convergence informations
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+
     if verbose >= 1 : print_('Initial population:',mp)
     pop.convergence_information(gen,optim_param,verbose)
+
     pop.selection(optim_param,verbose)
 
     time_1 = timer.time()
-
-#    a =asdfkjh
 
     for gen in range(1, optim_param.n_gen+1):
         print_("\n\nGeneration:" + str(gen),mp)
@@ -105,13 +115,12 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
         pop.mutation(optim_param,conditions_list,ref_results_list,gen,verbose)
         pop.fitness_eval_newchilds(optim_param,conditions_list,ref_results_list)
         pop.selection(optim_param,verbose)
+        pop.check_early_conv(optim_param,gen,verbose)
         best_ind,new_best_ind = pop.compare_best_ind(best_ind,optim_param,verbose)
-
         if new_best_ind and optim_param.exp_data:                              # optimization of the time iteration for reactor models
-#            conditions_list,ref_results_list\
-#                    =best_ind.time_step_optim(conditions_list,ref_results_list)
             best_ind.fitness = best_ind.fitness_eval(conditions_list,optim_param,ref_results_list)
-
+        if gen<optim_param.keep_until_gen:
+            pop.insert_pop2keep(optim_param, pop2keep)
         if verbose > 5: pop.display(optim_param)
         pop.convergence_information(gen,optim_param,verbose)
 
@@ -125,7 +134,11 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     os.chdir(conditions_list[0].main_path)
     if not os.path.exists('Red_mech'):  os.mkdir('Red_mech')
     os.chdir('Red_mech')
-    best_ind.mech.write_new_mech(new_filename)
+    if '.cti' in new_filename:
+        best_ind.mech.write_new_mech(new_filename)
+    else:
+        best_ind.mech.write_yaml_mech(new_filename)
+
     if conditions_list[0].simul_param.write_ck:
         best_ind.mech.write_chemkin_mech(new_filename,conditions_list[0].version)
     os.chdir(conditions_list[0].main_path)
@@ -167,7 +180,6 @@ class Chromosome:
             self.mech    = copy.deepcopy(rand_kin)
         self.r2opt   = []
         self.find_r2opt(red_data_list,optim_param,conditions_list)
-        self.get_uncertainty(optim_param)
 
         if rand_kin == True:
             self.randomize_kin(optim_param)
@@ -189,52 +201,170 @@ class Chromosome:
             or optim_param.optim_on_meth=='SA':
                 # keep maximal sensitivities
                 if len(red_data_list[0].red_op.sensi_r)!=0:
-                    max_sens_list=np.zeros((len(red_data_list[0].red_op.sensi_r),len(red_data_list[0].red_op.sensi_r[0])))
-                    n_r2opt_sp_max = round(n_r2opt/len(red_data_list[0].red_op.sensi_r))    # number of react to opt per target data (spec / Sl / ...)
+                    # ------------ 10/07/2023
+                    add_col = 0
+                    for l in range(len(red_data_list)):
+                        if red_data_list[l].red_op.sensi_Sl is not False\
+                        and conditions_list[l].error_param.Sl_check:
+                            if red_data_list[l].red_op.sensi_T is not False\
+                            and conditions_list[l].error_param.T_check:
+                                if red_data_list[l].red_op.sensi_igt is not False\
+                                and conditions_list[l].error_param.ig_check:
+                                    # sensitivity analysis on: Sl, T, igt
+                                    add_col = 3
+                                    idx_Sl = -3 ; idx_T = -2 ; idx_igt = -1
+                                else:
+                                    # sensitivity analysis on: Sl, T
+                                    add_col = max(add_col,2)
+                                    idx_Sl = -2 ; idx_T = -1
+                            elif red_data_list[l].red_op.sensi_igt is not False\
+                            and conditions_list[l].error_param.ig_check:
+                                # sensitivity analysis on: Sl, igt
+                                add_col = max(add_col,2)
+                                idx_Sl = -2 ; idx_igt = -1
+                            else:
+                                # sensitivity analysis on: Sl
+                                add_col = max(add_col,1)
+                                idx_Sl = -1
+                        elif red_data_list[l].red_op.sensi_T is not False\
+                        and conditions_list[l].error_param.T_check:
+                            if red_data_list[l].red_op.sensi_igt is not False\
+                            and conditions_list[l].error_param.ig_check:
+                                # sensitivity analysis on: T, igt
+                                add_col = max(add_col,2)
+                                idx_T = -2 ; idx_igt = -1
+                            else:
+                                # sensitivity analysis on: T
+                                add_col = max(add_col,1)
+                                idx_T = -1
+                        elif red_data_list[l].red_op.sensi_igt is not False\
+                        and conditions_list[l].error_param.ig_check:
+                            # sensitivity analysis on: igt
+                            add_col = max(add_col,1)
+                            idx_igt = -1
+
+                    # create max_sens_list
+                    max_sens_list=np.zeros((len(red_data_list[0].red_op.sensi_r)+add_col,len(red_data_list[0].red_op.sensi_r[0])))
+
+
+                    # fill max_sens_list   - species sensitivities
                     for l in range(len(red_data_list)):
                         for idx in range(len(red_data_list[l].red_op.sensi_r)):
                             for r in range(len(red_data_list[l].red_op.sensi_r[idx])):
                                 if abs(red_data_list[l].red_op.sensi_r[idx][r])>max_sens_list[idx][r]:
                                     max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_r[idx][r])
-                                if l == len(red_data_list[l].red_op.sensi_r-1):
-                                    try:
-                                        if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[idx][r]\
-                                        and conditions_list[l].error_param.Sl_check:
-                                            max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_Sl[r])
-                                    except:
-                                        A=2
-                                    try:
-                                        if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[idx][r]\
-                                        and conditions_list[l].error_param.T_check:
-                                            max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_T[r])
-                                    except:
-                                        A=2
-                else:
-                    max_sens_list = [0]
-                    for l in range(len(red_data_list)): #
+                                # if l == len(red_data_list[l].red_op.sensi_r-1):
+                                #     try:
+                                #         if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[idx][r]\
+                                #         and conditions_list[l].error_param.Sl_check:
+                                #             max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_Sl[r])
+                                #     except:
+                                #         A=2
+                                #     try:
+                                #         if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[idx][r]\
+                                #         and conditions_list[l].error_param.T_check:
+                                #             max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_T[r])
+                                #     except:
+                                #         A=2
+                                #     try:
+                                #         if abs(red_data_list[l].red_op.sensi_igt[r])>max_sens_list[idx][r]\
+                                #         and conditions_list[l].error_param.ig_check:
+                                #             max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_igt[r])
+                                #     except:
+                                #         A=2
+
+                    # fill max_sens_list...
+                    for l in range(len(red_data_list)):
+                        #   - Sl sensitivities
                         if red_data_list[l].red_op.sensi_Sl is not False\
                         and conditions_list[l].error_param.Sl_check:
-                            if len(max_sens_list)==1:
-                                max_sens_list = red_data_list[l].red_op.sensi_Sl
+                            if len(max_sens_list[idx_Sl])==1:
+                                max_sens_list[idx_Sl] = red_data_list[l].red_op.sensi_Sl
                             else:
                                 for r in range(len(red_data_list[l].red_op.sensi_Sl)):
-                                    if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[r]\
+                                    if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[idx_Sl][r]\
                                     and conditions_list[l].error_param.Sl_check:
-                                        max_sens_list[r]=abs(red_data_list[l].red_op.sensi_Sl[r])
+                                        max_sens_list[idx_Sl][r]=abs(red_data_list[l].red_op.sensi_Sl[r])
+                        #   - T sensitivities
                         if red_data_list[l].red_op.sensi_T is not False\
                         and conditions_list[l].error_param.T_check:
-                            if len(max_sens_list)==1:
-                                max_sens_list = red_data_list[l].red_op.sensi_T
+                            if len(max_sens_list[idx_T])==1:
+                                max_sens_list[idx_T] = red_data_list[l].red_op.sensi_T
                             else:
                                 for r in range(len(red_data_list[l].red_op.sensi_T)):
-                                    if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[r]\
+                                    if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[idx_T][r]\
                                     and conditions_list[l].error_param.T_check:
-                                        max_sens_list[r]=abs(red_data_list[l].red_op.sensi_T[r])
+                                        max_sens_list[idx_T][r]=abs(red_data_list[l].red_op.sensi_T[r])
+                        #   - igt sensitivities
+                        if red_data_list[l].red_op.sensi_igt is not False\
+                        and conditions_list[l].error_param.ig_check:
+                            if len(max_sens_list[idx_igt])==1:
+                                max_sens_list[idx_igt] = red_data_list[l].red_op.sensi_igt
+                            else:
+                                for r in range(len(red_data_list[l].red_op.sensi_igt)):
+                                    if abs(red_data_list[l].red_op.sensi_igt[r])>max_sens_list[idx_igt][r]\
+                                    and conditions_list[l].error_param.ig_check:
+                                        max_sens_list[idx_igt][r]=abs(red_data_list[l].red_op.sensi_igt[r])
                     if len(max_sens_list)==1:
                         print_('Warning, no sensitivity data',mp)
 
+                    # ------------------------
 
-                for idx in range(len(red_data_list[0].red_op.sensi_r)):
+
+# =============================================================================
+#                     # --------------   OLD   --------------
+#                     max_sens_list=np.zeros((len(red_data_list[0].red_op.sensi_r),len(red_data_list[0].red_op.sensi_r[0])))
+#                     n_r2opt_sp_max = round(n_r2opt/len(red_data_list[0].red_op.sensi_r))    # number of react to opt per target data (spec / Sl / ...)
+#                     for l in range(len(red_data_list)):
+#                         for idx in range(len(red_data_list[l].red_op.sensi_r)):
+#                             for r in range(len(red_data_list[l].red_op.sensi_r[idx])):
+#                                 if abs(red_data_list[l].red_op.sensi_r[idx][r])>max_sens_list[idx][r]:
+#                                     max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_r[idx][r])
+#                                 if l == len(red_data_list[l].red_op.sensi_r-1):
+#                                     try:
+#                                         if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[idx][r]\
+#                                         and conditions_list[l].error_param.Sl_check:
+#                                             max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_Sl[r])
+#                                     except:
+#                                         A=2
+#                                     try:
+#                                         if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[idx][r]\
+#                                         and conditions_list[l].error_param.T_check:
+#                                             max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_T[r])
+#                                     except:
+#                                         A=2
+#                 else:
+#                     max_sens_list = [0]
+#                     for l in range(len(red_data_list)): #
+#                         if red_data_list[l].red_op.sensi_Sl is not False\
+#                         and conditions_list[l].error_param.Sl_check:
+#                             if len(max_sens_list)==1:
+#                                 max_sens_list = red_data_list[l].red_op.sensi_Sl
+#                             else:
+#                                 for r in range(len(red_data_list[l].red_op.sensi_Sl)):
+#                                     if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[r]\
+#                                     and conditions_list[l].error_param.Sl_check:
+#                                         max_sens_list[r]=abs(red_data_list[l].red_op.sensi_Sl[r])
+#                         if red_data_list[l].red_op.sensi_T is not False\
+#                         and conditions_list[l].error_param.T_check:
+#                             if len(max_sens_list)==1:
+#                                 max_sens_list = red_data_list[l].red_op.sensi_T
+#                             else:
+#                                 for r in range(len(red_data_list[l].red_op.sensi_T)):
+#                                     if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[r]\
+#                                     and conditions_list[l].error_param.T_check:
+#                                         max_sens_list[r]=abs(red_data_list[l].red_op.sensi_T[r])
+#                     if len(max_sens_list)==1:
+#                         print_('Warning, no sensitivity data',mp)
+#
+#                     # --------------   OLD   --------------
+# =============================================================================
+
+
+                n_r2opt_sp_max = round(n_r2opt/len(red_data_list[0].red_op.sensi_r))    # number of react to opt per target data (spec / Sl / ...)
+                react2mod = []
+                for idx in range(len(max_sens_list)):
+                    react2mod.append([])
                     sensi_r=[]
                     for r in range(len(max_sens_list[idx])):
                         sensi_r.append((max_sens_list[idx][r],r+1))
@@ -268,6 +398,7 @@ class Chromosome:
                                     # if sub mechs can be modified:
                                     if sub_C or sub_CO or sub_N or sub_S or sub_Si:
                                         self.mech.react.modif[r2]=True ; n_r2opt_sp+=1
+                                        react2mod[-1].append(r2)
                             if n_r2opt_sp==n_r2opt_sp_max: break
                         if n_r2opt_sp==n_r2opt_sp_max: break
 
@@ -281,7 +412,10 @@ class Chromosome:
                             if abs(red_data_list[l].red_op.r_interaction_coeffs[idx][r])>max_coeffs_list[idx][r]:
                                 max_coeffs_list[idx][r]=abs(red_data_list[l].red_op.r_interaction_coeffs[idx][r])
 
+
+                react2mod = []
                 for idx in range(n_tspc):
+                    react2mod.append([])
                     drg_coeffs=[]
                     for j in range(len(max_coeffs_list[idx])):
                         drg_coeffs.append((max_coeffs_list[idx][j],j+1))
@@ -316,8 +450,61 @@ class Chromosome:
                                     # if sub mechs can be modified:
                                     if sub_C or sub_CO or sub_N or sub_S or sub_Si:
                                         self.mech.react.modif[r2]=True ; n_r2opt_sp+=1
+                                        react2mod[-1].append(r2)
+
                             if n_r2opt_sp==n_r2opt_sp_max: break
                         if n_r2opt_sp==n_r2opt_sp_max: break
+
+            if optim_param.display_react2opt:
+                n_r_opt=0
+                for _r in range(len(self.mech.react.modif)):
+                    if self.mech.react.modif[_r] == True:n_r_opt+=1
+
+
+                print_('-------------------------------- \n'+str(n_r_opt)+' reactions to optimize:',mp)
+                for _tn in range(len(red_data_list[0].tspc)):
+                    print_(' * for target: '+red_data_list[0].tspc[_tn]+':',mp)
+                    for _r in react2mod[_tn]:
+                        if   int(self.mech.react.number[_r])<10:    spaces='    -   '
+                        elif int(self.mech.react.number[_r])<100:   spaces='   -   '
+                        elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
+                        elif int(self.mech.react.number[_r])<10000: spaces=' -   '
+                        print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
+
+                # ------------ 10/07/2023
+                if 'idx_Sl' in locals():
+                    print_(' * for target Flame speed'+':',mp)
+                    for _r in react2mod[idx_Sl]:
+                        if   int(self.mech.react.number[_r])<10:    spaces='    -   '
+                        elif int(self.mech.react.number[_r])<100:   spaces='   -   '
+                        elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
+                        elif int(self.mech.react.number[_r])<10000: spaces=' -   '
+                        print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
+
+                if 'idx_T' in locals():
+                    print_(' * for target Temperature'+':',mp)
+                    for _r in react2mod[idx_T]:
+                        if   int(self.mech.react.number[_r])<10:    spaces='    -   '
+                        elif int(self.mech.react.number[_r])<100:   spaces='   -   '
+                        elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
+                        elif int(self.mech.react.number[_r])<10000: spaces=' -   '
+                        print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
+                # ------------------------
+
+
+
+
+#                for _r in range(len(self.mech.react.modif)):
+#                    if self.mech.react.modif[_r] == True:
+#                        if   int(self.mech.react.number[_r])<10:    spaces='    -   '
+#                        elif int(self.mech.react.number[_r])<100:   spaces='   -   '
+#                        elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
+#                        elif int(self.mech.react.number[_r])<10000: spaces=' -   '
+#
+#                        print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
+                print_('--------------------------------\n\n',mp)
+                optim_param.display_react2opt=False
+
 
         else:   #selection of submech in gui
 
@@ -331,7 +518,7 @@ class Chromosome:
                 # CxHyOz sub-mechanisms (H2 submech is considered as a C0 submech)
                 for n_C in range(len(optim_param.opt_subm_C)):
                     if optim_param.opt_subm_C[n_C]==False:
-                        for r in range(len(self.mech.react.formula)):
+                        for r in range(len(self.mech.react.equation)):
                             if self.mech.react.subm_C[r] == n_C \
                             and not self.mech.react.subm_CO[r]  \
                             and self.mech.react.subm_N[r]  == 0 \
@@ -340,24 +527,24 @@ class Chromosome:
                                 self.mech.react.modif[r] = False
                 # CO sub-mechanism
                 if optim_param.opt_subm_CO==False:
-                    for r in range(len(self.mech.react.formula)):
+                    for r in range(len(self.mech.react.equation)):
                         if self.mech.react.subm_CO[r] == True:
                             self.mech.react.modif[r] = False
                 # N sub-mechanisms
                 for n_N_ in range(len(optim_param.opt_subm_N)-1):
                     n_N = n_N_ + 1
                     if optim_param.opt_subm_N[n_N]==False:
-                        for r in range(len(self.mech.react.formula)):
+                        for r in range(len(self.mech.react.equation)):
                             if self.mech.react.subm_N[r] == n_N:
                                 self.mech.react.modif[r] = False
                 # S sub-mechanism
                 if optim_param.opt_subm_S==False:
-                    for r in range(len(self.mech.react.formula)):
+                    for r in range(len(self.mech.react.equation)):
                         if self.mech.react.subm_S[r] == True:
                             self.mech.react.modif[r] = False
                 # Si sub-mechanism
                 if optim_param.opt_subm_Si==False:
-                    for r in range(len(self.mech.react.formula)):
+                    for r in range(len(self.mech.react.equation)):
                         if self.mech.react.subm_Si[r] == True:
                             self.mech.react.modif[r] = False
             else:
@@ -373,39 +560,9 @@ class Chromosome:
                         self.mech.react.modif[r] = True
 
 
-    def get_uncertainty(self,optim_param):
-
-        # Directory
-        os.chdir(optim_param.main_path)
-        table = [] ; uncertainty =[] ; num_react=[]
 
 
-        try :
-            f=open('uncertainties.csv')
-            csv_f=csv.reader(f, delimiter=';')
-            for row in csv_f:
-                table.append(row)
-            f.close()
 
-            for i in range(len(table)-1):
-                num_react.append(table[i+1][0])      # [0] reaction number column
-                uncertainty.append(table[i+1][4])    # [4] uncertainties column
-        except:
-            a=2
-            # print('Uncertainties.csv absent: all uncertainties are fixed to ',str(optim_param.Arrh_max_variation))
-
-        self.mech.react.incert = []
-        for r in range(len(self.mech.react.formula)):
-            react_found=False
-            for r_inc in range(len(uncertainty)):
-                if int(num_react[r_inc])==self.mech.react.number[r]\
-                and uncertainty[r_inc]!='':
-                    self.mech.react.incert.append([float(u) for u in uncertainty[r_inc].split(',')])
-                    react_found = True
-                    break
-            if not react_found:
-                self.mech.react.incert.append(optim_param.Arrh_max_variation)
-        os.chdir("GA")
 
 #    def get_values(self,optim_param,n_ind):
 #
@@ -430,7 +587,7 @@ class Chromosome:
 #            # print('Uncertainties.csv absent: all uncertainties are fixed to ',str(optim_param.Arrh_max_variation))
 #
 ##        self.mech.react.incert = []
-##        for r in range(len(self.mech.react.formula)):
+##        for r in range(len(self.mech.react.equation)):
 ##            if not react_found:
 ##                self.mech.react.incert.append(optim_param.Arrh_max_variation)
 #
@@ -460,22 +617,18 @@ class Chromosome:
         verbose = conditions_list[0].simul_param.verbose
 
         os.chdir(conditions_list[0].main_path+'/GA')
-        filename = 'temp.cti'
-        self.mech.write_new_mech(filename)
+
+        if '.cti' in conditions_list[0].mech:
+            filename = 'temp.cti'
+            self.mech.write_new_mech(filename)
+        else:
+            filename = 'temp.yaml'
+            self.mech.write_yaml_mech(filename)
+
 
         # --------------------------------------------------------------------------------
         # interpretation of the new mech
-
-        # supress console output during the interpretation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-
-        ct.suppress_thermo_warnings()
-        gas = ct.Solution(filename)
-
-        # restore console output
-        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+        gas = cdef.get_gas_ct(filename)
         # --------------------------------------------------------------------------------
 
         qoi_tot = [] ; qoi_tot_pond =  [] ; pond=0
@@ -530,20 +683,19 @@ class Chromosome:
 
         print_('time step optimization',mp)
         os.chdir(conditions_list[0].main_path+'/GA')
-        filename = 'temp.cti'
-        self.mech.write_new_mech(filename)
+        if '.cti' in conditions_list[0].mech:
+            filename = 'temp.cti'
+            self.mech.write_new_mech(filename)
+        else:
+            filename = 'temp.yaml'
+            self.mech.write_yaml_mech(filename)
+
         # --------------------------------------------------------------------------------
         # interpretation of the new mech
 
-        # supress console output during the interpretation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-
         for i in range(len(conditions_list)):
             conditions   = conditions_list[i]
-            ct.suppress_thermo_warnings()
-            conditions.composition.gas = ct.Solution(filename)
+            conditions.composition.gas = cdef.get_gas_ct(filename)
             if 'reactor' in conditions.config:
                 opt_results, conditions = comp.ref_computation(conditions)
                 ref_results = comp.red_computation(conditions, \
@@ -551,8 +703,6 @@ class Chromosome:
                             self.mech.spec.activ_m,self.mech.react.activ_m)
                 ref_results_list[i] = ref_results
                 conditions_list[i]  = conditions
-        # restore console output
-        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
         # --------------------------------------------------------------------------------
 
 
@@ -562,54 +712,71 @@ class Chromosome:
     def randomize_kin(self,optim_param):
 
         for r in range(len(self.mech.react.type)):
-            if self.mech.react.modif[r]:
-                incert_r = [u/100 for u in self.mech.react.incert[r]]
-                if self.mech.react.type[r] == "three_body_reaction"\
-                or self.mech.react.type[r] == "reaction":
-                    for k in range(len(self.mech.react.kin[r])):
-#                        if k==0:
-                        self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
-                        +self.mech.react.ref_kin[r][k]*random.uniform(-1,1)*incert_r[k]
-#                        else:
-#                            self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
-#                            +self.mech.react.ref_kin[r][k]*random.uniform(-1,1)*incert_r[k]
+            try_r = 0 ; valid = False ; damping = 0.75 ; max_try = 10
+            while not valid and try_r < max_try:
+                var_range = 1-(try_r/max_try)
+                if self.mech.react.modif[r]:
+                    incert_r = [u/100 for u in self.mech.react.incert[r]]
+                    if self.mech.react.type[r] == "three_body_reaction"\
+                    or self.mech.react.type[r] == "reaction":
+                        for k in range(len(self.mech.react.kin[r])):
+                            self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
+                            +self.mech.react.ref_kin[r][k]*random.uniform(-var_range,var_range)*incert_r[k]*(damping**try_r)
 
-                elif self.mech.react.type[r] == "falloff_reaction"\
-                or self.mech.react.type[r] == "pdep_arrhenius"\
-                or self.mech.react.type[r] == "chemically_activated_reaction"\
-                or self.mech.react.type[r] == "chebyshev":
-                    for k1 in range(len(self.mech.react.kin[r])):
-                        for k2 in range(len(self.mech.react.kin[r][k1])):
-#                            if k2==0:
-                            self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
-                            +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-1,1)*incert_r[k2]
-#                            else:
-#                                self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
-#                                +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-1,1)*incert_r[k2]
+                    elif self.mech.react.type[r] == "falloff_reaction"\
+                    or self.mech.react.type[r] == "pdep_arrhenius"\
+                    or self.mech.react.type[r] == "chemically_activated_reaction"\
+                    or self.mech.react.type[r] == "chebyshev":
+                        for k1 in range(len(self.mech.react.kin[r])):
+                            for k2 in range(len(self.mech.react.kin[r][k1])):
+                                self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
+                                +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-var_range,var_range)*incert_r[k2]*(damping**try_r)
+
+                    valid = check_k(self.mech.react,r)
+                else:
+                    valid = True
+
+                try_r +=1
+
+            if not valid:
+                self.mech.react.kin[r] = copy.deepcopy(self.mech.react.ref_kin[r])
 
 
-    def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0):
+
+
+
+    def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0,ref_ind=False):
 
         verbose = conditions_list[0].simul_param.verbose
+        mp = conditions_list[0].main_path
         os.chdir(conditions_list[0].main_path+'/GA')
-        filename = 'temp_'+str(n_par)+'.cti'
-        self.mech.write_new_mech(filename)
+
+        filename = 'temp_'+str(n_par)
+        # if self.mech.keep4opt == True:
+        #     filename = 'keep_' + filename
+        if '.cti' in conditions_list[0].mech:
+            filename += '.cti'
+            self.mech.write_new_mech(filename)
+        else:
+            filename += '.yaml'
+            self.mech.write_yaml_mech(filename)
+
 
         # --------------------------------------------------------------------------------
         # interpretation of the new mech
 
-        # supress console output during the interpretation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
+        # suppress console output during the interpretation
+        # if verbose<9:
+        #     old_stdout = sys.stdout ; old_stderr = sys.stderr
+        #     with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
 
-        ct.suppress_thermo_warnings()
-        gas = ct.Solution(filename)
-
-        # restore console output
-        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
+        gas = cdef.get_gas_ct(filename)
+        
+        #restore console output
+        # if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
         # --------------------------------------------------------------------------------
-
+        
+        txt_f='\n'
         qoi_tot = [] ; pond=0 ; qoi_tot_mean=0
         for i in range(len(conditions_list)):
 
@@ -632,6 +799,17 @@ class Chromosome:
                                self.mech.spec.activ_m,self.mech.react.activ_m)
             os.chdir(cur_path)
 
+            # ####### DEV 
+            # if ref_ind:
+            #     ref_results.opt_refind_T            = copy.deepcopy(Opt_results.T)
+            #     ref_results.opt_refind_conc         = copy.deepcopy(Opt_results.conc)
+            #     ref_results.opt_refind_X            = copy.deepcopy(Opt_results.X)
+            #     ref_results.opt_refind_ign_time_hr  = copy.deepcopy(Opt_results.ign_time_hr)
+            #     ref_results.opt_refind_ign_time_sp  = copy.deepcopy(Opt_results.ign_time_sp)
+            #     ref_results.opt_refind_ign_time     = copy.deepcopy(Opt_results.ign_time)
+            #     ref_results.opt_refind_Sl           = copy.deepcopy(Opt_results.Sl)
+            #     ref_results.opt_refind_K_ext        = copy.deepcopy(Opt_results.K_ext)
+
             errors = cdef.Errors(conditions,ref_results,Opt_results,\
                                  optim_param)
 
@@ -639,45 +817,70 @@ class Chromosome:
             if optim_param.coeff_cond:  coeff_cond = optim_param.coeff_cond[i]
             else:                       coeff_cond = 1
 
+            qoi_case, pond_case = 0,0
+            cc = conditions.config
             for sp in range(optim_param.n_tspc):
                 if errors.qoi_s[sp]:
                     pond_i = optim_param.coeff_s[sp]*coeff_cond
-                    qoi_tot_mean += errors.qoi_s[sp]*pond_i
-                    qoi_tot.append(errors.qoi_s[sp]*min(1,np.ceil(pond_i)))
-                    pond+=pond_i
+                    txt_f+='Fit ' + cc + '  sp - ' + optim_param.tspc[sp] + ' : ' + "%.3f" %(1-errors.qoi_s[sp]) + '  pond = ' + "%.1f" %pond_i + '\n'
+                    qoi_tot_mean += (1-errors.qoi_s[sp])*pond_i
+                    qoi_case     += (1-errors.qoi_s[sp])*pond_i
+                    qoi_tot.append((1-errors.qoi_s[sp])*min(1,np.ceil(pond_i)))
+                    pond+=pond_i ; pond_case+=pond_i
             if 'JSR' not in conditions.config and T_check  and errors.qoi_T:
                 pond_i = optim_param.coeff_T*coeff_cond
-                qoi_tot_mean += errors.qoi_T*pond_i
-                qoi_tot.append(errors.qoi_T*min(1,np.ceil(pond_i)))
-                pond+=pond_i
+                txt_f+='Fit ' + cc + ' - T: ' + "%.3f" %(1-errors.qoi_T) + '  pond = ' + "%.1f" %pond_i + '\n'
+                qoi_tot_mean += (1-errors.qoi_T)*pond_i
+                qoi_case     += (1-errors.qoi_T)*pond_i
+                qoi_tot.append((1-errors.qoi_T)*min(1,np.ceil(pond_i)))
+                pond+=pond_i ; pond_case+=pond_i
             if 'reactor' in conditions.config and ig_check and errors.qoi_ig:
                 pond_i = optim_param.coeff_ig*coeff_cond
-                qoi_tot_mean += errors.qoi_ig*pond_i
-                qoi_tot.append(errors.qoi_ig*min(1,np.ceil(pond_i)))
-                pond+=pond_i
+                txt_f+='Fit reactor - igt: ' + "%.3f" %(1-errors.qoi_ig) + '  pond = ' + "%.1f" %pond_i + '\n'
+                qoi_tot_mean += (1-errors.qoi_ig)*pond_i
+                qoi_case     += (1-errors.qoi_ig)*pond_i
+                qoi_tot.append((1-errors.qoi_ig)*min(1,np.ceil(pond_i)))
+                pond+=pond_i ; pond_case+=pond_i
             if 'free_flame' in conditions.config and Sl_check and errors.qoi_Sl:
                 pond_i = optim_param.coeff_Sl*coeff_cond
-                qoi_tot_mean += errors.qoi_Sl*pond_i
-                qoi_tot.append(errors.qoi_Sl*min(1,np.ceil(pond_i)))
-                pond+=pond_i
+                txt_f+='Fit free_flame - Sl: ' + "%.3f" %(1-errors.qoi_Sl) + '  pond = ' + "%.1f" %pond_i + '\n'
+                qoi_tot_mean += (1-errors.qoi_Sl)*pond_i
+                qoi_case     += (1-errors.qoi_Sl)*pond_i
+                qoi_tot.append((1-errors.qoi_Sl)*min(1,np.ceil(pond_i)))
+                pond+=pond_i ; pond_case+=pond_i
             if ('diff_flame' in conditions.config or 'pp_flame' in conditions.config) and K_check and errors.qoi_K:
                 pond_i = optim_param.coeff_K*coeff_cond
-                qoi_tot_mean += errors.qoi_K*pond_i
-                qoi_tot.append(errors.qoi_K*min(1,np.ceil(pond_i)))
-                pond+=pond_i
+                txt_f+='Fit diff_flame - K: ' + "%.3f" %(1-errors.qoi_K) + '  pond = ' + "%.1f" %pond_i + '\n'
+                qoi_tot_mean += (1-errors.qoi_K)*pond_i
+                qoi_case     += (1-errors.qoi_K)*pond_i
+                qoi_tot.append((1-errors.qoi_K)*min(1,np.ceil(pond_i)))
+                pond+=pond_i ; pond_case+=pond_i
 
+            # detailed informations on initial fitness (for each case)
+#            print_detailed_fit = True
+#            if print_detailed_fit:
+#                fit_i =  1/(qoi_case/pond_case)
+#                txt_fit = 'Fitness condition ' + str(i+1) + ': ' + str(fit_i) \
+#                          + '   pond: ' + str(pond_case)
+#                print_(txt_fit, mp)
+        if verbose>=5:
+             print_(txt_f,mp)       
+ 
         if 'no data' in qoi_tot:  qoi_tot.remove('no data')
         if conditions.error_param.error_type_fit == 'mean':
 #             self.fitness = 1/(np.sum(qoi_tot)/pond)
-             fitness = 1/(qoi_tot_mean/pond)
+             # fitness = 1/(qoi_tot_mean/pond)
+             fitness = qoi_tot_mean/pond
+             if verbose>=5:
+                  print_('Fitness of the individual= ' + '%.3f' %fitness,mp)
         elif conditions.error_param.error_type_fit == 'max':
-             fitness = 1/np.max(qoi_tot)
+             fitness = 1-np.max(qoi_tot)
 
         # check nan
         if fitness != fitness:
             fitness = 0
 
-        return fitness
+        return max(fitness,0)
 
     def export_data(self,conditions_list,optim_param,ref_results_list,filename='temp.cti'):
         verbose = conditions_list[0].simul_param.verbose
@@ -687,21 +890,20 @@ class Chromosome:
         qoi_tot = [] ; pond=0
 
         os.chdir(conditions_list[0].main_path+'/GA')
-        self.mech.write_new_mech(filename)
+        if '.cti' in conditions_list[0].mech:
+            self.mech.write_new_mech(filename)
+        else:
+            if '.cti' in filename:
+                filename = filename[:-4] + '.yaml'
+            self.mech.write_yaml_mech(filename)
 
         # --------------------------------------------------------------------------------
         # interpretation of the new mech
 
-        # supress console output during the interpretation
-        if verbose<9:
-            old_stdout = sys.stdout ; old_stderr = sys.stderr
-            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-
         ct.suppress_thermo_warnings()
-        gas = ct.Solution(filename)
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        gas = cdef.get_gas_ct(filename)
 
-        # restore console output
-        if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
         # --------------------------------------------------------------------------------
 
 
@@ -714,7 +916,10 @@ class Chromosome:
             conditions   = conditions_list[i]
             ref_results = ref_results_list[i]
             os.chdir(conditions_list[0].main_path+'/GA')
-            self.mech.write_new_mech(filename)
+            if '.cti' in filename:
+                self.mech.write_new_mech(filename)
+            else:
+                self.mech.write_yaml_mech(filename)
 
             T_check  = conditions_list[i].error_param.T_check
             Sl_check = conditions_list[i].error_param.Sl_check
@@ -762,18 +967,49 @@ class Population:
 
         self.population = []
 
+        mech_data = self.get_uncertainty(mech_data,optim_param,conditions_list)
+
+
         # option to import modified mecanisms in the first population
         if optim_param.import_mech:
             rand_kin = optim_param.import_mech
             cur_path = os.getcwd()
             os.chdir(mp+'/../_kinetic_mech/'+optim_param.import_mech)
+            print_(mp+'/../_kinetic_mech/'+optim_param.import_mech,mp)
+            print_('Import kinetic mechanisms from:',mp)
             list_files = os.listdir()
             list_mech = []
             for _file in list_files:
-                if '.cti' in _file:
+                if '.cti' in _file or '.yaml' in _file:
                     list_mech.append(cdef.Mech_data(_file))
-                    print('Imported mechanism: ' + _file)
+
+                    list_mech[-1].react.incert      = copy.deepcopy(mech_data.react.incert)
+
+                    list_mech[-1].react.f_max       = copy.deepcopy(mech_data.react.f_max)
+                    list_mech[-1].react.f_T_fit     = copy.deepcopy(mech_data.react.f_T_fit)
+                    list_mech[-1].react.k0_fit      = copy.deepcopy(mech_data.react.k0_fit)
+                    list_mech[-1].react.f_max_lp    = copy.deepcopy(mech_data.react.f_max_lp)
+                    list_mech[-1].react.f_T_fit_lp  = copy.deepcopy(mech_data.react.f_T_fit_lp)
+                    list_mech[-1].react.k0_fit_lp   = copy.deepcopy(mech_data.react.k0_fit_lp)
+                    list_mech[-1].react.f_max_hp    = copy.deepcopy(mech_data.react.f_max_hp)
+                    list_mech[-1].react.f_T_fit_hp  = copy.deepcopy(mech_data.react.f_T_fit_hp)
+                    list_mech[-1].react.k0_fit_hp   = copy.deepcopy(mech_data.react.k0_fit_hp)
+
+                    list_mech[-1].react.k_ref       = copy.deepcopy(mech_data.react.k_ref)
+                    list_mech[-1].react.k_min       = copy.deepcopy(mech_data.react.k_min)
+                    list_mech[-1].react.k_max       = copy.deepcopy(mech_data.react.k_max)
+                    list_mech[-1].react.k_ref_lp    = copy.deepcopy(mech_data.react.k_ref_lp)
+                    list_mech[-1].react.k_min_lp    = copy.deepcopy(mech_data.react.k_min_lp)
+                    list_mech[-1].react.k_max_lp    = copy.deepcopy(mech_data.react.k_max_lp)
+                    list_mech[-1].react.k_ref_hp    = copy.deepcopy(mech_data.react.k_ref_hp)
+                    list_mech[-1].react.k_min_hp    = copy.deepcopy(mech_data.react.k_min_hp)
+                    list_mech[-1].react.k_max_hp    = copy.deepcopy(mech_data.react.k_max_hp)
+                    if 'keep' in _file.lower():
+                        list_mech[-1].keep4opt = True
+
+                    print_('Imported mechanism: ' + _file,mp)
             os.chdir(cur_path)
+
 
         for ind in range(size_pop):
             # if import_mech, get the mecanism to import in the first population
@@ -783,6 +1019,7 @@ class Population:
             self.population.append(Chromosome(conditions_list,mech_data,\
                                    ref_results_list,red_data_list,rand_kin))
 
+
 #        optim_from_values = False
 #        if optim_from_values:
 #            for ind in range(size_pop):
@@ -791,6 +1028,256 @@ class Population:
 
     def __getitem__(self, i):
         return self.population[i]
+
+
+
+    def get_uncertainty(self,mech_data,optim_param,conditions_list):
+
+        # Directory
+        os.chdir(optim_param.main_path)
+        table = [] ; uncertainty =[] ; num_react=[]
+
+
+        if 'uncertainties.csv' in os.listdir():
+            f=open('uncertainties.csv')
+            csv_f=csv.reader(f, delimiter=';')
+            for row in csv_f:
+                table.append(row)
+            f.close()
+
+            for i in range(len(table)-1):
+                num_react.append(table[i+1][0])      # [0] reaction number column
+                uncertainty.append(table[i+1][4])    # [4] uncertainties column
+        else:
+            a=2
+            # print('Uncertainties.csv absent: all uncertainties are fixed to ',str(optim_param.Arrh_max_variation))
+
+        mech_data.react.incert = []
+        for r in range(len(mech_data.react.equation)):
+            react_found=False
+            for r_inc in range(len(uncertainty)):
+                if int(num_react[r_inc])==mech_data.react.number[r]\
+                and uncertainty[r_inc]!='':
+                    mech_data.react.incert.append([float(u) for u in uncertainty[r_inc].split(',')])
+                    react_found = True
+                    break
+            if not react_found:
+                mech_data.react.incert.append(optim_param.Arrh_max_variation)
+
+
+        # =============================================================================
+        # Incertitude _f
+        # =============================================================================
+
+
+        # 1- lire fichier csv
+        if 'uncertainties_f.csv' in os.listdir():
+            f=open('uncertainties_f.csv')
+            csv_f     = csv.reader(f, delimiter=';')
+            react_f   = {'equation':[],
+                         'f_max':[],'f_T_fit':[],'k0_fit':[],
+                         'f_max_lp':[],'f_T_fit_lp':[],'k0_fit_lp':[],
+                         'f_max_hp':[],'f_T_fit_hp':[],'k0_fit_hp':[]}
+            # new_react = False
+            for row in csv_f:
+                if 'T_it:' in row:
+                    T_min  = int(row[2])
+                    T_max  = int(row[3])
+                    T_incr = int(row[4])
+                    mech_data.react.f_Tit = [T_min,T_max,T_incr]
+#                if "'---------------------------" in row:
+#                    new_react = True
+#                if new_react:
+                if 'equation:' in row:
+                    react_f['equation'].append(row[3])
+                    react_f['f_max'].append(False)
+                    react_f['f_max_lp'].append(False)
+                    react_f['f_max_hp'].append(False)                    
+                    react_f['f_T_fit'].append(False)
+                    react_f['f_T_fit_lp'].append(False)
+                    react_f['f_T_fit_hp'].append(False)
+                    react_f['k0_fit'].append(False)
+                    react_f['k0_fit_lp'].append(False)
+                    react_f['k0_fit_hp'].append(False)
+                    if 'h + ho2 => h2 + o2' in row[3]:
+                        print('toto')
+                    
+                # --- atmospheric pressure
+                if 'f max:' in row:
+                    f_max = row[3]      # row.split(';')[3]
+                    if f_max == 'False':         react_f['f_max'][-1] = optim_param.f_default
+                    else:                        react_f['f_max'][-1] = f_max
+                if 'f_T_fit:' in row:
+                    f_T_fit = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            f_T_fit.append(np.float32(row[3+_t]))
+                        react_f['f_T_fit'][-1] = f_T_fit
+                    else:
+                        react_f['f_T_fit'][-1] = [optim_param.f_default,0,0,0,0,0,0]
+                if 'k0_fit:' in row:
+                    k0_fit = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            k0_fit.append(np.float32(row[3+_t]))
+                        react_f['k0_fit'][-1] = k0_fit
+                    else:
+                        react_f['k0_fit'][-1] = False
+#                        new_react = False
+                # --- low pressure
+                if 'f max (low P):' in row:
+                    f_max_lp = row[3]       # row.split(';')[3]
+                    if f_max_lp == 'False':      react_f['f_max_lp'][-1] = optim_param.f_default
+                    else:                        react_f['f_max_lp'][-1] = f_max_lp
+                if 'f_T_fit_lp:' in row:
+                    f_T_fit_lp = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            f_T_fit_lp.append(np.float32(row[3+_t]))
+                        react_f['f_T_fit_lp'][-1] = f_T_fit_lp
+                    else:
+                        react_f['f_T_fit_lp'][-1] = [optim_param.f_default,0,0,0,0,0,0]
+                if 'k0_fit_lp:' in row:
+                    k0_fit_lp = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            k0_fit_lp.append(np.float32(row[3+_t]))
+                        react_f['k0_fit_lp'][-1] = k0_fit_lp
+                    else:
+                        react_f['k0_fit_lp'][-1] = False
+                # --- high pressure
+                if 'f max (high P):' in row:
+                    f_max_hp = row[3]     # row.split(';')[3]
+                    if f_max_hp == 'False':      react_f['f_max_hp'][-1] = optim_param.f_default
+                    else:                        react_f['f_max_hp'][-1] = f_max_hp
+                if 'f_T_fit_hp:' in row:
+                    f_T_fit_hp = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            f_T_fit_hp.append(np.float32(row[3+_t]))
+                        react_f['f_T_fit_hp'][-1] = f_T_fit_hp
+                    else:
+                        react_f['f_T_fit_hp'][-1] = [optim_param.f_default,0,0,0,0,0,0]
+                if 'k0_fit_hp:' in row:
+                    k0_fit_hp = []
+                    if row[3] != 'False' :
+                        for _t in range(9):
+                            k0_fit_hp.append(np.float32(row[3+_t]))
+                        react_f['k0_fit_hp'][-1] = k0_fit_hp
+                    else:
+                        react_f['k0_fit_hp'][-1] = False
+#                        new_react = False
+
+            f.close()
+
+
+            # 2b - comparer les réactifs du méca avec ceux du fichier
+            for _r1,r1_equation in enumerate(mech_data.react.equation):
+                if _r1==15:
+                    print('toto')
+                if '<=>' in r1_equation:
+                    reactants_m = r1_equation.split('<=>')[0].upper()
+                    products_m  = r1_equation.split('<=>')[1].upper()
+                else:
+                    reactants_m = r1_equation.split('=>')[0].upper()
+                    products_m  = r1_equation.split('=>')[1].upper()
+                reactants_meca = cdef.get_react_species(reactants_m)
+                products_meca = cdef.get_react_species(products_m)
+                reaction_found   = False
+                for _r2,r2_equation in enumerate(react_f['equation']):
+                    if '<=>' in r2_equation:
+                        reactants_f = r2_equation.split('<=>')[0].upper()
+                        products_f  = r2_equation.split('<=>')[1].upper()
+                    else:
+                        reactants_f = r2_equation.split('=>')[0].upper()
+                        products_f  = r2_equation.split('=>')[1].upper()
+                    reactants_file = cdef.get_react_species(reactants_f)
+                    products_file  = cdef.get_react_species(products_f)
+                    # check identical reactions
+                    if (set(reactants_file) == set(reactants_meca) and set(products_file) == set(products_meca)) \
+                    or (set(reactants_file) == set(products_meca)  and set(products_file) == set(reactants_meca) and '<=>' in r2_equation):
+                        mech_data.react.f_max.append(react_f['f_max'][_r2])
+                        mech_data.react.f_T_fit.append(react_f['f_T_fit'][_r2])
+                        mech_data.react.k0_fit.append(react_f['k0_fit'][_r2])
+                        mech_data.react.f_max_lp.append(react_f['f_max_lp'][_r2])
+                        mech_data.react.f_T_fit_lp.append(react_f['f_T_fit_lp'][_r2])
+                        mech_data.react.k0_fit_lp.append(react_f['k0_fit_lp'][_r2])
+                        mech_data.react.f_max_hp.append(react_f['f_max_hp'][_r2])
+                        mech_data.react.f_T_fit_hp.append(react_f['f_T_fit_hp'][_r2])
+                        mech_data.react.k0_fit_hp.append(react_f['k0_fit_hp'][_r2])
+                        reaction_found = True
+                        break
+                    # else:
+                    #     if r1_equation.upper() == r2_equation.upper():
+                    #         mech_data.react.f_max.append(react_f['f_max'][_r2])
+                    #         mech_data.react.f_T_fit.append(react_f['f_T_fit'][_r2])
+                    #         mech_data.react.k0_fit.append(react_f['k0_fit'][_r2])
+                    #         mech_data.react.f_max_lp.append(react_f['f_max_lp'][_r2])
+                    #         mech_data.react.f_T_fit_lp.append(react_f['f_T_fit_lp'][_r2])
+                    #         mech_data.react.k0_fit_lp.append(react_f['k0_fit_lp'][_r2])
+                    #         mech_data.react.f_max_hp.append(react_f['f_max_hp'][_r2])
+                    #         mech_data.react.f_T_fit_hp.append(react_f['f_T_fit_hp'][_r2])
+                    #         mech_data.react.k0_fit_hp.append(react_f['k0_fit_hp'][_r2])
+                    #         reaction_found = True
+                    #         break
+
+                if not reaction_found:
+                    mech_data.react.f_max.append(optim_param.f_default)
+                    mech_data.react.f_T_fit.append(optim_param.f_default)
+                    mech_data.react.k0_fit.append(False)
+                    mech_data.react.f_max_lp.append(optim_param.f_default)
+                    mech_data.react.f_T_fit_lp.append(optim_param.f_default)
+                    mech_data.react.k0_fit_lp.append(False)
+                    mech_data.react.f_max_hp.append(optim_param.f_default)
+                    mech_data.react.f_T_fit_hp.append(optim_param.f_default)
+                    mech_data.react.k0_fit_hp.append(False)
+
+        else:
+            for r in range(len(mech_data.react.equation)):
+                mech_data.react.f_max.append(optim_param.f_default)
+                mech_data.react.f_T_fit.append(optim_param.f_default)
+                mech_data.react.k0_fit.append(False)
+                mech_data.react.f_max_lp.append(optim_param.f_default)
+                mech_data.react.f_T_fit_lp.append(optim_param.f_default)
+                mech_data.react.k0_fit_lp.append(False)
+                mech_data.react.f_max_hp.append(optim_param.f_default)
+                mech_data.react.f_T_fit_hp.append(optim_param.f_default)
+                mech_data.react.k0_fit_hp.append(False)
+
+        p_min  = 5e4    # Pa
+        p_max  = 5e6    # Pa
+        for i in range(len(conditions_list)):
+            if conditions_list[i].state_var.P < p_min:
+                p_min = conditions_list[i].state_var.P
+            if conditions_list[i].state_var.P > p_max:
+                p_max = conditions_list[i].state_var.P
+        mech_data = compute_kref_and_klim(mech_data,p_min,p_max)
+
+        os.chdir("GA")
+
+        return mech_data
+
+
+
+    def check_early_conv(self,optim_param,gen,verbose):
+
+        mp      = optim_param.main_path
+        MaxIt   = optim_param.n_gen
+
+        # calculation of the fitness stats
+        fitness_list = []
+        for p in range(len(self.population)):
+            fitness_list.append(self.population[p].fitness)
+        best_fitness = np.max(fitness_list) ; std_fit = np.std(fitness_list)
+
+        fitness_list = np.array((fitness_list))
+
+        if gen < .9*MaxIt and std_fit<(.1*best_fitness):
+            print_('Early convergence detected, create new random individuals',mp)
+            self.sort_fitness()
+
+            for p_i in range(round(len(self.population)/2)):
+                 self.population[p_i].randomize_kin(optim_param)
 
 
 
@@ -813,23 +1300,59 @@ class Population:
 
     def compare_best_ind(self, best_ind, optim_param, main_path, verbose=0):
         mp = optim_param.main_path
+
+        mp = optim_param.main_path
         n_ind = optim_param.n_ind
         best_idx = self.find_best()
+
         new_best_ind = False
         # compare the current best population ind to the previous best ind
         if self.population[best_idx].fitness > best_ind.fitness:
             best_ind = copy.deepcopy(self.population[best_idx])
             os.chdir(mp+'/GA')
-            best_ind.mech.write_new_mech("optim_mech.cti")
+            if '.cti' in self.population[0].mech.name:
+                best_ind.mech.write_new_mech("optim_mech.cti")
+            else:
+                best_ind.mech.write_yaml_mech("optim_mech.yaml")
+
             if verbose >= 3:
                 print_("New best_ind: "+"%.3f" %(best_ind.fitness),mp)
             new_best_ind = True
         best_idx = self.find_best(n_ind)
+
         if self.population[best_idx].fitness < best_ind.fitness:
             worst_idx=self.find_worst(best_idx,n_ind)
             self.population[worst_idx]=copy.deepcopy(best_ind)
 
         return best_ind, new_best_ind
+
+
+    def def_pop2keep(self):
+        pop2keep = []
+        for ind in self.population:
+            if ind.mech.keep4opt == True:
+                pop2keep.append(copy.deepcopy(ind))
+        return pop2keep
+
+
+    def insert_pop2keep(self, optim_param, pop2keep):
+        n_ind = optim_param.n_ind
+
+        # Fitness list
+        list_fit = []
+        for _p in range(n_ind):
+            list_fit.append(self.population[_p].fitness)
+
+        # Get sorted element indices
+        sort_index = sorted(range(len(list_fit)), key=lambda k: list_fit[k])
+
+        # Create the order list from the sorted indices
+        order = [0] * len(list_fit)
+        for i, _index in enumerate(sort_index, start=1):
+            order[_index] = i
+
+        for _p2k, mech_2keep in enumerate(pop2keep):
+            self.population[order[_p2k]]=copy.deepcopy(mech_2keep)
 
 
     def find_best(self,n_ind=False):
@@ -872,13 +1395,7 @@ class Population:
         # change dir
         os.chdir(conditions_list[0].main_path)
 
-        # supress console output during the interpretation
-        old_stdout = sys.stdout ; old_stderr = sys.stderr
-        with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-        ct.suppress_thermo_warnings()
-        gas = ct.Solution(mech)
-        # restore console output
-        sys.stdout = old_stdout ; sys.stderr = old_stderr
+        gas = cdef.get_gas_ct(mech)
 
         for _c in range(len(conditions_list)):
             conditions_list[_c].composition.gas     = gas
@@ -892,6 +1409,7 @@ class Population:
             fitness = 0
 
         bar.update(ind,title)
+
         return (fitness,ind)
 
     def fitness_eval_newchilds(self,optim_param,conditions_list,ref_results_list):
@@ -914,7 +1432,8 @@ class Population:
             del ref_results_list[res].gas
             del ref_results_list[res].f
             simul_time_limit += ref_results_list[res].simul_time
-        simul_time_limit = simul_time_limit*5*child_nb + 30
+#        simul_time_limit = simul_time_limit*(6+np.random.uniform()*16)#*(child_nb/num_cores)
+        simul_time_limit = simul_time_limit*2*(child_nb/num_cores) + 30
 #        simul_time_limit = simul_time_limit*5 + 30
 
 
@@ -935,72 +1454,87 @@ class Population:
 
         # Fitness calculation
 
+        if sys.gettrace() is not None : is_debug_mode = True
+        else:                           is_debug_mode = False
+
         # no parallelisation --------------------------------------------------
+        if is_debug_mode:
+            fit_list = []
+            mech = conditions_list[0].mech
 
-#        fit_list = []
-#        mech = conditions_list[0].mech
-#        # supress console output during the interpretation
-#        old_stdout = sys.stdout ; old_stderr = sys.stderr
-#        with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-#        gas = ct.Solution(mech)
-#        # restore console output
-#        sys.stdout = old_stdout ; sys.stderr = old_stderr
-#        for _c in range(len(conditions_list)):
-#            conditions_list[_c].composition.gas     = gas
-#            conditions_list[_c].composition.gas_ref = gas
-#        for ch in range(child_nb):
-#            fit_list.append([self.population[ch].fitness_eval(conditions_list,optim_param,ref_results_list,ch),ch])
+            gas = cdef.get_gas_ct(mech)
+            for _c in range(len(conditions_list)):
+                conditions_list[_c].composition.gas     = gas
+                conditions_list[_c].composition.gas_ref = gas
+            for ch in range(child_nb):
+                fit_list.append([self.population[ch].fitness_eval(conditions_list,optim_param,ref_results_list,ch),ch])
+        else:
 
+            # Parallelisation 1 ---------------------------------------------------
+    #        with Pool(processes=num_cores) as pool:
+    #            fit_list = [ pool.apply_async(self.fitness_eval_par, args) for args in fit_eval_inp ]
 
-        # Parallelisation 1 ---------------------------------------------------
-#        with Pool(processes=num_cores) as pool:
-#            fit_list = [ pool.apply_async(self.fitness_eval_par, args) for args in fit_eval_inp ]
+            # Parallelisation 2 ---------------------------------------------------
+    #        fit_list = []
+    #        def log_result(fit_i):
+    #            # This is called whenever foo_pool(i) returns a result.
+    #            # result_list is modified only by the main process, not the pool workers.
+    #            fit_list.append(fit_i)
+    #
+    #        pool=Pool(processes=num_cores)
+    #        for args in fit_eval_inp:
+    #            pool.apply_async(self.fitness_eval_par, args, callback=log_result)
+    #        pool.close()
 
-        # Parallelisation 2 ---------------------------------------------------
-#        fit_list = []
-#        def log_result(fit_i):
-#            # This is called whenever foo_pool(i) returns a result.
-#            # result_list is modified only by the main process, not the pool workers.
-#            fit_list.append(fit_i)
-#
-#        pool=Pool(processes=num_cores)
-#        for args in fit_eval_inp:
-#            pool.apply_async(self.fitness_eval_par, args, callback=log_result)
-#        pool.close()
-
-        # Parallelisation 3 ---------------------------------------------------
-#        if os.name == 'nt': multiprocessing.get_context('spawn')
-#        with multiprocessing.Pool(num_cores) as p:
-#            fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+            # Parallelisation 3 ---------------------------------------------------
+    #        if os.name == 'nt': multiprocessing.get_context('spawn')
+    #        with multiprocessing.Pool(num_cores) as p:
+    #            fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
 
 
-        # Parallelisation 4   (with simulation time check) --------------------
-        #  https://pythonhosted.org/Pebble/#pools
-        fit_list = []
-        with ProcessPool() as pool:
-            sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
-            try:
-                for fit in sim_results.result():
-                    fit_list.append(fit)
-            except TimeoutError:
-                print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 5 x ref simulation time)',mp)
-                print_("TimeoutError: aborting remaining computations",mp)
-                fit_list.sort(reverse=False, key=lambda col: col[1])
-                fitness_incomplete = copy.deepcopy(fit_list)
-                list_ind_eval = []
-                for ind_fit_inc in fitness_incomplete:
-                    list_ind_eval.append(ind_fit_inc[1])
-                n_sim=len(fitness_incomplete)
-                for _i in range(child_nb):
-                    try:
-                        if _i not in list_ind_eval:
-                            fit_list.insert(_i,(0,_i))
-                    except:
-                        fit_list.append((0,_i))
-                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
-                sim_results.cancel()
+            # Parallelisation 4   (with simulation time check) --------------------
+            #  https://pythonhosted.org/Pebble/#pools
+            fit_list = []
+            with ProcessPool() as pool:
+                sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
+                try:
+                    for fit in sim_results.result():
+                        fit_list.append(fit)
+                except TimeoutError:
+                    print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 1.5 x ref simulation time)',mp)
+                    print_("TimeoutError: aborting remaining computations",mp)
+                    fit_list.sort(reverse=False, key=lambda col: col[1])
+                    fitness_incomplete = copy.deepcopy(fit_list)
+                    list_ind_eval = []
+                    for ind_fit_inc in fitness_incomplete:
+                        list_ind_eval.append(ind_fit_inc[1])
+                    n_sim=len(fitness_incomplete)
+                    for _i in range(child_nb):
+                        try:
+                            if _i+optim_param.n_ind not in list_ind_eval:
+                                fit_list.insert(_i,(0,_i))
+                        except:
+                            fit_list.append((0,_i))
+                    print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                    sim_results.cancel()
+                except:
+                    print_('\n\nWarning : error in simulation',mp)
+                    print_("aborting remaining computations",mp)
+                    fit_list.sort(reverse=False, key=lambda col: col[1])
+                    fitness_incomplete = copy.deepcopy(fit_list)
+                    list_ind_eval = []
+                    for ind_fit_inc in fitness_incomplete:
+                        list_ind_eval.append(ind_fit_inc[1])
+                    n_sim=len(fitness_incomplete)
+                    for _i in range(child_nb):
+                        try:
+                            if _i+optim_param.n_ind not in list_ind_eval:
+                                fit_list.insert(_i,(0,_i))
+                        except:
+                            fit_list.append((0,_i))
+                    print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                    sim_results.cancel()
 
-        fit_list.sort(reverse=False, key=lambda col: col[1])
 
 
 #        for _i in range(len(fit_list)):
@@ -1043,16 +1577,18 @@ class Population:
 
 
 
-
         fit_list.sort(reverse=False, key=lambda col: col[1])
+
 
         for _i in range(len(fit_list)):
             ind = optim_param.n_ind + _i
             self.population[ind].fitness = fit_list[_i][0]
 
-
         bar.update(child_nb,title)
         print('\n')
+
+
+
 
         for i in range(len(conditions_list)):
             conditions_list[i].composition.gas     = gas
@@ -1101,33 +1637,32 @@ class Population:
         os.chdir("GA")
 
 
-#        # bypass parallelisation for debugging -------------------------------
-#        if 'Dagaut' in conditions_list[0].main_path:
-#            fit_i = []
-#            mech = conditions_list[0].mech
-#            # supress console output during the interpretation
-#            old_stdout = sys.stdout ; old_stderr = sys.stderr
-#            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-#            gas = ct.Solution(mech)
-#            # restore console output
-#            sys.stdout = old_stdout ; sys.stderr = old_stderr
-#            for _c in range(len(conditions_list)):
-#                conditions_list[_c].composition.gas     = gas
-#                conditions_list[_c].composition.gas_ref = gas
-#            for ind in range(n_ind):
-#                fit_i.append(self.fitness_eval(conditions_list,optim_param,ref_results_list,ind),ind)
-#        else:
-#        # bypass parallelisation for debugging -------------------------------
-        # Fitness calculation
-        num_cores   = multiprocessing.cpu_count()
-        if os.name == 'nt': multiprocessing.get_context('spawn')
-        with multiprocessing.Pool(num_cores) as p:
-            fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
+        if sys.gettrace() is not None : is_debug_mode = True
+        else:                           is_debug_mode = False
 
-        fit_i.sort(reverse=False, key=lambda col: col[1])
+        if is_debug_mode:
+            # bypass parallelisation for debugging
+            fit_i = []
+            mech = conditions_list[0].mech
 
-        for _i in range(len(fit_i)):
-            self.population[_i].fitness = fit_i[_i][0]
+            gas = cdef.get_gas_ct(mech)
+            for _c in range(len(conditions_list)):
+                conditions_list[_c].composition.gas     = gas
+                conditions_list[_c].composition.gas_ref = gas
+            for ind in range(n_ind):
+                fit_i.append([self.population[ind].fitness_eval(conditions_list,optim_param,ref_results_list,ind),ind])
+
+        else:
+            # Parallelized Fitness calculation
+            num_cores   = multiprocessing.cpu_count()
+            if os.name == 'nt': multiprocessing.get_context('spawn')
+            with multiprocessing.Pool(num_cores) as p:
+                fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
+    #
+            fit_i.sort(reverse=False, key=lambda col: col[1])
+
+            for _i in range(len(fit_i)):
+                self.population[_i].fitness = fit_i[_i][0]
 
 
 
@@ -1172,8 +1707,8 @@ class Population:
 
 
 
-#%%
-### Selection
+#%% Selection
+
     def selection(self,optim_param,verbose):
         mp = optim_param.main_path
 
@@ -1296,8 +1831,8 @@ class Population:
 
 
 
-#%%
-### CrossOver
+#%% CrossOver
+
     def Xover(self,optim_param,conditions_list,ref_results_list,verbose):
         mp = optim_param.main_path
 
@@ -1333,7 +1868,6 @@ class Population:
                                        ref_results_list,created_ind)
                     created_ind_total += 2
                     created_ind += 2
-        print_('',mp)
 
 
     def Xover_1_simple(self,conditions_list,optim_param,ref_results_list,created_ind):
@@ -1345,7 +1879,7 @@ class Population:
         parent2    = random.randrange(0, size_pop)
         child1     = size_pop+created_ind
         child2     = size_pop+created_ind+1
-        while parent1 == parent2 :
+        while parent1 == parent2:
             parent2 = random.randrange(0, size_pop)
 
         self.population[child1] = copy.deepcopy(self.population[parent1])
@@ -1355,9 +1889,7 @@ class Population:
         for i in range(a,size_react):
             self.population[child1].mech.react.kin[i] = copy.deepcopy(self.population[parent2].mech.react.kin[i])
             self.population[child2].mech.react.kin[i] = copy.deepcopy(self.population[parent1].mech.react.kin[i])
-
-#        self.population[child1].fitness_eval(conditions_list,optim_param,ref_results_list)
-#        self.population[child2].fitness_eval(conditions_list,optim_param,ref_results_list)
+                
 
     def Xover_2_multiple(self,conditions_list,optim_param,ref_results_list,created_ind):
 
@@ -1382,8 +1914,8 @@ class Population:
 
 
     def Xover_3_arith(self,conditions_list,optim_param,ref_results_list,created_ind):
-    #(self,ref_pop,created_ind, AG_reference, AG_mech, error_param, max_variation):
 
+        mp = optim_param.main_path
         random.seed()
         size_react = len(self.population[0].mech.react.kin)
         size_pop   = optim_param.n_ind
@@ -1399,80 +1931,154 @@ class Population:
 
 
         for r in range(size_react):
-            incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
-            if self.population[0].mech.react.modif[r]:
-                mix = random.random()
-
-                if self.population[0].mech.react.type[r] =='three_body_reaction' \
-                or self.population[0].mech.react.type[r] =='reaction':
-                    nTry = 0; maxRetry = 15
-                    while nTry <= maxRetry:
-
-                        val1=[];val2=[]
-                        for k in range(3):
-                            ref = self.population[0].mech.react.ref_kin[r][k]
-                            if ref!= 0.0:
-                                new_val1  = self.population[p1].mech.react.kin[r][k]*mix \
-                                           +self.population[p2].mech.react.kin[r][k]*(1-mix)
-                                new_val2  = self.population[p2].mech.react.kin[r][k]*mix \
-                                           +self.population[p1].mech.react.kin[r][k]*(1-mix)
-                                if  abs(ref*(1-incert_r[k])) < abs(new_val1) < abs(ref*(1+incert_r[k]))\
-                                and abs(ref*(1-incert_r[k])) < abs(new_val2) < abs(ref*(1+incert_r[k]))\
-                                and new_val1/ref > 0\
-                                and new_val2/ref > 0:
-                                    val1.append(new_val1)
-                                    val2.append(new_val2)
-                            else :
-                                val1.append(.0)
-                                val2.append(.0)
-                        if len(val1)==3:
-#                            val1[0]=abs(val1[0])    # avoid negative pre-exponential factor
-#                            val2[0]=abs(val2[0])    # avoid negative pre-exponential factor
-                            self.population[child1].mech.react.kin[r] = list(val1)
-                            self.population[child2].mech.react.kin[r] = list(val2)
-                            break
-                        else:
-                            nTry +=1 ; mix = random.random()
-
-
-                if self.population[0].mech.react.type[r] =='falloff_reaction' \
-                or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
-                or self.population[0].mech.react.type[r] =='chebyshev'\
-                or self.population[0].mech.react.type[r] =='pdep_arrhenius':
-                    for j in range(len(self.population[0].mech.react.kin[r])):
+            try_r = 0 ; valid1,valid2 = False,False
+            while not ((valid1 and valid2) or try_r > 3):
+                incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
+                if self.population[0].mech.react.modif[r]:
+                    mix = random.random()
+                    if self.population[0].mech.react.type[r] =='three_body_reaction' \
+                    or self.population[0].mech.react.type[r] =='reaction':
                         nTry = 0; maxRetry = 15
                         while nTry <= maxRetry:
-                            success = True
                             val1=[];val2=[]
                             for k in range(3):
-                                ref=self.population[0].mech.react.ref_kin[r][j][k]
+                                ref = self.population[0].mech.react.ref_kin[r][k]
                                 if ref!= 0.0:
-                                    new_val1  = self.population[p1].mech.react.kin[r][j][k]*mix\
-                                               +self.population[p2].mech.react.kin[r][j][k]*(1-mix)
-                                    new_val2  = self.population[p2].mech.react.kin[r][j][k]*mix \
-                                               +self.population[p1].mech.react.kin[r][j][k]*(1-mix)
-                                    if abs(new_val1) < abs(ref*(1-incert_r[k]))\
-                                    or abs(new_val1) > abs(ref*(1+incert_r[k]))\
-                                    or new_val1/ref < 0:
-                                        success = False
-                                    elif abs(new_val2) < abs(ref*(1-incert_r[k]))\
-                                    or   abs(new_val2) > abs(ref*(1+incert_r[k]))\
-                                    or   new_val2/ref < 0:
-                                        success = False
+                                    new_val1  = self.population[p1].mech.react.kin[r][k]*mix \
+                                               +self.population[p2].mech.react.kin[r][k]*(1-mix)
+                                    new_val2  = self.population[p2].mech.react.kin[r][k]*mix \
+                                               +self.population[p1].mech.react.kin[r][k]*(1-mix)
+                                    if optim_param.Arrh_var:
+                                        a = ref*(1-incert_r[k])
+                                        b = ref*(1-incert_r[k])
+                                        min_val = min(a,b)
+                                        max_val = max(a,b)
                                     else:
+                                        f_min = self.population[0].mech.react.f_min[r]
+                                        T_min = self.population[0].mech.react.f_Tit[0]
+                                        T_max = self.population[0].mech.react.f_Tit[1]            
+                                        R = 8.314/4.1868 #(cal/mol)                                    
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))                                
+                                    if  min_val < new_val1 < max_val\
+                                    and min_val < new_val2 < max_val\
+                                    and new_val1/ref > 0\
+                                    and new_val2/ref > 0:
                                         val1.append(new_val1)
                                         val2.append(new_val2)
                                 else :
-                                    val1.append(.0)
-                                    val2.append(.0)
-                            if success:
-#                                val1[0]=abs(val1[0])    # avoid negative pre-exponential factor
-#                                val2[0]=abs(val2[0])    # avoid negative pre-exponential factor
-                                self.population[child1].mech.react.kin[r][j]=list(val1)
-                                self.population[child2].mech.react.kin[r][j]=list(val2)
+                                    val1.append(ref)
+                                    val2.append(ref)
+                            if len(val1)==3:
+                                self.population[child1].mech.react.kin[r] = list(val1)
+                                self.population[child2].mech.react.kin[r] = list(val2)
                                 break
                             else:
                                 nTry +=1 ; mix = random.random()
+
+                    if self.population[0].mech.react.type[r] =='falloff_reaction' \
+                    or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
+                    or self.population[0].mech.react.type[r] =='chebyshev'\
+                    or self.population[0].mech.react.type[r] =='pdep_arrhenius':
+                        mix = random.random()                      
+                        nTry = 0; maxRetry = 15
+                        while nTry <= maxRetry:
+                            success = True                        
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                val1=[];val2=[]
+                                for k in range(3):
+                                    ref=self.population[0].mech.react.ref_kin[r][j][k]
+                                    if ref!= 0.0:
+                                        new_val1  = self.population[p1].mech.react.kin[r][j][k]*mix\
+                                                   +self.population[p2].mech.react.kin[r][j][k]*(1-mix)
+                                        new_val2  = self.population[p2].mech.react.kin[r][j][k]*mix \
+                                                   +self.population[p1].mech.react.kin[r][j][k]*(1-mix)
+                                        if optim_param.Arrh_var or self.population[0].mech.react.type[r] =='chebyshev':
+                                            a = ref*(1-incert_r[k])
+                                            b = ref*(1-incert_r[k])
+                                            min_val = min(a,b)
+                                            max_val = max(a,b)
+                                        else:
+                                            f_min = self.population[0].mech.react.f_min[r]
+                                            T_min = self.population[0].mech.react.f_Tit[0]
+                                            T_max = self.population[0].mech.react.f_Tit[1]            
+                                            R = 8.314/4.1868 #(cal/mol)                                    
+                                            if k==0: # A
+                                                if ref>0:
+                                                    min_val=ref/(10**f_min)
+                                                    max_val=ref*(10**f_min)
+                                                if ref<0:
+                                                    min_val=ref*(10**f_min)
+                                                    max_val=ref/(10**f_min)
+                                            if k==1: # n
+                                                if ref>0:
+                                                    min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                    max_val=ref+(f_min/np.log10(T_max))
+                                                if ref<0:
+                                                    min_val=ref-(f_min/np.log10(T_max))
+                                                    max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                            if k==2: # Ea
+                                                if ref>0:
+                                                    min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                    max_val=ref+(f_min*R*T_min*np.log(10))
+                                                if ref<0:
+                                                    min_val=ref-(f_min*R*T_min*np.log(10))
+                                                    max_val=min(0,ref+(f_min*R*T_min*np.log(10)))    
+                                        if  min_val < new_val1 < max_val\
+                                        and min_val < new_val2 < max_val\
+                                        and new_val1/ref > 0\
+                                        and new_val2/ref > 0:
+                                            val1.append(new_val1)
+                                            val2.append(new_val2)
+                                        else:
+                                            success = False
+                                    else :
+                                        val1.append(.0)
+                                        val2.append(.0)
+                            if success:
+                                for j in range(len(self.population[0].mech.react.kin[r])):
+                                    for k in range(3):
+                                        if ref!= 0.0:
+                                            new_val1  = self.population[p1].mech.react.kin[r][j][k]*mix\
+                                                       +self.population[p2].mech.react.kin[r][j][k]*(1-mix)
+                                            new_val2  = self.population[p2].mech.react.kin[r][j][k]*mix \
+                                                       +self.population[p1].mech.react.kin[r][j][k]*(1-mix)
+                                            self.population[child1].mech.react.kin[r][j][k] = new_val1
+                                            self.population[child2].mech.react.kin[r][j][k] = new_val2                                
+                                break
+                            else:
+                                nTry +=1 ; 
+                    valid1 = check_k(self.population[child1].mech.react,r)
+                    valid2 = check_k(self.population[child2].mech.react,r)
+                    try_r += 1
+                else:
+                    valid1,valid2 = True,True
+
+            if not valid1 or not valid2:
+                if not valid1:
+                    self.population[child1].mech.react.kin[r] = copy.deepcopy(self.population[p1].mech.react.kin[r])
+                if not valid2:
+                    self.population[child2].mech.react.kin[r] = copy.deepcopy(self.population[p2].mech.react.kin[r])
+
 
 
     def Xover_4_heuri(self,conditions_list,optim_param,ref_results_list,created_ind):
@@ -1482,6 +2088,7 @@ class Population:
         size_pop   = optim_param.n_ind
         p1    = random.randrange(0, size_pop)
         p2    = random.randrange(0, size_pop)
+        damping = 0.75
         while p1 == p2:
             p2 = random.randrange(0, size_pop)
         if self.population[p1].fitness>self.population[p2].fitness:
@@ -1494,68 +2101,144 @@ class Population:
         self.population[child1] = copy.deepcopy(self.population[worse])
         self.population[child2] = copy.deepcopy(self.population[best])
 
-
         for r in range(size_react):
-            incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
-            mix = random.random()
-            if self.population[0].mech.react.modif[r]:
-                if self.population[0].mech.react.type[r] =='three_body_reaction' \
-                or self.population[0].mech.react.type[r] =='reaction':
-                    nTry = 0; maxRetry = 15
-                    while nTry <= maxRetry:
-                        success = True
-                        val1=[]
-                        for k in range(3):
-                            ref = self.population[0].mech.react.ref_kin[r][k]
-                            if ref!= 0.0:
-                                bestVal  = self.population[best].mech.react.kin[r][k]
-                                worseVal = self.population[worse].mech.react.kin[r][k]
-                                new_val  = mix*(bestVal-worseVal)+bestVal
-                                if abs(new_val) < abs(ref*(1-incert_r[k]))\
-                                or abs(new_val) > abs(ref*(1+incert_r[k]))\
-                                or new_val/ref < 0:
-                                    success = False
-                                else: val1.append(new_val)
-                            else :
-                                val1.append(.0)
-                        if success:
-#                            val1[0]=abs(val1[0])    # avoid negative pre-exponential factor
-                            self.population[child1].mech.react.kin[r] = list(val1)
-                            break
-                        else:
-                            nTry +=1 ; mix = random.random()
-
-                if self.population[0].mech.react.type[r] =='falloff_reaction' \
-                or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
-                or self.population[0].mech.react.type[r] =='chebyshev'\
-                or self.population[0].mech.react.type[r] =='pdep_arrhenius':
-                    for j in range(len(self.population[0].mech.react.kin[r])):
+            try_r = 0 ; valid1,valid2 = False,False
+            while not ((valid1 and valid2) or try_r > 3):
+                incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
+                mix = random.random()
+                if self.population[0].mech.react.modif[r]:
+                    if self.population[0].mech.react.type[r] =='three_body_reaction' \
+                    or self.population[0].mech.react.type[r] =='reaction':
                         nTry = 0; maxRetry = 15
                         while nTry <= maxRetry:
                             success = True
                             val1=[]
                             for k in range(3):
-                                ref=self.population[0].mech.react.ref_kin[r][j][k]
+                                ref = self.population[0].mech.react.ref_kin[r][k]
                                 if ref!= 0.0:
-                                    bestVal  = self.population[best].mech.react.kin[r][j][k]
-                                    worseVal = self.population[worse].mech.react.kin[r][j][k]
-                                    new_val  = mix*(bestVal-worseVal)+bestVal
-                                    if abs(new_val) < abs(ref*(1-incert_r[k]))\
-                                    or abs(new_val) > abs(ref*(1+incert_r[k]))\
-                                    or new_val/ref  < 0:
+                                    bestVal  = self.population[best].mech.react.kin[r][k]
+                                    worseVal = self.population[worse].mech.react.kin[r][k]
+                                    new_val  = mix*(damping**try_r)*(bestVal-worseVal)+bestVal
+                                    if optim_param.Arrh_var:
+                                        a = ref*(1-incert_r[k])
+                                        b = ref*(1-incert_r[k])
+                                        min_val = min(a,b)
+                                        max_val = max(a,b)
+                                    else:
+                                        f_min = self.population[0].mech.react.f_min[r]
+                                        T_min = self.population[0].mech.react.f_Tit[0]
+                                        T_max = self.population[0].mech.react.f_Tit[1]            
+                                        R = 8.314/4.1868 #(cal/mol)                                    
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))                                
+                                    if  min_val < new_val < max_val\
+                                    and new_val/ref > 0:
+                                        val1.append(new_val)
+                                    else:
                                         success = False
-                                    else: val1.append(new_val)
-                                else:
-                                    val1.append(.0)
+                                else :
+                                    val1.append(ref)
                             if success:
-#                                val1[0]=abs(val1[0])    # avoid negative pre-exponential factor
-                                self.population[child1].mech.react.kin[r][j]=list(val1)
+                                self.population[child1].mech.react.kin[r] = list(val1)
                                 break
                             else:
                                 nTry +=1 ; mix = random.random()
+                    if self.population[0].mech.react.type[r] =='falloff_reaction' \
+                    or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
+                    or self.population[0].mech.react.type[r] =='chebyshev'\
+                    or self.population[0].mech.react.type[r] =='pdep_arrhenius':
+                        nTry = 0; maxRetry = 15
+                        while nTry <= maxRetry:
+                            success = True                        
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                val1=[]
+                                for k in range(3):
+                                    ref=self.population[0].mech.react.ref_kin[r][j][k]
+                                    if ref!= 0.0:
+                                        bestVal  = self.population[best].mech.react.kin[r][j][k]
+                                        worseVal = self.population[worse].mech.react.kin[r][j][k]
+                                        new_val  = mix*(damping**try_r)*(bestVal-worseVal)+bestVal
+                                        if optim_param.Arrh_var:
+                                            a = ref*(1-incert_r[k])
+                                            b = ref*(1-incert_r[k])
+                                            min_val = min(a,b)
+                                            max_val = max(a,b)
+                                        else:
+                                            f_min = self.population[0].mech.react.f_min[r]
+                                            T_min = self.population[0].mech.react.f_Tit[0]
+                                            T_max = self.population[0].mech.react.f_Tit[1]            
+                                            R = 8.314/4.1868 #(cal/mol)                                    
+                                            if k==0: # A
+                                                if ref>0:
+                                                    min_val=ref/(10**f_min)
+                                                    max_val=ref*(10**f_min)
+                                                if ref<0:
+                                                    min_val=ref*(10**f_min)
+                                                    max_val=ref/(10**f_min)
+                                            if k==1: # n
+                                                if ref>0:
+                                                    min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                    max_val=ref+(f_min/np.log10(T_max))
+                                                if ref<0:
+                                                    min_val=ref-(f_min/np.log10(T_max))
+                                                    max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                            if k==2: # Ea
+                                                if ref>0:
+                                                    min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                    max_val=ref+(f_min*R*T_min*np.log(10))
+                                                if ref<0:
+                                                    min_val=ref-(f_min*R*T_min*np.log(10))
+                                                    max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
+                                        if  min_val < new_val < max_val\
+                                        and new_val/ref > 0:
+                                            val1.append(new_val)
+                                        else:
+                                            success = False
+                                    else:
+                                        val1.append(.0)
+                            if success:
+                                for j in range(len(self.population[0].mech.react.kin[r])):
+                                    for k in range(3):
+                                        bestVal  = self.population[best].mech.react.kin[r][j][k]
+                                        worseVal = self.population[worse].mech.react.kin[r][j][k]                                        
+                                        new_val  = mix*(damping**try_r)*(bestVal-worseVal)+bestVal
+                                        self.population[child1].mech.react.kin[r][j][k]=new_val
+                                break
+                            else:
+                                nTry +=1 ; mix = random.random()
+                    valid1 = check_k(self.population[child1].mech.react,r)
+                    valid2 = check_k(self.population[child2].mech.react,r)
+                    try_r += 1
+                else:
+                    valid1,valid2 = True,True
+            if not valid1 and valid2:
+                if not valid1:
+                    self.population[child1].mech.react.kin[r] = copy.deepcopy(self.population[p1].mech.react.kin[r])
+                if not valid2:
+                    self.population[child2].mech.react.kin[r] = copy.deepcopy(self.population[p2].mech.react.kin[r])
 
 
-### Mutation
+#%% Mutation
+
     def mutation(self,optim_param,conditions_list,ref_results_list,gen,verbose):
         mp = optim_param.main_path
 
@@ -1589,7 +2272,6 @@ class Population:
                     self.mut_3_bound(conditions_list,optim_param,ref_results_list,\
                                created_ind_total,optim_param.mut_option[2])
                     created_ind_total += 1
-        print_('',mp)
 
     def mut_1_unif(self,conditions_list,optim_param,ref_results_list,created_ind,opt):
 
@@ -1598,43 +2280,128 @@ class Population:
         size_pop   = int(optim_param.n_ind)
         parent1    = random.randrange(0, size_pop)
         child1     = int(size_pop+created_ind)
-        probaMut = optim_param.mut_intensity
+        probaMut   = optim_param.mut_intensity
+        damping    = 0.75
 
         self.population[child1] = copy.deepcopy(self.population[parent1])
 
         for r in range(size_react):
-            incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
-            if self.population[0].mech.react.modif[r]:
-                if self.population[0].mech.react.type[r] =='three_body_reaction' \
-                or self.population[0].mech.react.type[r] =='reaction':
-                    val=[]
-                    for k in range(3):
-                        ref = self.population[0].mech.react.ref_kin[r][k]
-                        rand = random.random()*100
-                        if rand < probaMut: # random modif of a kinetic constant
-                            val.append(random.uniform(ref*(1-incert_r[k])\
-                                                    ,ref*(1+incert_r[k])))
-                        else:
-                            val.append(self.population[child1].mech.react.kin[r][k])
-#                    val[0]=abs(val[0])    # avoid negative pre-exponential factor
-                    self.population[child1].mech.react.kin[r]=list(val)
-
-                if self.population[0].mech.react.type[r] =='falloff_reaction' \
-                or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
-                or self.population[0].mech.react.type[r] =='chebyshev'\
-                or self.population[0].mech.react.type[r] =='pdep_arrhenius':
-                    for j in range(len(self.population[0].mech.react.kin[r])):
+            try_r = 0 ; valid = False
+            while not (valid or try_r > 10):
+                incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
+                if self.population[0].mech.react.modif[r]:
+                    if self.population[0].mech.react.type[r] =='three_body_reaction' \
+                    or self.population[0].mech.react.type[r] =='reaction':
                         val=[]
+                        for k in range(3):                            
+                            ref = self.population[0].mech.react.ref_kin[r][k]
+                            rand = random.random()*100
+                            if ref==0:
+                                rand = probaMut+1
+                            if rand < probaMut: # random modif of a kinetic constant
+                                if optim_param.Arrh_var:
+                                    val.append(random.uniform(ref*(1-incert_r[k]*(damping**try_r))\
+                                                            ,ref*(1+incert_r[k]*(damping**try_r))))
+                                
+                                else:
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)                                    
+                                    if k==0: # A
+                                        val.append(random.uniform(ref/(10**f_min),ref*(10**f_min)))
+                                    if k==1: # n
+                                        if ref>0:
+                                            min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                            max_val=ref+(f_min/np.log10(T_max))
+                                        if ref<0:
+                                            min_val=ref-(f_min/np.log10(T_max))
+                                            max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        val.append(random.uniform(min_val,max_val))
+                                    if k==2: # Ea
+                                        if ref>0:
+                                            min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                            max_val=ref+(f_min*R*T_min*np.log(10))
+                                        if ref<0:
+                                            min_val=ref-(f_min*R*T_min*np.log(10))
+                                            max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
+                                        val.append(random.uniform(min_val,max_val))
+                            else:
+                                val.append(self.population[child1].mech.react.kin[r][k])
+                        self.population[child1].mech.react.kin[r]=list(val)
+
+                    if self.population[0].mech.react.type[r] =='falloff_reaction' \
+                    or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
+                    or self.population[0].mech.react.type[r] =='pdep_arrhenius':
+                        mod_factor = [] ; j=0
+                        # calculate the variation for the three Arrhenius parameters
+                        # and then apply the same factors to the other Arrhenius parameters
+                        # to keep consistancy on the modifications (see Bertolino et al. Comb and Flame 229 (2021) 111366)
                         for k in range(3):
                             ref = self.population[0].mech.react.ref_kin[r][j][k]
                             rand = random.random()*100
+                            if ref==0:
+                                rand = probaMut+1
                             if rand < probaMut: # random modif of a kinetic constant
-                                val.append(random.uniform(ref*(1-incert_r[k])\
-                                                        ,ref*(1+incert_r[k])))
+                                if optim_param.Arrh_var:
+                                    val = random.uniform(ref*(1-incert_r[k]*(damping**try_r))\
+                                                            ,ref*(1+incert_r[k]*(damping**try_r)))
+                                    if ref!=0:  mod_factor.append(val/ref)
+                                    else:       mod_factor.append(0)
+                                else:
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)                                    
+                                    if k==0: # A
+                                        val = random.uniform(ref/(10**f_min),ref*(10**f_min))
+                                    if k==1: # n
+                                        if ref>0:
+                                            min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                            max_val=ref+(f_min/np.log10(T_max))
+                                        if ref<0:
+                                            min_val=ref-(f_min/np.log10(T_max))
+                                            max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        val = random.uniform(min_val,max_val)
+                                    if k==2: # Ea
+                                        if ref>0:
+                                            min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                            max_val=ref+(f_min*R*T_min*np.log(10))
+                                        if ref<0:
+                                            min_val=ref-(f_min*R*T_min*np.log(10))
+                                            max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
+                                        val = random.uniform(min_val,max_val)
+                                    if ref!=0:  mod_factor.append(val/ref)
+                                    else:       mod_factor.append(0)
                             else:
-                                val.append(self.population[child1].mech.react.kin[r][j][k])
-#                        val[0]=abs(val[0])    # avoid negative pre-exponential factor
-                        self.population[child1].mech.react.kin[r][j]=list(val)
+                                mod_factor.append(1)
+                        # Introduction of the new Arrhenius parameters                                
+                        for j in range(len(self.population[0].mech.react.kin[r])):
+                            for k in range(3):
+                                ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                self.population[child1].mech.react.kin[r][j][k]=ref*mod_factor[k]
+                                
+                    if self.population[0].mech.react.type[r] =='chebyshev':
+                        for j in range(len(self.population[0].mech.react.kin[r])):
+                            val=[]
+                            for k in range(3):
+                                ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                rand = random.random()*100
+                                if ref==0:
+                                    rand = probaMut+1
+                                if rand < probaMut: # random modif of a kinetic constant
+                                    val.append(random.uniform(ref*(1-incert_r[k]*(damping**try_r))\
+                                                            ,ref*(1+incert_r[k]*(damping**try_r))))
+                                else:
+                                    val.append(self.population[child1].mech.react.kin[r][j][k])
+                            self.population[child1].mech.react.kin[r][j]=list(val)
+                                
+                # Validation of the new reaction rate                                
+                valid = check_k(self.population[child1].mech.react,r)
+                try_r += 1
+
+            if not valid:
+                self.population[child1].mech.react.kin[r] = copy.deepcopy(self.population[parent1].mech.react.kin[r])
 
 
 
@@ -1649,65 +2416,156 @@ class Population:
         probaMut   = optim_param.mut_intensity
         ratio      = gen/optim_param.n_gen
         shape      = option
+        damping    = 0.75
 
         self.population[child1] = copy.deepcopy(self.population[parent1])
 
         for r in range(size_react):
-            rand = random.random()*100
-            incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
-            if rand < probaMut:
-                if self.population[0].mech.react.modif[r]:
-                    if self.population[0].mech.react.type[r] =='three_body_reaction' \
-                    or self.population[0].mech.react.type[r] =='reaction':
-                        for k in range(3):
-                            ref = self.population[0].mech.react.ref_kin[r][k]
-                            if ref>0:
-                                min_val = ref*(1-incert_r[k])
-                                max_val = ref*(1+incert_r[k])
-                            else:
-                                max_val = ref*(1-incert_r[k])
-                                min_val = ref*(1+incert_r[k])
-                            val = self.population[child1].mech.react.kin[r][k]
-                            rand_dir = random.randrange(0,2)
-                            if rand_dir == 0: # random modif of a kinetic constant
-                                change=(max_val-val)*(random.random()*(1-ratio))**shape
-                                self.population[child1].mech.react.kin[r][k]+=change
-#                                if k==0: # avoid negative pre-exponential factor
-#                                    self.population[child1].mech.react.kin[r][k] \
-#                                         = self.population[child1].mech.react.kin[r][k]
-                            elif rand_dir == 1:
-                                change=(val-min_val)*(random.random()*(1-ratio))**shape
-                                self.population[child1].mech.react.kin[r][k]-=change
-#                                if k==0: # avoid negative pre-exponential factor
-#                                    self.population[child1].mech.react.kin[r][k] \
-#                                         = self.population[child1].mech.react.kin[r][k]
-                    elif self.population[0].mech.react.type[r] =='falloff_reaction' \
-                    or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
-                    or self.population[0].mech.react.type[r] =='chebyshev'\
-                    or self.population[0].mech.react.type[r] =='pdep_arrhenius':
-                        for j in range(len(self.population[0].mech.react.kin[r])):
+            try_r = 0 ; valid = False
+            while not (valid or try_r > 10):
+                rand = random.random()*100
+                incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
+                if rand < probaMut:
+                    if self.population[0].mech.react.modif[r]:
+                        if self.population[0].mech.react.type[r] =='three_body_reaction' \
+                        or self.population[0].mech.react.type[r] =='reaction':
                             for k in range(3):
-                                ref = self.population[0].mech.react.ref_kin[r][j][k]
-                                if ref>0:
-                                    min_val = ref*(1-incert_r[k])
-                                    max_val = ref*(1+incert_r[k])
+                                ref = self.population[0].mech.react.ref_kin[r][k]
+                                val = self.population[child1].mech.react.kin[r][k]
+                                if optim_param.Arrh_var:
+                                    if ref>0:
+                                        min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        max_val = ref*(1+incert_r[k]*(damping**try_r))
+                                    else:
+                                        max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        min_val = ref*(1+incert_r[k]*(damping**try_r))
                                 else:
-                                    max_val = ref*(1-incert_r[k])
-                                    min_val = ref*(1+incert_r[k])
-                                val = self.population[child1].mech.react.kin[r][j][k]
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)   
+                                    if ref==0:
+                                        min_val, max_val = 0,0
+                                    else:
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
                                 rand_dir = random.randrange(0,2)
                                 if rand_dir == 0: # random modif of a kinetic constant
                                     change=(max_val-val)*(random.random()*(1-ratio))**shape
-                                    self.population[child1].mech.react.kin[r][j][k]+=change
-#                                    if k==0: # avoid negative pre-exponential factor
-#                                        self.population[child1].mech.react.kin[r][j][k] \
-#                                             = abs(self.population[child1].mech.react.kin[r][j][k])
+                                    self.population[child1].mech.react.kin[r][k]+=change
                                 elif rand_dir == 1:
                                     change=(val-min_val)*(random.random()*(1-ratio))**shape
-                                    self.population[child1].mech.react.kin[r][j][k]-=change
-#                                    if k==0: # avoid negative pre-exponential factor
-#                                        self.population[child1].mech.react.kin[r][j][k] \
-#                                             = self.population[child1].mech.react.kin[r][j][k]
+                                    self.population[child1].mech.react.kin[r][k]-=change
+                                    
+                        elif self.population[0].mech.react.type[r] =='falloff_reaction' \
+                        or self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
+                        or self.population[0].mech.react.type[r] =='pdep_arrhenius':
+                            mod_factor = [] ; j=0     
+                            # calculate the variation for the three Arrhenius parameters
+                            # and then apply the same factors to the other Arrhenius parameters
+                            # to keep consistancy on the modifications (see Bertolino et al. Comb and Flame 229 (2021) 111366)
+                            for k in range(3):
+                                ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                val = self.population[child1].mech.react.kin[r][j][k]                                    
+                                if optim_param.Arrh_var:
+                                    if ref>0:
+                                        min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        max_val = ref*(1+incert_r[k]*(damping**try_r))
+                                    else:
+                                        max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        min_val = ref*(1+incert_r[k]*(damping**try_r))
+                                else:
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)
+                                    if ref==0:
+                                        min_val, max_val = 0,0
+                                    else:                                        
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
+                                rand_dir = random.randrange(0,2)
+                                if ref != 0:
+                                    if rand_dir == 0: # random modif of a kinetic constant
+                                        change=(max_val-val)*(random.random()*(1-ratio))**shape
+                                        new_val = self.population[child1].mech.react.kin[r][j][k]+change
+                                        mod_factor.append(new_val/ref)
+                                    elif rand_dir == 1:
+                                        change=(val-min_val)*(random.random()*(1-ratio))**shape
+                                        new_val = self.population[child1].mech.react.kin[r][j][k]-change
+                                        mod_factor.append(new_val/ref)
+                                else:
+                                    mod_factor.append(0)
+                            # Introduction of the new Arrhenius parameters
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                for k in range(3):
+                                    ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                    self.population[child1].mech.react.kin[r][j][k]=ref*mod_factor[k]
+                                    
+                        elif self.population[0].mech.react.type[r] =='chebyshev':
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                for k in range(3):
+                                    ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                    val = self.population[child1].mech.react.kin[r][j][k]                                    
+                                    if ref>0:
+                                        min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        max_val = ref*(1+incert_r[k]*(damping**try_r))
+                                    else:
+                                        max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                        min_val = ref*(1+incert_r[k]*(damping**try_r))
+                                    rand_dir = random.randrange(0,2)
+                                    if rand_dir == 0: # random modif of a kinetic constant
+                                        change=(max_val-val)*(random.random()*(1-ratio))**shape
+                                        self.population[child1].mech.react.kin[r][j][k]+=change
+                                    elif rand_dir == 1:
+                                        change=(val-min_val)*(random.random()*(1-ratio))**shape
+                                        self.population[child1].mech.react.kin[r][j][k]-=change                                    
+                                    
+                # Validation of the new reaction rate
+                valid = check_k(self.population[child1].mech.react,r)
+                try_r += 1
+
+            if not valid:
+                self.population[child1].mech.react.kin[r] = copy.deepcopy(self.population[parent1].mech.react.kin[r])
+
 
 #        self.population[child1].fitness_eval(conditions_list,optim_param,ref_results_list)
 
@@ -1721,54 +2579,139 @@ class Population:
         parent1    = random.randrange(0, size_pop)
         child1     = int(size_pop+created_ind)
         probaMut   = optim_param.mut_intensity
+        damping    = 0.75
         self.population[child1] = copy.deepcopy(self.population[parent1])
 
         for r in range(size_react):
+            try_r = 0 ; valid = False 
             rand = random.random()*100
-            incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]
-            if rand < probaMut:
-                if self.population[0].mech.react.modif[r]:
-                    if self.population[0].mech.react.type[r] =='three_body_reaction' \
-                    or self.population[0].mech.react.type[r] =='reaction':
-                        for k in range(3):
-                            ref = self.population[0].mech.react.ref_kin[r][k]
-                            rand_dir = random.randrange(0,2)
-                            if rand_dir == 0: # random modif of a kinetic constant to the boundary value
-#                                if k==0:
-#                                    self.population[child1].mech.react.kin[r][k] \
-#                                    = abs(ref*(1-incert_r[k]))
-#                                else:
-                                self.population[child1].mech.react.kin[r][k] \
-                                = ref*(1-incert_r[k])
-                            elif rand_dir == 1:
-                                self.population[child1].mech.react.kin[r][k] \
-                                = ref*(1+incert_r[k])
-                    elif self.population[0].mech.react.type[r] =='falloff_reaction' \
-                    or   self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
-                    or   self.population[0].mech.react.type[r] =='chebyshev'\
-                    or   self.population[0].mech.react.type[r] =='pdep_arrhenius':
-                        for j in range(len(self.population[0].mech.react.kin[r])):
+            if rand < probaMut:      
+                incert_r = [u/100 for u in self.population[0].mech.react.incert[r]]                
+                while not (valid or try_r > 10):
+                    if self.population[0].mech.react.modif[r]:
+                        if self.population[0].mech.react.type[r] =='three_body_reaction' \
+                        or self.population[0].mech.react.type[r] =='reaction':
+                            for k in range(3):
+                                ref = self.population[0].mech.react.ref_kin[r][k]
+                                rand_dir = random.randrange(0,2)           
+                                if optim_param.Arrh_var:
+                                    min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                    max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                else:
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)
+                                    if ref==0:
+                                        min_val, max_val = 0,0
+                                    else:
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))                                
+                                if rand_dir == 0: # random modif of a kinetic constant to the boundary value        
+                                    self.population[child1].mech.react.kin[r][k] = min_val
+                                elif rand_dir == 1:
+                                    self.population[child1].mech.react.kin[r][k] = max_val
+                        elif self.population[0].mech.react.type[r] =='falloff_reaction' \
+                        or   self.population[0].mech.react.type[r] =='chemically_activated_reaction'\
+                        or   self.population[0].mech.react.type[r] =='pdep_arrhenius':
+                            mod_factor = [] ; j=0     
+                            # calculate the variation for the three first Arrhenius parameters
+                            # and then apply the same factors to the other Arrhenius parameters
+                            # to keep consistancy on the modifications (see Bertolino et al. Comb and Flame 229 (2021) 111366)
                             for k in range(3):
                                 ref = self.population[0].mech.react.ref_kin[r][j][k]
                                 rand_dir = random.randrange(0,2)
-                                if rand_dir == 0: # random modif of a kinetic constant to the boundary value
-#                                    if k==0:      # avoid negative pre-exponential factor
-#                                        self.population[child1].mech.react.kin[r][j][k] \
-#                                        = abs(ref*(1-incert_r[k]))
-#                                    else:
-                                    self.population[child1].mech.react.kin[r][j][k] \
-                                    = ref*(1-incert_r[k])
+                                if optim_param.Arrh_var:
+                                    min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                    max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                else:
+                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    T_min = self.population[0].mech.react.f_Tit[0]
+                                    T_max = self.population[0].mech.react.f_Tit[1]            
+                                    R = 8.314/4.1868 #(cal/mol)    
+                                    if ref==0:
+                                        min_val, max_val = 0,0
+                                    else:
+                                        if k==0: # A
+                                            if ref>0:
+                                                min_val=ref/(10**f_min)
+                                                max_val=ref*(10**f_min)
+                                            if ref<0:
+                                                min_val=ref*(10**f_min)
+                                                max_val=ref/(10**f_min)
+                                        if k==1: # n
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min/np.log10(T_max)))
+                                                max_val=ref+(f_min/np.log10(T_max))
+                                            if ref<0:
+                                                min_val=ref-(f_min/np.log10(T_max))
+                                                max_val=min(0,ref+(f_min/np.log10(T_max)))
+                                        if k==2: # Ea
+                                            if ref>0:
+                                                min_val=max(0,ref-(f_min*R*T_min*np.log(10)))
+                                                max_val=ref+(f_min*R*T_min*np.log(10))
+                                            if ref<0:
+                                                min_val=ref-(f_min*R*T_min*np.log(10))
+                                                max_val=min(0,ref+(f_min*R*T_min*np.log(10)))
+                                if ref != 0:
+                                    if rand_dir == 0: # random modif of a kinetic constant to the boundary value
+                                        mod_factor.append(min_val/ref)                                                                    
+                                    elif rand_dir == 1:                            
+                                        mod_factor.append(max_val/ref)            
+                                else:
+                                    mod_factor.append(0)
+                            # Introduction of the new Arrhenius parameters
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                for k in range(3):
+                                    ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                    self.population[child1].mech.react.kin[r][j][k]=ref*mod_factor[k]
+                                    
+                        elif self.population[0].mech.react.type[r] =='chebyshev':
+                            for j in range(len(self.population[0].mech.react.kin[r])):
+                                for k in range(3):
+                                    ref = self.population[0].mech.react.ref_kin[r][j][k]
+                                    rand_dir = random.randrange(0,2)
+                                    min_val = ref*(1-incert_r[k]*(damping**try_r))
+                                    max_val = ref*(1-incert_r[k]*(damping**try_r))
+                                if rand_dir == 0: # random modif of a kinetic constant to the boundary value        
+                                    self.population[child1].mech.react.kin[r][j][k] = min_val
                                 elif rand_dir == 1:
-                                    self.population[child1].mech.react.kin[r][j][k] \
-                                    = ref*(1+incert_r[k])
+                                    self.population[child1].mech.react.kin[r][j][k] = max_val
+                
+                    # Validation of the new reaction rate
+                    valid = check_k(self.population[child1].mech.react,r)
+                    try_r += 1
+
+            if not valid:
+                self.population[child1].mech.react.kin[r] = copy.deepcopy(self.population[parent1].mech.react.kin[r])
+
 #        self.population[child1].fitness_eval(conditions_list,optim_param,ref_results_list)
 
 
 
 
 
-#%%
-### Others
+#%% Others
+
     def popBestInd(self):
         index=0
         max_fit  = 0
@@ -1789,6 +2732,487 @@ class Population:
     def sort_fitness_rev(self):
         """ Sort population according to chromosome fitness """
         self.population =sorted(self.population, key=operator.attrgetter('fitness'), reverse=True)
+
+
+#%% Functions
+
+def check_k(_react,_r):
+
+    T_min  = _react.f_Tit[0]
+    T_max  = _react.f_Tit[1]
+    T_incr = _react.f_Tit[2]
+    T_list = np.array(range(T_min,T_max+T_incr,T_incr))
+    R = 8.314/4.1868 #(cal/mol)
+    P =  1e5  # (Pa)
+    lp = 5e4  # (Pa)
+    hp = 5e6  # (Pa)
+
+    valid_kin = True
+    # https://cantera.org/science/reactions.html
+    import warnings
+
+
+    Y_r = []
+
+    if _react.type[_r] == 'reaction' or _react.type[_r] == 'three_body_reaction':
+        A = _react.kin[_r][0] ; n = _react.kin[_r][1] ; Ea = _react.kin[_r][2]
+        for i,T in enumerate(T_list):
+            Y_r.append(A*T**n*np.exp(-Ea/(R*T)))
+            if not _react.k_min[_r][i] < A*T**n*np.exp(-Ea/(R*T)) < _react.k_max[_r][i]:
+                valid_kin = False
+
+    elif _react.type[_r] == 'pdep_arrhenius':
+        all_P = [lp, P, hp]
+        list_P = _react.param[_r][0]
+
+        for Pi,_pi in enumerate(all_P):
+            # pressure limits of the reaction law
+            idx_Pinf,idx_Psup = 0,0
+            for _p in range(len(list_P)):
+                if P <= float(list_P[_p]):
+                    idx_Psup = _p
+                    if idx_Psup==0: idx_Pinf = 0
+                    else:           idx_Pinf = _p-1
+                    break
+            P_inf = float(list_P[idx_Pinf])
+            P_sup = float(list_P[idx_Psup])
+
+            for i,T in enumerate(T_list):
+                # k_pinf:
+                i=0 ; k_pinf=0
+                while float(list_P[idx_Pinf-i]) == float(list_P[idx_Pinf]):
+                    A = _react.kin[_r][idx_Pinf-i][0]
+                    n = _react.kin[_r][idx_Pinf-i][1]
+                    Ea = _react.kin[_r][idx_Pinf-i][2]
+                    k_pinf +=  A * (T)**n * np.exp(-Ea/(R*T))
+                    i+=1
+                # k_psup:
+                i=0 ; k_psup=0
+                while float(list_P[idx_Psup+i]) == float(list_P[idx_Psup]):
+                    A = _react.kin[_r][idx_Psup+i][0]
+                    n = _react.kin[_r][idx_Psup+i][1]
+                    Ea = _react.kin[_r][idx_Psup+i][2]
+                    k_psup +=  A * (T)**n * np.exp(-Ea/(R*T))
+                    i+=1
+                    if idx_Psup+i>=len(list_P):
+                        break
+                # k
+                if P_inf == P_sup:
+                    if _pi==0: k_lp = k_pinf
+                    if _pi==1: k    = k_pinf
+                    if _pi==2: k_hp = k_pinf
+                else:
+                    if k_pinf < 1e-150: k_pinf = 1e-150  # avoid log(0) calculation
+                    if k_psup < 1e-150: k_psup = 1e-150  # avoid log(0) calculation
+                    if _pi==0:
+                        k_lp = np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(Pi)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf))))
+                        if not _react.k_min_lp[_r][i] < k_lp < _react.k_max_lp[_r][i]:
+                            valid_kin = False
+                            break
+                    if _pi==1:
+                        k = np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(Pi)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf))))
+                        if not _react.k_min[_r][i] < k < _react.k_max[_r][i]:
+                            valid_kin = False
+                            break
+                    if _pi==2:
+                        k_hp = np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(Pi)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf))))
+                        if not _react.k_min_hp[_r][i] < k_hp < _react.k_max_hp[_r][i]:
+                            valid_kin = False
+
+    elif _react.type[_r] == 'falloff_reaction' or _react.type[_r] == 'chemically_activated_reaction':
+        # get Troe param
+        try:
+            Troe_func = True
+            At = np.float32(_react.param[_r]['A'])
+            T3t = np.float32(_react.param[_r]['T3'])
+            T1t = np.float32(_react.param[_r]['T1'])
+            T2t = np.float32(_react.param[_r]['T2'])
+        except:
+            Troe_func = False
+        # calculation of k
+        Af = _react.kin[_r][0][0] ; nf = _react.kin[_r][0][1] ; Eaf = _react.kin[_r][0][2]
+        A0 = _react.kin[_r][1][0] ; n0 = _react.kin[_r][1][1] ; Ea0 = _react.kin[_r][1][2]
+        for i,T in enumerate(T_list):
+            M    = P/(8.314*T)           # mol/m3
+            M    = M*1e-6                # mol/cm3
+            M_lp  = (lp*1e-6)/(8.314*T)  # mol/cm3
+            M_hp  = (hp*1e-6)/(8.314*T)  # mol/cm3
+            kinf = Af * T**nf * np.exp(-Eaf/(R*T))
+            k0   = A0 * T**n0 * np.exp(-Ea0/(R*T))
+            Pr    = (k0*M)/kinf
+            Pr_lp = (k0*M_lp)/kinf
+            Pr_hp = (k0*M_hp)/kinf
+            warnings.filterwarnings("ignore") # suppress warnings with exponential calculation
+            if Troe_func:
+                if T2t: Fcent = (1-At)*np.exp(-T/T3t) + At*np.exp(-T/T1t) + np.exp(-T2t/T1t)
+                else:   Fcent = (1-At)*np.exp(-T/T3t) + At*np.exp(-T/T1t)
+                C  = -0.4 - 0.67*np.log10(Fcent)
+                N  = 0.75 - 1.27*np.log10(Fcent)
+                f1 = (np.log10(Pr) + C) / (N-0.14*(np.log10(Pr)+C))
+                F  = 10**(np.log10(Fcent) / (1+f1**2))
+                f1_lp = (np.log10(Pr_lp) + C) / (N-0.14*(np.log10(Pr_lp)+C))
+                F_lp  = 10**(np.log10(Fcent) / (1+f1_lp**2))
+                f1_hp = (np.log10(Pr_hp) + C) / (N-0.14*(np.log10(Pr_hp)+C))
+                F_hp  = 10**(np.log10(Fcent) / (1+f1_hp**2))
+            else:
+                F,F_lp,F_hp = 1,1,1
+            if _react.type[_r] == 'falloff_reaction':
+                k    = kinf*(Pr/(1+Pr))*F
+                k_lp = kinf*(Pr_lp/(1+Pr_lp))*F_lp
+                k_hp = kinf*(Pr_hp/(1+Pr_hp))*F_hp
+            elif _react.type[_r] == 'chemically_activated_reaction':
+                k    = k0*(1/(1+Pr))*F
+                k_lp = k0*(1/(1+Pr_lp))*F
+                k_hp = k0*(1/(1+Pr_hp))*F
+            warnings.resetwarnings()
+            if not   _react.k_min[_r][i] < k    < _react.k_max[_r][i]:
+                valid_kin = False
+            elif not _react.k_min_lp[_r][i] < k_lp < _react.k_max_lp[_r][i]:
+                valid_kin = False
+            elif not _react.k_min_hp[_r][i] < k_hp < _react.k_max_hp[_r][i]:
+                valid_kin = False
+    elif 'chebyshev' in _react.type[_r]:
+        # get param
+        Tmin = np.float32(_react.param[_r]['Tmin'])
+        Tmax = np.float32(_react.param[_r]['Tmax'])
+        Pmin = np.float32(_react.param[_r]['Pmin'])
+        Pmax = np.float32(_react.param[_r]['Pmin'])
+        if _react.param[_r]['Pmin_unit'] is not False:
+            if "'Pa'" in _react.param[_r]['Pmin_unit']:    # conversion to atm
+                Pmin = Pmin/101325
+            elif "'Bar'" in _react.param[_r]['Pmin_unit']: # conversion to atm
+                Pmin = Pmin/1.01325
+        if _react.param[_r]['Pmax_unit'] is not False:
+            if "'Pa'" in _react.param[_r]['Pmax_unit']:    # conversion to atm
+                Pmax = Pmax/101325
+            elif "'Bar'" in _react.param[_r]['Pmax_unit']: # conversion to atm
+                Pmax = Pmax/1.01325
+
+
+        # k calculation (Carstensen H-H. Reaction Rate Representation Using Chebyshev Polynomials)
+        # size of NT Np coefficients
+        N_T = len(_react.kin[_r]) ; N_P = len(_react.kin[_r][0])
+        for i,T in enumerate(T_list):
+            T_tilde = (2/T - 1/Tmin - 1/Tmax)/(1/Tmax - 1/Tmin)
+            P_tilde = (2*np.log10(P) - np.log10(Pmin) - np.log10(Pmax))/(np.log10(Pmax) - np.log10(Pmin))
+
+            log_k = 0
+            for t in range(N_T):
+                phi_tT = np.cos(t*np.arccos(T_tilde))
+                for p in range(N_P):
+                    phi_pP = np.cos(p*np.arccos(P_tilde))
+                    a_tp = _react.kin[_r][t][p]
+                    log_k += a_tp*phi_tT*phi_pP
+            k = 10**log_k
+            if not _react.k_min[_r][i] < k < _react.k_max[_r][i]:
+                valid_kin = False
+
+    else:
+        k = list(np.array([0]*len(T_list)))
+
+
+#
+#    if _react.equation[_r] == 'CH3O + O2 <=> CH2O + HO2':
+##    or _react.equation[_r] == 'CH3O + H (+ M) <=> CH3OH (+ M)'\
+##    or _react.equation[_r] == 'H2 + O <=> H + OH'\
+##    or _react.equation[_r] == 'HO2 + OH <=> H2O + O2'\
+##    or _react.equation[_r] == 'C2H4 + H (+M) <=> C2H5 (+M)':
+#        import tool_brooks as tb
+#        print(str(valid_kin))
+#
+#        if valid_kin:
+#            tb.plot_graph___Title_X_Y_Legend_kwargs(_react.equation[_r],
+#                                                1000/T_list,
+#                                                [Y_r],
+#                                                ['k0'],
+#                                                fill_between_X = 1000/T_list,
+#                                                fill_between_Y = [_react.k_min[_r],_react.k_max[_r]],
+#                                                fig_save=True,
+#                                                fig_show=True,
+#                                                Y_log   =True)
+#        print(str(valid_kin))
+
+    return valid_kin
+
+
+
+
+def compute_kref_and_klim(mech_data,p_min,p_max):
+
+    T_min  = mech_data.react.f_Tit[0]
+    T_max  = mech_data.react.f_Tit[1]
+    T_incr = mech_data.react.f_Tit[2]
+    T_list = np.array(range(T_min,T_max+T_incr,T_incr))
+
+    R = 8.314/4.1868 #(cal/mol)
+
+    P =  1e5  # (Pa)
+    lp = 5e4  # (Pa)
+    hp = 5e6  # (Pa)
+
+    # https://cantera.org/science/reactions.html
+    import warnings
+    mech_data.react.k_ref = []
+    mech_data.react.k_min = []
+    mech_data.react.k_max = []
+    mech_data.react.k_ref_lp = []
+    mech_data.react.k_min_lp = []
+    mech_data.react.k_max_lp = []
+    mech_data.react.k_ref_hp = []
+    mech_data.react.k_min_hp = []
+    mech_data.react.k_max_hp = []
+    mech_data.react.f_min    = [] 
+    mech_data.react.f_lp_min = []
+    mech_data.react.f_hp_min = []
+
+    for _r in range(len(mech_data.react.type)):
+        k_ref,k_ref_lp,k_ref_hp = [],[],[]
+        
+        # atm pressure
+        f_T,k0 = [],[]
+        cT  = mech_data.react.f_T_fit[_r]
+
+        if mech_data.react.k0_fit[_r] is not False:
+            ck0 = np.poly1d(mech_data.react.k0_fit[_r])
+            k0  = 10**ck0(T_list)
+        else:
+            k0  = False
+
+        if type(cT) is list:
+            cTf   = np.poly1d(cT)
+            f_T   = cTf(T_list)
+        else:
+            f_T   = np.array([cT]*len(T_list))
+        mech_data.react.f_min.append(min(f_T))
+
+
+        # low pressure
+        f_T_lp,k0_lp = [],[]
+        cT  = np.poly1d(mech_data.react.f_T_fit_lp[_r])
+        ck0 = np.poly1d(mech_data.react.k0_fit_lp[_r])
+        f_T_lp   = cT(T_list)
+        k0_lp    = 10**ck0(T_list)
+        mech_data.react.f_lp_min.append(min(f_T_lp))
+
+        # high pressure
+        f_T_hp,k0_hp = [],[]
+        cT  = np.poly1d(mech_data.react.f_T_fit_hp[_r])
+        ck0 = np.poly1d(mech_data.react.k0_fit_hp[_r])
+        f_T_hp   = cT(T_list)
+        k0_hp    = 10**ck0(T_list)
+        mech_data.react.f_hp_min.append(min(f_T_hp))
+
+        if k0 is not False:
+            if mech_data.react.type[_r] == 'three_body_reaction':
+                M = P/(8.314/T_list)
+                k0 = np.array(k0)/M
+            mech_data.react.k_ref.append(np.array(k0))
+            # mech_data.react.k_min.append(np.array(k0)/(10**np.array(f_T)))
+            # mech_data.react.k_max.append(np.array(k0)*(10**np.array(f_T)))
+            mech_data.react.k_min.append(np.array(k0)*np.exp(np.array(-f_T) * np.log(10)))
+            mech_data.react.k_max.append(np.array(k0)*np.exp(np.array(f_T) * np.log(10)))
+
+            mech_data.react.k_ref_lp.append(np.array(k0_lp))
+            # mech_data.react.k_min_lp.append(np.array(k0_lp)/(10**np.array(f_T_lp)))
+            # mech_data.react.k_max_lp.append(np.array(k0_lp)*(10**np.array(f_T_lp)))
+            mech_data.react.k_min_lp.append(np.array(k0_lp)*np.exp(np.array(-f_T_lp) * np.log(10)))
+            mech_data.react.k_max_lp.append(np.array(k0_lp)*np.exp(np.array(f_T_lp) * np.log(10)))
+
+            mech_data.react.k_ref_hp.append(np.array(k0_hp))
+            # mech_data.react.k_min_hp.append(np.array(k0_hp)/(10**np.array(f_T_hp)))
+            # mech_data.react.k_max_hp.append(np.array(k0_hp)*(10**np.array(f_T_hp)))
+            mech_data.react.k_min_hp.append(np.array(k0_hp)*np.exp(np.array(-f_T_hp) * np.log(10)))
+            mech_data.react.k_max_hp.append(np.array(k0_hp)*np.exp(np.array(f_T_hp) * np.log(10)))
+
+        else:
+            # ---  k_ref calculation  ---
+            if mech_data.react.type[_r] == 'reaction' or mech_data.react.type[_r] == 'three_body_reaction':
+                A = mech_data.react.ref_kin[_r][0] ; n = mech_data.react.ref_kin[_r][1] ; Ea = mech_data.react.ref_kin[_r][2]
+                for i,T in enumerate(T_list):
+                    k_ref.append(A*T**n*np.exp(-Ea/(R*T)))
+
+
+            elif mech_data.react.type[_r] == 'pdep_arrhenius':
+                all_P = [p_min/101325, P/101325, p_max/101325] #atm
+
+                # pressure limits of the reaction law
+                list_P = mech_data.react.param[_r][0]
+                list_P, list_P_unit = [],[]
+                for p in range(len(mech_data.react.param[_r][0])):
+                    if mech_data.react.param[_r][1][p] is not False:
+                        list_P_unit.append(mech_data.react.param[_r][1][p])
+                        if   list_P_unit[-1] == 'Pa':
+                            list_P.append(mech_data.react.param[_r][0][p]/101325)
+                        elif list_P_unit[-1] == 'bar':
+                            list_P.append(mech_data.react.param[_r][0][p]/1.01325)
+                        else: #atm
+                            list_P.append(mech_data.react.param[_r][0][p])
+                    else:
+                        list_P_unit.append('atm')
+                        list_P.append(mech_data.react.param[_r][0][p])
+
+                for _pi,Pi in enumerate(all_P):
+                    # pressure limits of the reaction law
+                    idx_Pinf,idx_Psup = 0,0
+                    for _p in range(len(list_P)):
+                        if Pi <= float(list_P[_p]):
+                            idx_Psup = _p
+                            if idx_Psup==0: idx_Pinf = 0
+                            else:           idx_Pinf = _p-1
+                            break
+                    P_inf = float(list_P[idx_Pinf])
+                    P_sup = float(list_P[idx_Psup])
+
+                    for T in T_list:
+                        # k_pinf:
+                        i=0 ; k_pinf=0
+                        try:
+                            while float(list_P[idx_Pinf-i]) == float(list_P[idx_Pinf]):
+                                A  = mech_data.react.ref_kin[_r][idx_Pinf-i][0]
+                                n  = mech_data.react.ref_kin[_r][idx_Pinf-i][1]
+                                Ea = mech_data.react.ref_kin[_r][idx_Pinf-i][2]
+                                k_pinf +=  A * (T)**n * np.exp(-Ea/(R*T))
+                                i+=1
+                        except:
+                            bug = True
+                            k_pinf = 1
+
+                        # k_psup:
+                        i=0 ; k_psup=0
+                        try:
+                            while float(list_P[idx_Psup+i]) == float(list_P[idx_Psup]):
+                                A  = mech_data.react.ref_kin[_r][idx_Psup+i][0]
+                                n  = mech_data.react.ref_kin[_r][idx_Psup+i][1]
+                                Ea = mech_data.react.ref_kin[_r][idx_Psup+i][2]
+                                k_psup +=  A * (T)**n * np.exp(-Ea/(R*T))
+                                i+=1
+                                if idx_Psup+i>=len(list_P):
+                                    break
+                        except:
+                            k_psup=1
+                        # k
+                        if P_inf == P_sup:
+                            if _pi==0: k_ref_lp.append(k_pinf)
+                            if _pi==1: k_ref.append(k_pinf)
+                            if _pi==2: k_ref_hp.append(k_pinf)
+                        else:
+                            if k_pinf < 1e-150: k_pinf = 1e-150  # avoid log(0) calculation
+                            if k_psup < 1e-150: k_psup = 1e-150  # avoid log(0) calculation
+                            if _pi==0: k_ref_lp.append(np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(P)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf)))))
+                            if _pi==1: k_ref.append(np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(P)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf)))))
+                            if _pi==2: k_ref_hp.append(np.exp(np.log(k_pinf)+(np.log(k_psup)-np.log(k_pinf))*((np.log(P)-np.log(P_inf))/(np.log(P_sup)-np.log(P_inf)))))
+
+            elif mech_data.react.type[_r] == 'falloff_reaction' or mech_data.react.type[_r] == 'chemically_activated_reaction':
+
+                # get Troe param
+                if mech_data.react.param[_r] is not False:
+                    Troe_func = True
+                    At = float(mech_data.react.param[_r]['A'])
+                    T3t = float(mech_data.react.param[_r]['T3'])
+                    T1t = float(mech_data.react.param[_r]['T1'])
+                    T2t = float(mech_data.react.param[_r]['T1'])
+                else:
+                    Troe_func = False
+
+                # calculation of k
+                Af = mech_data.react.ref_kin[_r][0][0] ; nf = mech_data.react.ref_kin[_r][0][1] ; Eaf = mech_data.react.ref_kin[_r][0][2]
+                A0 = mech_data.react.ref_kin[_r][1][0] ; n0 = mech_data.react.ref_kin[_r][1][1] ; Ea0 = mech_data.react.ref_kin[_r][1][2]
+                for T in T_list:
+                    M     = P/(8.314*T)           # mol/m3
+                    M     = M*1e-6                # mol/cm3
+                    M_lp  = p_min        / (8.314*T)*1e-6    # mol/cm3
+                    M_hp  = p_max        / (8.314*T)*1e-6    # mol/cm3
+                    kinf  = Af * T**nf * np.exp(-Eaf/(R*T))
+                    k0    = A0 * T**n0 * np.exp(-Ea0/(R*T))
+                    Pr    = (k0*M)/kinf
+                    Pr_lp = (k0*M_lp)/kinf
+                    Pr_hp = (k0*M_hp)/kinf
+                    warnings.filterwarnings("ignore") # suppress warnings with exponential calculation
+                    if Troe_func:
+                        if T2t: Fcent = (1-At)*np.exp(-T/T3t) + At*np.exp(-T/T1t) + np.exp(-T2t/T1t)
+                        else:   Fcent = (1-At)*np.exp(-T/T3t) + At*np.exp(-T/T1t)
+                        C      = -0.4 - 0.67*np.log10(Fcent)
+                        N      = 0.75 - 1.27*np.log10(Fcent)
+                        f1     = (np.log10(Pr) + C) / (N-0.14*(np.log10(Pr)+C))
+                        f1_lp = (np.log10(Pr_lp) + C) / (N-0.14*(np.log10(Pr_lp)+C))
+                        f1_hp = (np.log10(Pr_hp) + C) / (N-0.14*(np.log10(Pr_hp)+C))
+                        F      = 10**(np.log10(Fcent) / (1+f1**2))
+                        F_lp   = 10**(np.log10(Fcent) / (1+f1_lp**2))
+                        F_hp   = 10**(np.log10(Fcent) / (1+f1_hp**2))
+                    else:
+                        F,F_lp,F_hp = 1,1,1
+                    if mech_data.react.type[_r] == 'falloff_reaction':
+                        k_ref.append(kinf*(Pr/(1+Pr))*F)
+                        k_ref_lp.append(kinf*(Pr_lp/(1+Pr_lp))*F_lp)
+                        k_ref_hp.append(kinf*(Pr_hp/(1+Pr_hp))*F_hp)
+                    elif mech_data.react.type[_r] == 'chemically_activated_reaction':
+                        k_ref.append(k0*(1/(1+Pr))*F)
+                        k_ref_lp.append(k0*(1/(1+Pr_lp))*F_lp)
+                        k_ref_hp.append(k0*(1/(1+Pr_hp))*F_hp)
+
+                    warnings.resetwarnings()
+
+            elif 'chebyshev' in mech_data.react.type[_r]:
+
+                # get param
+                Tmin = float(mech_data.react.param[_r]['Tmin'])
+                Tmax = float(mech_data.react.param[_r]['Tmax'])
+                Pmin = float(mech_data.react.param[_r]['Pmin_value'])
+                Pmax = float(mech_data.react.param[_r]['Pmax_value'])
+                if mech_data.react.param[_r]['Pmin_unit'] is not False:
+                    if mech_data.react.param[_r]['Pmin_unit'].lower() == "pa":
+                        Pmin = Pmin/101325
+                    if mech_data.react.param[_r]['Pmin_unit'].lower() == "bar":
+                        Pmin = Pmin/1.01325
+                if mech_data.react.param[_r]['Pmax_unit'] is not False:
+                    if mech_data.react.param[_r]['Pmax_unit'].lower() == "pa":
+                        Pmax = Pmax/101325
+                    if mech_data.react.param[_r]['Pmax_unit'].lower() == "bar":
+                        Pmax = Pmax/1.01325
+
+                # k calculation (Carstensen H-H. Reaction Rate Representation Using Chebyshev Polynomials)
+                # size of NT Np coefficients
+                N_T = len(mech_data.react.ref_kin[_r]) ; N_P = len(mech_data.react.ref_kin[_r][0])
+                for T in T_list:
+                    T_tilde = (2/T - 1/Tmin - 1/Tmax)/(1/Tmax - 1/Tmin)
+                    P_tilde = (2*np.log10(P) - np.log10(Pmin) - np.log10(Pmax))/(np.log10(Pmax) - np.log10(Pmin))
+
+                    log_k = 0
+                    for t in range(N_T):
+                        phi_tT = np.cos(t*np.arccos(T_tilde))
+                        for p in range(N_P):
+                            phi_pP = np.cos(p*np.arccos(P_tilde))
+                            a_tp = mech_data.react.ref_kin[_r][t][p]
+                            log_k += a_tp*phi_tT*phi_pP
+                    k_ref.append(10**log_k)
+
+            else:
+                k_ref = list(np.array([0]*len(T_list)))
+
+            mech_data.react.k_ref.append(np.array(k_ref))
+            # use logarithm to avoid overflow
+            mech_data.react.k_min.append(np.array(k_ref)*np.exp(-np.array(f_T)*np.log(10)))
+            mech_data.react.k_max.append(np.array(k_ref)*np.exp(np.array(f_T)*np.log(10)))
+            if len(k_ref_lp)>0:
+                mech_data.react.k_ref_lp.append(np.array(k_ref_lp))
+                mech_data.react.k_min_lp.append(np.array(k_ref_lp)*np.exp(-np.array(f_T_lp)*np.log(10)))
+                mech_data.react.k_max_lp.append(np.array(k_ref_lp)*np.exp(np.array(f_T_lp)*np.log(10)))
+
+                mech_data.react.k_ref_hp.append(np.array(k_ref_hp))
+                mech_data.react.k_min_hp.append(np.array(k_ref_hp)*np.exp(-np.array(f_T_hp)*np.log(10)))
+                mech_data.react.k_max_hp.append(np.array(k_ref_hp)*np.exp(np.array(f_T_hp)*np.log(10)))
+
+            else:
+                mech_data.react.k_min_lp.append(False)
+                mech_data.react.k_max_lp.append(False)
+                mech_data.react.k_ref_hp.append(np.array(k_ref_hp))
+                mech_data.react.k_min_hp.append(False)
+                mech_data.react.k_max_hp.append(False)
+
+
+    return mech_data
+
+
 
 
 
@@ -1980,6 +3404,13 @@ def get_kin_coeffs(mech_data_ref,mech_data_opt,Tmin=300,Tmax=2000):
     return A, n, Ea, kT, A_ref, n_ref, Ea_ref, kT_ref
 
 
+# def mina(a, b):
+#     return a if abs(a) < abs(b) else b
+
+# def maxa(a, b):
+#     return a if abs(a) < abs(b) else b
+
+
 
 def plot_diff_refopt(mech_data_ref,mech_data_opt,diff_all,reaction_label="number",\
                      reaction_2plot="all",fig_width=7,verbose=5):
@@ -2005,11 +3436,11 @@ def plot_diff_refopt(mech_data_ref,mech_data_opt,diff_all,reaction_label="number
                 diff_vect.append(diff[r][1])
                 if reaction_label == "number":
                     reactions.append(str(mech_data_ref.react.number[r_num]))
-                elif reaction_label == "formula":
-                    reactions.append(str(mech_data_ref.react.formula[r_num]))
-                elif reaction_label == "reaction+formula":
+                elif reaction_label == "equation":
+                    reactions.append(str(mech_data_ref.react.equation[r_num]))
+                elif reaction_label == "reaction+equation":
                     reactions.append("("+str(mech_data_ref.react.number[r_num])\
-                                     +") "+mech_data_ref.react.formula[r_num])
+                                     +") "+mech_data_ref.react.equation[r_num])
 
         y_pos = np.arange(len(reactions))
 
@@ -2565,34 +3996,18 @@ def plot_bar(y_label,var,fig_n,x_label,label=False):
 
 
 
+# optimisation en fonction des incertitudes :
+#    * pour les réactions standard, three body, et pdep, falloff à patm:
+#       -> fait par rapport au k(T) moyen (noté k0) à patm
+#       les limites kmin et kmax sont calculées p/r à f(T)
 #
-#    # Plot max values
-#    fig_title = fig_title.replace('mean.png','max.png')
-#    fig, ax = plt.subplots()
-#    ax.barh(y_pos, max_v, align='center', alpha=1)
-#    ax.set_yticks(y_pos)
-#    ax.set_yticklabels(y_label)
-#    ax.set_xlabel('differences (%)')
-#    fig.set_size_inches(7, 2+len(y_label)/6)
-#    fig.subplots_adjust(left = 0.5, bottom = 0.15,
-#                   right = 0.9, top = 0.95, wspace = 0, hspace = 0.5)
-#    if verbose>5:  plt.show()
-#    fig.savefig(fig_title,dpi=300)
+#    * pour les réactions dépendantes de la pression (pdep, falloff, chemically activated):
+#        -> fait par rapport aux k_ref calculés  borné à P=0.5 et 50bars pour éviter de dégrader le mécanisme si les plages de pressions sont plus faibles
+#               P_min < 0.5 bar et Pmax > 50 bars si les conditions pré-définies impliquent de telles pressions
 #
-#    # Plot mean and max values
-#    width = 0.5
-#    fig_title = fig_title.replace('max.png','mean_max.png')
-#    fig, ax = plt.subplots()
-#    ax.barh(y_pos-width/2, mean_v, width, align='center', alpha=1,label='mean')
-#    ax.barh(y_pos+width/2, max_v,  width, align='center', alpha=1,label='max')
-#    ax.set_yticks(y_pos)
-#    ax.set_yticklabels(y_label)
-#    ax.set_xlabel('differences (%)')
-#    ax.legend()
-#    fig.set_size_inches(7, 2+len(y_label)/6)
-#    fig.subplots_adjust(left = 0.5, bottom = 0.15,
-#                   right = 0.9, top = 0.95, wspace = 0, hspace = 0.5)
-#    if verbose>5:  plt.show()
+#        -> variation dans les limites des incertitudes f(T) (définies à p atm)
 #
-#    fig.savefig(fig_title,dpi=300)
-
+#    * chebychev : pas de modif des coeffs
+#
+#    * si pas de f(T) alors f = 0.7
+#

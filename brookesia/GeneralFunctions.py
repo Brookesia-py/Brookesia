@@ -27,9 +27,9 @@ import os                          as os
 import sys                         as sys
 import cantera                     as ct
 import time                        as timer
-import brookesia.Computation      as comp
-import brookesia.SA               as sa
-import brookesia.DRG              as drg
+import brookesia.Computation   as comp
+import brookesia.SA            as sa
+import brookesia.DRG           as drg
 try:
     import brookesia.CSP          as csp
 except:
@@ -48,6 +48,7 @@ from scipy.interpolate       import interp1d
 from shutil import copyfile
 
 import matplotlib.pyplot as plt
+from contextlib import redirect_stdout
 
 
 #==============================================================================
@@ -79,7 +80,12 @@ def main_redopt_algo(filename,WD_path,version):
         if not os.path.exists(mf):  os.mkdir(mf)
     if not os.path.exists(mp):  os.mkdir(mp)
     try: copyfile('_kinetic_mech/'+mech,mp+'/'+mech)
-    except:  copyfile(mech,mp+'/'+mech.split('/')[-1])
+    except:
+        try:
+            copyfile('_kinetic_mech/'+mech,mp+'/'+mech.split('/')[-1])
+            mech = mech.split('/')[-1]
+            conditions_list[0].mech = mech
+        except: copyfile(mech,mp+'/'+mech.split('/')[-1])
     if mech_prev_red:
         try:    copyfile('_kinetic_mech/'+mech_prev_red,mp+'/'+mech_prev_red)
         except: copyfile(mech_prev_red,mp+'/'+mech_prev_red.split('/')[-1])
@@ -88,87 +94,89 @@ def main_redopt_algo(filename,WD_path,version):
     except: copyfile(filename,mp+'/Conditions_redopt.inp')
     if os.path.isfile('_uncertainties/uncertainties.csv'):
         copyfile('_uncertainties/uncertainties.csv',mp+'/uncertainties.csv')
-    if os.path.isfile('_uncertainties/new_values.csv'):
-        copyfile('_uncertainties/new_values.csv',mp+'/new_values.csv')
+    if os.path.isfile('_uncertainties/uncertainties_f.csv'):
+        copyfile('_uncertainties/uncertainties_f.csv',mp+'/uncertainties_f.csv')
+#    if os.path.isfile('_uncertainties/new_values.csv'):
+#        copyfile('_uncertainties/new_values.csv',mp+'/new_values.csv')
 
     os.chdir(conditions_list[0].main_path)
 
     print_('Computed with :\n * Cantera  '+ct.__version__+'\n * Brookesia '+version+'\n\n',mp)
 
-    try:
-        #==============================================================================
-        #%%      Mechanism informations
-        #==============================================================================
+    # try:
+    #==============================================================================
+    #%%      Mechanism informations
+    #==============================================================================
 
-        verbose = conditions_list[0].simul_param.verbose
-        mech_data = cdef.Mech_data(mech,verbose)
+    verbose = conditions_list[0].simul_param.verbose
+    mech_data = cdef.Mech_data(mech,verbose)
 
-        if mech_prev_red:
-            mech_data_prev = cdef.Mech_data(mech_prev_red,verbose)
-            mech_data.compare_red(mech_data_prev,mp)
+    if mech_prev_red:
+        mech_data_prev = cdef.Mech_data(mech_prev_red,verbose)
+        mech_data.compare_red(mech_data_prev,mp)
 #            mech_data.get_kin_data(mech_prev_red)
 
-        #==============================================================================
-        #%%      Information displaying
-        #==============================================================================
+    #==============================================================================
+    #%%      Information displaying
+    #==============================================================================
 
-        gas_ref = conditions_list[0].composition.gas
-        ns_ref = gas_ref.n_species
-        nr_ref = gas_ref.n_reactions
+    gas_ref = conditions_list[0].composition.gas
+    ns_ref = gas_ref.n_species
+    nr_ref = gas_ref.n_reactions
 
-        if verbose >=1:
-            print_('\n\n\nmechanism: ' + mech,mp)
-            print_(str(ns_ref)+' species',mp)
-            print_(str(nr_ref)+' reactions',mp)
-
-
-        if verbose >=1:
-            print_('Number of evaluated conditions: '+ '%.0f' %len(conditions_list),mp)
-
-        #==============================================================================
-        #%%     Reference data computation
-        #==============================================================================
-
-        if not ref_results_list:  # if no external data provided
-            ref_results_list = []
-            for i in range(len(conditions_list)):
-                results,conditions = computation_reference(conditions_list[i],verbose)
-                conditions_list[i] = conditions
-                ref_results_list.append(results)
-
-    #    ref_results_list[0].plotData_opt(['CH4'])
-
-        #==============================================================================
-        #%%    Reduction procedure
-        ##=============================================================================
-        os.chdir(mp)
-
-        ns_red,nr_red,red_results_list,red_data_list\
-            =reduction(conditions_list,ref_results_list,red_data_list,mech_data)
+    if verbose >=1:
+        print_('\n\n\nmechanism: ' + mech,mp)
+        print_(str(ns_ref)+' species',mp)
+        print_(str(nr_ref)+' reactions',mp)
 
 
-        #============================================================================
-        #%%    Display results
-        ##===========================================================================
-        _reduction = False
-        for op in range(len(red_data_list)):
-            if red_data_list[op][0].reduction_operator != 'NULL': _reduction = True
-        if _reduction:
-            print_('\n\n Species reduction:  '+ '%4.0f' %ns_ref+ '  -> '+ '%5.0f' %ns_red,mp)
-            print_('\n\n Reaction reduction: '+ '%4.0f' %nr_ref+ '  -> '+ '%5.0f' %nr_red,mp)
+    if verbose >=1:
+        print_('Number of evaluated conditions: '+ '%.0f' %len(conditions_list),mp)
+
+    #==============================================================================
+    #%%     Reference data computation
+    #==============================================================================
+
+    if not ref_results_list:  # if no external data provided
+        ref_results_list = []
+        for i in range(len(conditions_list)):
+            results,conditions = computation_reference(conditions_list[i],verbose)
+            conditions_list[i] = conditions
+            ref_results_list.append(results)
+
+#    ref_results_list[0].plotData_opt(['CH4'])
+
+    #==============================================================================
+    #%%    Reduction procedure
+    ##=============================================================================
+    os.chdir(mp)
+
+    ns_red,nr_red,red_results_list,red_data_list\
+        =reduction(conditions_list,ref_results_list,red_data_list,mech_data)
 
 
-        #============================================================================
-        #%%    Saving results in csv file if no reduction
-        ##===========================================================================
-        if len(red_data_list)==0:
-            ref_results_list[0].write_mech_info('')
-            for l in range(len(ref_results_list)):
-                ref_results_list[l].write_case_data('Reference','',l+1)
-        os.chdir(conditions_list[0].main_path)
+    #============================================================================
+    #%%    Display results
+    ##===========================================================================
+    _reduction = False
+    for op in range(len(red_data_list)):
+        if red_data_list[op][0].reduction_operator != 'NULL': _reduction = True
+    if _reduction:
+        print_('\n\n Species reduction:  '+ '%4.0f' %ns_ref+ '  -> '+ '%5.0f' %ns_red,mp)
+        print_('\n\n Reaction reduction: '+ '%4.0f' %nr_ref+ '  -> '+ '%5.0f' %nr_red,mp)
 
-    except:
-        print_(traceback.format_exc(),mp)
+
+    #============================================================================
+    #%%    Saving results in csv file if no reduction
+    ##===========================================================================
+    if len(red_data_list)==0:
+        ref_results_list[0].write_mech_info('')
+        for l in range(len(ref_results_list)):
+            ref_results_list[l].write_case_data('Reference','',l+1)
+    os.chdir(conditions_list[0].main_path)
+
+    # except:
+    #     print_(traceback.format_exc(),mp)
     os.chdir(conditions_list[0].main_path)
 
 
@@ -190,6 +198,7 @@ def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
         print_('============================ \n\n',mp)
 
         results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
+        results.conditions = conditions
 
         return results,conditions
 
@@ -198,6 +207,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
     verbose = conditions_list[0].simul_param.verbose
     mp = conditions_list[0].main_path
+    path_lm = '/dev/null' ; path_w = 'nul'
 
     # maximum number of reduction iteration
     n_it_max = 100
@@ -449,19 +459,28 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                   " species, "+ str(active_r_pm.count(True))+\
                                   " reactions remaining",mp)
                         os.chdir(conditions_list[0].main_path+'/__'+red_method)
-                        mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
+                        if '.cti' in conditions_list[0].mech:
+                            mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
+                        else:
+                            mech_data.write_yaml_mech("temp.yaml",active_sp_pm,active_r_pm)
                         # -----------------------------------------------------
                         #         Simulation with the reduced mechanism
                         # -----------------------------------------------------
                         # -----   1. interpretation of the new mech
+                        
+
                         if verbose<8:
-                        # supress console output during the simulation
-                            old_stdout = sys.stdout ; old_stderr = sys.stderr
-                            with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-                        red_data.red_op.gas = ct.Solution('temp.cti')
-                        if verbose<8:
-                        # restore console output
-                            sys.stdout = old_stdout ; sys.stderr = old_stderr
+                            with open(path_lm, 'w') as fnull:  
+                                with redirect_stdout(fnull):
+                                    if '.cti' in conditions_list[0].mech:
+                                        red_data.red_op.gas = ct.Solution('temp.cti')
+                                    else:
+                                        red_data.red_op.gas = ct.Solution('temp.yaml')
+                        else:
+                            if '.cti' in conditions_list[0].mech:
+                                red_data.red_op.gas = ct.Solution('temp.cti')
+                            else:
+                                red_data.red_op.gas = ct.Solution('temp.yaml')
 
 
                         # -----   2. Simulation
@@ -471,23 +490,35 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         p = multiprocessing.Process(target=comp.red_computation,\
                                               args=(conditions, red_data.red_op.gas,\
                                                     active_sp_pm,active_r_pm,return_list))
-
-                        try:
-                            p.start()
-                            # Wait and stop the simulation if the calculation time is excessively long
-                            p.join(3*conditions.simul_param.ref_simul_time+300)
-                            # If thread is active
-                            if p.is_alive():
-                                print_("  Warning: An excessive calculation time have been detected. The simulation is stopped",mp)
-                                p.terminate()
-                                p.join()      # Cleanup
+                            
+                        if sys.gettrace() is not None : is_debug_mode = True
+                        else:                           is_debug_mode = False
+    
+                        if not is_debug_mode:
                             try:
-                                red_results_loop = return_list[0]
-                                simulation_done = True
-                            except: # if the simulation has been stopped
-                                simulation_done = False
-
-                        except:
+                                p.start()
+                                # Wait and stop the simulation if the calculation time is excessively long
+                                p.join(3*conditions.simul_param.ref_simul_time+300)
+                                # If thread is active
+                                if p.is_alive():
+                                    print_("  Warning: An excessive calculation time have been detected. The simulation is stopped",mp)
+                                    p.terminate()
+                                    p.join()      # Cleanup
+                                try:
+                                    red_results_loop = return_list[0]
+                                    simulation_done = True
+                                except: # if the simulation has been stopped
+                                    simulation_done = False
+    
+                            except:
+                                try:
+                                    red_results_loop = comp.red_computation(\
+                                                conditions, red_data.red_op.gas,\
+                                                active_sp_pm,active_r_pm)
+                                    simulation_done = True
+                                except:
+                                    simulation_done = False
+                        else: 
                             try:
                                 red_results_loop = comp.red_computation(\
                                             conditions, red_data.red_op.gas,\
@@ -1093,11 +1124,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
             # Save the non optimised mech
             filename = conditions_list[0].mech_ext
+            # filename = filename.replace('.yaml','.cti')
             new_filename = str(op+1) + '_' + filename
             os.chdir(conditions_list[0].main_path)
             if op==0:  os.mkdir('Red_mech')
             os.chdir('Red_mech')
-            mech_data.write_new_mech(new_filename)
+            if '.cti' in new_filename:
+                mech_data.write_new_mech(new_filename)
+            else:
+                mech_data.write_yaml_mech(new_filename)
             if conditions_list[0].simul_param.write_ck:
                 mech_data.write_chemkin_mech(new_filename,conditions_list[0].version)
             os.chdir(conditions_list[0].main_path)
@@ -1109,13 +1144,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 # interpretation of the new mech
 
                 # supress console output during the simulation
-                old_stdout = sys.stdout ; old_stderr = sys.stderr
-                with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-
-                red_results_list[i].gas = ct.Solution('Red_mech/'+new_filename)
-
-                # restore console output
-                sys.stdout = old_stdout ; sys.stderr = old_stderr
+                with open(path_lm, 'w') as fnull:  
+                    with redirect_stdout(fnull):
+                        red_results_list[i].gas = ct.Solution('Red_mech/'+new_filename)
                 # --------------------------------------------------------------------------------
 
                 red_results_list[i] = comp.red_computation(conditions_list[i],\
@@ -1428,6 +1459,7 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
     headers_steps=[]
     headers_steps_save = []
     case_titles = []
+    case_titles_str = []
     case_data = []
     case_steps = []
     K_ext = []
@@ -1465,6 +1497,9 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
 
                         if "reactor" in line[0] or "flame" in line[0] or "JSR" in line[0] or "PFR" in line[0]:
                             case_titles.append(line)
+
+                        if "config" in line[0]:
+                            case_titles_str.append(line)
 
 
                         if "Step" in line[0]:
@@ -1528,13 +1563,30 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
             mixt_X = case_titles[c][6]
         P             = float(case_titles[c][7])
         if "diff_" not in config and "pp_" not in config:
-            Ti            = float(case_titles[c][8])
-            rtol_ts       = float(case_titles[c][9])
-            atol_ts       = float(case_titles[c][10])
+            Ti        = float(case_titles[c][8])
+            rtol_ts   = float(case_titles[c][9])
+            atol_ts   = float(case_titles[c][10])
+            try:
+                scal_ref, t_max_coeff, t_max_s, grad_curv_ratio, n_pts, delta_npts = False, False, False, False, False, False
+                for i in [12,13,14,15,16]:
+                    if case_titles_str[c][i] == 'Scal_ref':
+                        scal_ref   = case_titles[c][i]
+                    if case_titles_str[c][i] == 't_max_coeff':
+                        t_max_coeff   = float(case_titles[c][i])
+                    if case_titles_str[c][i] == 't_max_s':
+                        t_max_s   = float(case_titles[c][i])
+                    if case_titles_str[c][i] == 'grad_curv_ratio':
+                        grad_curv_ratio   = float(case_titles[c][i])
+                    if case_titles_str[c][i] == 'n_pts':
+                        n_pts   = int(case_titles[c][i])
+                    if case_titles_str[c][i] == 'delta_npts':
+                        delta_npts   = int(case_titles[c][i])
+            except:
+                a=2
         else:
-            Ti            = float(case_titles[c][16])
-            rtol_ts       = float(case_titles[c][17])
-            atol_ts       = float(case_titles[c][18])
+            Ti        = float(case_titles[c][16])
+            rtol_ts   = float(case_titles[c][17])
+            atol_ts   = float(case_titles[c][18])
         if "flame" in config and "diff_" not in config and "pp_" not in config:
             rtol_ss   = float(case_titles[c][11])
             atol_ss   = float(case_titles[c][12])
@@ -1621,10 +1673,24 @@ def read_ref_data(data_file_name,gas,conc_unit,ext_data_type,tspc,mech,verbose=4
         if ext_data_type!="Experimental_data":
             conditions_list[-1].simul_param.pts_scatter   = np.array(pts_scatter)
             conditions_list[-1].simul_param.pts_scatter_i = np.array(pts_scatter)
-            conditions_list[-1].simul_param.rtol_ts       = rtol_ts
-            conditions_list[-1].simul_param.atol_ts       = atol_ts
         else:
             conditions_list[-1].exp_data = True
+            if scal_ref != False and scal_ref != '':
+                conditions_list[-1].simul_param.Scal_ref = scal_ref
+            if grad_curv_ratio != False and grad_curv_ratio != '':
+                conditions_list[-1].simul_param.grad_curv_ratio = grad_curv_ratio
+            if t_max_coeff != False and t_max_coeff != '':
+                conditions_list[-1].simul_param.t_max_coeff = t_max_coeff
+            if t_max_s != False and t_max_s != '':
+                conditions_list[-1].simul_param.t_max_s = t_max_s
+            if n_pts != False and n_pts != '':
+                conditions_list[-1].simul_param.n_pts = n_pts
+            if delta_npts != False and delta_npts != '':
+                conditions_list[-1].simul_param.delta_npts = delta_npts
+        conditions_list[-1].simul_param.rtol_ts       = rtol_ts
+        conditions_list[-1].simul_param.atol_ts       = atol_ts
+
+
         if "flame" in config:
             conditions_list[-1].simul_param.rtol_ss = rtol_ss
             conditions_list[-1].simul_param.atol_ss = atol_ss
@@ -1813,11 +1879,6 @@ def get_reduction_parameters(filename):
         if txt[0] == 'error_coupling':    error_coupling    = clean_txt(txt[1])
         if txt[0] == 'restore_flame_folder': restore_flame_folder = clean_txt(txt[1]);
 
-    # gas
-    try:
-        gas_ref = ct.Solution('_kinetic_mech/'+mech)
-    except:
-        gas_ref = ct.Solution(mech)
 
 
 # =============================================================================
@@ -1860,6 +1921,7 @@ def get_reduction_parameters(filename):
             if txt[0] == 'n_pts':             n_pts           = float(txt[1])
             if txt[0] == 'delta_npts':        delta_npts      = float(txt[1])
             if txt[0] == 't_max_coeff':       t_max_coeff     = float(txt[1])
+            if txt[0] == 't_max_s':           t_max_s         = float(txt[1])
             if txt[0] == 'Scal_ref':          Scal_ref        = clean_txt(txt[1])
             if txt[0] == 'grad_curv_ratio':   grad_curv_ratio = float(txt[1])
             if txt[0] == 'tign_nPoints':      tign_nPoints    = float(txt[1])
@@ -1954,16 +2016,18 @@ def get_reduction_parameters(filename):
                             except:
                                 diluent = oxidant
                                 diluent_ratio = 1
-
-
                         if 'diff_' in config:
                             phi=[False]; phis2=[False]*len(mdot1)
+
                         conditions_list.append(cdef.conditions(mech,config,\
                                         fuel,oxidant,diluent,\
                                         phi,diluent_ratio,\
                                         T,P,tspc))
+                        gas_ref = conditions_list[-1].composition.gas_ref
+
                         if 'tol_ts' in locals():
-                            conditions_list[-1].simul_param.tol_ts = tol_ts
+                            conditions_list[-1].simul_param.atol_ts = tol_ts[1]
+                            conditions_list[-1].simul_param.rtol_ts = tol_ts[0]
                         if 'mech_prev_red' in locals():
                             if mech_prev_red != 'False':
                                 conditions_list[-1].mech_prev_red = mech_prev_red
@@ -1976,6 +2040,8 @@ def get_reduction_parameters(filename):
                             conditions_list[-1].simul_param.delta_npts = delta_npts
                         if 't_max_coeff' in locals():
                             conditions_list[-1].simul_param.t_max_coeff = t_max_coeff
+                        if 't_max_s' in locals():
+                            conditions_list[-1].simul_param.t_max_s = t_max_s
                         if 'Scal_ref' in locals():
                             conditions_list[-1].simul_param.Scal_ref = Scal_ref
                         if 'grad_curv_ratio' in locals():
@@ -1994,7 +2060,7 @@ def get_reduction_parameters(filename):
                         if 'tol_ss' in locals():
                             conditions_list[-1].simul_param.tol_ss = tol_ss
                         if 'transport_model' in locals():
-                            conditions_list[-1].simul_param.transport_model  = "Mix"
+                            conditions_list[-1].simul_param.transport_model  = transport_model
                         if 'pts_scatter' in locals():
                             conditions_list[-1].simul_param.pts_scatter = pts_scatter
                         if 'slope_ff' in locals():
@@ -2185,6 +2251,12 @@ def get_reduction_parameters(filename):
             save_conditions = False
 
     if external_results:
+        # gas
+        try:
+            gas_ref = cdef.get_gas_ct('_kinetic_mech/'+mech)
+        except:
+            gas_ref = cdef.get_gas_ct(mech)
+
         if 'verbose' in locals():
             conditions_list, ref_results_list = read_ref_data\
             (external_results,gas_ref,concentration_units,ext_data_type,tspc,mech,verbose)
@@ -2305,10 +2377,12 @@ def get_reduction_parameters(filename):
                 epsilon_rel        = float(txt[1])
             if txt[0] == 'epsilon_abs':       epsilon_abs        = float(txt[1])
             if txt[0] == 'csp_refin_iter':    csp_refin_iter     = int(txt[1])
+            if txt[0] == 'write_results':     write_results      = str2bool(txt[1])
 
             if txt[0] == 'ttol_sensi':
                 try:    ttol_sensi = txt2list_float(txt[1])
                 except: ttol_sensi = txt2list_bool(txt[1])
+            if txt[0] == 'sens_method':       sens_method        = clean_txt(txt[1])
 
             if 'optim' in locals():
                 if 'GA' in optim or 'PSO' in optim:
@@ -2316,7 +2390,9 @@ def get_reduction_parameters(filename):
                     if txt[0] == 'n_it':                n_gen              = int(txt[1])
                     if txt[0] == 'n_indiv':             n_indiv            = int(txt[1])
                     if txt[0] == 'Arrh_max_variation':  Arrh_max_variation = txt2list_float(txt[1])
+                    if txt[0] == 'f_uncert':            f_uncert           = float(txt[1])
                     if txt[0] == 'optim_on_meth':       optim_on_meth      = clean_txt(txt[1])
+                    if txt[0] == 'optim_on_meth_pts':   n_points           = float(txt[1])
                     if txt[0] == 'nb_r2opt':            nb_r2opt           = float(txt[1])
                     if txt[0] == 'reactions2opt':       reactions2opt      = txt2list_int(txt[1])
                     if txt[0] == 'import_mech':         import_mech        = clean_txt(txt[1])
@@ -2378,6 +2454,8 @@ def get_reduction_parameters(filename):
                 if 'inter_sp_inter' in locals(): red_data.red_op.inter_sp_inter = inter_sp_inter
                 if 'optim'          in locals(): red_data.red_op.optim          = optim
                 if 'ttol_sensi'     in locals(): red_data.red_op.tol_ts         = ttol_sensi
+                if 'sens_method'    in locals(): red_data.red_op.sens_method    = sens_method
+                if 'write_results'  in locals(): red_data.red_op.write_results  = write_results
 
                 if 'csp_method'     in locals(): red_data.red_op.csp_method     = csp_method
                 if 'tol_csp'        in locals(): red_data.red_op.tol_csp        = tol_csp
@@ -2392,7 +2470,10 @@ def get_reduction_parameters(filename):
                         red_data.optim_param = cdef.Optim_param(tspc, n_tspc)
                         if 'n_gen'              in locals(): red_data.optim_param.n_gen              = n_gen
                         if 'n_indiv'            in locals(): red_data.optim_param.n_ind              = n_indiv
-                        if 'Arrh_max_variation' in locals(): red_data.optim_param.Arrh_max_variation = Arrh_max_variation
+                        if 'Arrh_max_variation' in locals(): 
+                            red_data.optim_param.Arrh_max_variation = Arrh_max_variation
+                            red_data.optim_param.Arrh_var = True
+                        if 'f_uncert'          in locals(): red_data.optim_param.f_default          = f_uncert                        
                         if 'optim_on_meth'      in locals(): red_data.optim_param.optim_on_meth      = optim_on_meth
                         if 'nb_r2opt'           in locals(): red_data.optim_param.nb_r2opt           = nb_r2opt
                         if 'reactions2opt'      in locals(): red_data.optim_param.reactions2opt      = reactions2opt
@@ -2459,9 +2540,11 @@ def get_reduction_parameters(filename):
             if 'inter_sp_inter'     in locals(): del inter_sp_inter
             if 'optim'              in locals(): del optim
             if 'ttol_sensi'         in locals(): del ttol_sensi
+            if 'sens_method'        in locals(): del sens_method
             if 'n_gen'              in locals(): del n_gen
             if 'n_indiv'            in locals(): del n_indiv
             if 'Arrh_max_variation' in locals(): del Arrh_max_variation
+            if 'f_uncert'           in locals(): del f_uncert
             if 'optim_on_meth'      in locals(): del optim_on_meth
             if 'nb_r2opt'           in locals(): del nb_r2opt
             if 'reactions2opt'      in locals(): del reactions2opt
@@ -2491,6 +2574,15 @@ def get_reduction_parameters(filename):
             if 'fitness_weight_K'    in locals(): del fitness_weight_K
             if 'fitness_weight_sp'   in locals(): del fitness_weight_sp
             if 'fitness_weight_cond' in locals(): del fitness_weight_cond
+            if 'write_results'       in locals(): del write_results
+
+            if 'csp_method'          in locals(): del csp_method
+            if 'tol_csp'             in locals(): del tol_csp
+            if 'time_resolution'     in locals(): del time_resolution
+            if 'epsilon_rel'         in locals(): del epsilon_rel
+            if 'epsilon_abs'         in locals(): del epsilon_abs
+            if 'csp_refin_iter'      in locals(): del csp_refin_iter
+
 
             save_op = False
 
@@ -2624,3 +2716,4 @@ def copytree(src, dst, symlinks=False, ignore=None):
         else:
             if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
                 shutil.copy2(s, d)
+

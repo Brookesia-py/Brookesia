@@ -68,8 +68,8 @@ class Ui_MainWD(object):
 
         _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
         _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
-        sz_w = _width/1366
-        sz_h = _height/768
+        sz_w = int(_width/1366)
+        sz_h = int(_height/768)
 
         _translate = QtCore.QCoreApplication.translate
 
@@ -282,14 +282,18 @@ class Ui_MainWD(object):
         os.chdir(WD_path)
         wr.write_results()
 
-        full_workdir_table = full_workdir_table.append(full_workdir_table.iloc[0])
+        try: # for older version of PyQt5
+            full_workdir_table = full_workdir_table.append(full_workdir_table.iloc[0])
+        except:
+            full_workdir_table = full_workdir_table._append(full_workdir_table.iloc[0])
         full_workdir_table['working_dir_name'].iloc[-1] = WD_name
         full_workdir_table['directory'].iloc[-1]        = WD_path
 
-        workdir_table = workdir_table.append(full_workdir_table.iloc[-1])
-#        workdir_table = workdir_table.append(full_workdir_table.iloc[0])
-#        workdir_table['working_dir_name'].iloc[-1] = WD_name
-#        workdir_table['directory'].iloc[-1]        = WD_path
+        try: # for older version of PyQt5
+            workdir_table = workdir_table.append(full_workdir_table.iloc[-1])
+        except:
+            workdir_table = workdir_table._append(full_workdir_table.iloc[-1])
+
 
 
         #os.chdir(root_path)

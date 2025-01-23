@@ -22,11 +22,11 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
 
     # Zoom
     zoom = "n"         # y / n
-    x_min = 0.15
-    x_max = .27
+    x_min = 0
+    x_max = .005
 
     Plot_Sl  = False
-    Plot_Igt = True #(! ne fonctionne pas correctement si plusieurs pressions)
+    Plot_Igt = False #(! ne fonctionne pas correctement si plusieurs pressions)
 
     #fileName = ["0_reduction_results.csv"] # if fileName not in input options
 
@@ -38,22 +38,22 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
 
     fig_width = 4.5
     left_shift = 0.3
-    
-    plot_style = 'paper' #      'paper' 'paper_latex'  'presentation'  'poster' 
+
+    plot_style = 'paper' #      'paper' 'paper_latex'  'presentation'  'poster'
 
 
-    
-    
-    
+
+
+
     # pour adapter les polices (si besoin)
     delta_police_legend = -4.5
     delta_police_axes   = -2
     delta_police_ticks  = -2
     delta_police_title  = -2
 
-    
 
-    
+
+
 
 
 
@@ -78,11 +78,11 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
     import matplotlib.ticker as ticker
     from matplotlib.ticker import (MultipleLocator,FormatStrFormatter,AutoMinorLocator)
 
-    #if 'brookesia.Class_def' not in sys.modules:  
+    #if 'brookesia.Class_def' not in sys.modules:
         #del sys.modules["brookesia.Class_def"]
     import brookesia.Class_def as cdef
-        
-    
+
+
     # 3D tools
     #from mpl_toolkits.mplot3d import Axes3D
     #from matplotlib.collections import PolyCollection
@@ -98,9 +98,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
         fileName = fileName.split('/')[-1]
     try:
         os.mkdir('Plots')
-    except: 
+    except:
         a=2
-        
+
     #print(c_path)
 
     #%%============================================================================
@@ -121,7 +121,7 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
         var_c = var_b.replace('$','')
         Var_name_legend.append(var_a)
         Var_name.append(var_c)
-    
+
     delta_polices = [delta_police_legend,delta_police_axes,delta_police_ticks,delta_police_title]
 
 
@@ -390,9 +390,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
     colors_styles = ["blue","red","green","grey","purple","black", "darkturkoise",\
                         "sandybrown","saddlebrown","magenta"]
 
-    
+
     os.chdir('Plots')
-    
+
     plt.close("all")
 
     case_legend=copy.deepcopy(case_steps)
@@ -404,7 +404,7 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                     case_n = step_n
         for case_s in case_legend:
             if case_n:  case_s.remove(case_n)
-    
+
     if 'latex' in 'plot_style':
         for cn in range(len(case_legend)):
             for sn in range(len(case_legend[cn])):
@@ -649,7 +649,7 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
             if "mult" not in sys.argv:
                 #fig_title = case_titles[case].replace("/","")+".png"
                 #plt,fig = cdef.generate_plot_style(plt,fig, plot_style,delta_polices)
-                                
+
                 #plt.show()
                 plt.savefig(fig_title,dpi=300)
 
@@ -716,13 +716,13 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                 axes = plt.subplot(len(Var_name_legend), 1, var+1)
                 axes.legend(legend_mult)
             # Save figure
-            
+
     plt,fig = cdef.generate_plot_style(plt,fig, plot_style,delta_polices)
     fig.savefig(case_titles[last_case_nb] +".png",dpi=300)
-    
-    #if 'brookesia.Class_def' in sys.modules:  
+
+    #if 'brookesia.Class_def' in sys.modules:
         #del sys.modules["brookesia.Class_def"]
-    
+
     os.chdir('..')
 
 

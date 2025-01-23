@@ -19,13 +19,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-global version
-version = '1.7.0'
-
 # =============================================================================
 #  default options
 # =============================================================================
 
+version = '1.6.0'
 
 d_verbose               = 4
 d_show_plots            = False
@@ -264,8 +262,8 @@ class Ui_MainWindow(object):
         global sz_h
         _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
         _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
-        sz_w = _width/1366
-        sz_h = _height/768
+        sz_w = int(_width/1366)
+        sz_h = int(_height/768)
 
         self.root_path = root_path
         self.WD_path   = WD_path
@@ -1109,7 +1107,7 @@ class Ui_MainWindow(object):
         A=Files_windows()
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(A, "Select kinetic mechanism", "_kinetic_mech","cti Files (*.cti);;All Files (*);;Python Files (*.py)", options=options)
+        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(A, "Select kinetic mechanism", "_kinetic_mech","Yaml Files (*.yaml);;cti Files (*.cti);;All Files (*);;Python Files (*.py)", options=options)
         _translate = QtCore.QCoreApplication.translate
         font = QtGui.QFont();font.setBold(True);font.setItalic(False);font.setWeight(75)
         if mech_type=='ref':
@@ -1224,7 +1222,7 @@ class Ui_MainWindow(object):
             A=Files_windows()
             options = QtWidgets.QFileDialog.Options()
             options |= QtWidgets.QFileDialog.DontUseNativeDialog
-            folderName = QtWidgets.QFileDialog.getExistingDirectory(A, "Select former flame results folder (must contain .xml files) ", "_results_input/_flame_results", options=options)
+            folderName = QtWidgets.QFileDialog.getExistingDirectory(A, "Select former flame results folder (must contain .yaml files) ", "_results_input/_flame_results", options=options)
             _translate = QtCore.QCoreApplication.translate
             font = QtGui.QFont();font.setBold(True);font.setItalic(False);font.setWeight(75)
 
@@ -1625,7 +1623,7 @@ class Ui_MainWindow(object):
         self.pB_GA_drg[-1].clicked.connect(lambda: self.opt_clic('GA'))
 
         self.pB_PSO_drg.append(QtWidgets.QPushButton(self.DRG[-1]))
-        self.pB_PSO_drg[-1].setGeometry(QtCore.QRect(415*sz_w, 370*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_drg[-1].setGeometry(QtCore.QRect(41500*sz_w, 370*sz_h, 190*sz_w, 34*sz_h))
         self.pB_PSO_drg[-1].setObjectName("pB_PSO_drg")
         self.pB_PSO_drg[-1].clicked.connect(lambda: self.opt_clic('PSO'))
 
@@ -1779,7 +1777,7 @@ class Ui_MainWindow(object):
         self.pB_GA_sa[-1].setText(_translate("MainWindow", "Genetic Algorithm Optimization"))
 
         self.pB_PSO_sa.append(QtWidgets.QPushButton(self.SA[-1]))
-        self.pB_PSO_sa[-1].setGeometry(QtCore.QRect(415*sz_w, 420*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_sa[-1].setGeometry(QtCore.QRect(41500*sz_w, 420*sz_h, 190*sz_w, 34*sz_h))
         self.pB_PSO_sa[-1].setObjectName("pB_PSO_sa")
         self.pB_PSO_sa[-1].clicked.connect(lambda: self.opt_clic('PSO'))
         self.pB_PSO_sa[-1].setText(_translate("MainWindow", "Particle Swarm Optimization"))
@@ -1992,7 +1990,7 @@ class Ui_MainWindow(object):
         self.pB_GA_csp[-1].setText(_translate("MainWindow", "Genetic Algorithm Optimization"))
 
         self.pB_PSO_csp.append(QtWidgets.QPushButton(self.CSP[-1]))
-        self.pB_PSO_csp[-1].setGeometry(QtCore.QRect(415*sz_w, 440*sz_h, 190*sz_w, 34*sz_h))
+        self.pB_PSO_csp[-1].setGeometry(QtCore.QRect(41500*sz_w, 440*sz_h, 190*sz_w, 34*sz_h))
         self.pB_PSO_csp[-1].setObjectName("pB_PSO_csp")
         self.pB_PSO_csp[-1].clicked.connect(lambda: self.opt_clic('PSO'))
         self.pB_PSO_csp[-1].setText(_translate("MainWindow", "Particle Swarm Optimization"))
@@ -3257,7 +3255,7 @@ class Ui_MainWindow(object):
             self.cB_opt_react[idx_opt].setText(_translate("MainWindow", "Optimization based on selected reactions"))
 
             opt_react.insert(idx_opt,[])
-            for _r in range(len(self.mech_data.react.formula)):
+            for _r in range(len(self.mech_data.react.equation)):
                 opt_react[idx_opt].append(False)
 
             self.pB_GA_react2mod.insert(idx_opt,QtWidgets.QPushButton(self.GA_group_opt_react[idx_opt]))
@@ -6428,7 +6426,7 @@ class Ui_MainWindow(object):
                         del sub_mech_sel
 
                     if 'reactions2opt' in locals():
-                        for _r in range(len(self.mech_data.react.formula)):
+                        for _r in range(len(self.mech_data.react.equation)):
                             if _r-1 in reactions2opt:
                                 opt_react[-1][_r] = True
 
@@ -6715,7 +6713,6 @@ class Ui_MainWindow(object):
 
 
     def run_reduction(self):
-        global version
         self.write_parameters(False)
         genf.main_redopt_algo('last_condition.inp',self.WD_path,version)
 
@@ -6730,8 +6727,8 @@ def get_wd_folder(WD_p=True, WD_n=True):
 
     _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
     _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
-    sz_w = _width/1366
-    sz_h = _height/768
+    sz_w = int(_width/1366)
+    sz_h = int(_height/768)
 
     Window_f.setObjectName("Brookesia")
     Window_f.resize(790*sz_w, 671*sz_h)
@@ -6797,20 +6794,20 @@ class mech_windows(QtWidgets.QMainWindow):
         self.scrollArea_meca.setWidgetResizable(False)
         self.scrollArea_meca.setObjectName("scrollArea_opt")
         self.scroll_meca_Contents = QtWidgets.QWidget(self)
-        self.scroll_meca_Contents.setGeometry(QtCore.QRect(0, 0, 765*sz_w, 20+len(mech_data.react.formula)*15.02*sz_h))
+        self.scroll_meca_Contents.setGeometry(QtCore.QRect(0, 0, 765*sz_w, 21+int(len(mech_data.react.equation)*16*sz_h)))
         self.scroll_meca_Contents.setObjectName("mec_scroll")
         self.scrollArea_meca.setWidget(self.scroll_meca_Contents)
         self.cB_opt_r = []
-        if len(opt_react[opt_n])!=len(mech_data.react.formula):
+        if len(opt_react[opt_n])!=len(mech_data.react.equation):
             opt_react[opt_n] = []
-            for _r in range(len(mech_data.react.formula)):
+            for _r in range(len(mech_data.react.equation)):
                 opt_react[opt_n].append(False)
 
-        for _r in range(len(mech_data.react.formula)):
+        for _r in range(len(mech_data.react.equation)):
             self.cB_opt_r.append(QtWidgets.QCheckBox(self.scroll_meca_Contents))
             self.cB_opt_r[_r].setGeometry(QtCore.QRect(10*sz_w, 10*sz_h+15*sz_h*_r, 600*sz_w, 22*sz_h))
             self.cB_opt_r[_r].setObjectName("cB_opt_"+str(_r))
-            self.cB_opt_r[_r].setText(_translate("MainWindow", '(' + str(_r+1) + ')   ' +  mech_data.react.formula[_r]))
+            self.cB_opt_r[_r].setText(_translate("MainWindow", '(' + str(_r+1) + ')   ' +  mech_data.react.equation[_r]))
             self.cB_opt_r[_r].setChecked(opt_react[opt_n][_r])
 
         self.pB_cancel = QtWidgets.QPushButton(self)

@@ -29,6 +29,8 @@ import os
 import sys
 import multiprocessing
 from multiprocessing import Pool
+from pebble import ProcessPool
+from concurrent.futures import TimeoutError
 
 from shutil import copyfile
 import time as timer
@@ -741,10 +743,12 @@ class Population:
             rand_kin = optim_param.import_mech
             cur_path = os.getcwd()
             os.chdir(mp+'/../_kinetic_mech/'+optim_param.import_mech)
+            print_(mp+'/../_kinetic_mech/'+optim_param.import_mech,mp)
+            print_('Import kinetic mechanisms from:',mp)            
             list_files = os.listdir()
             list_mech = []
             for _file in list_files:
-                if '.cti' in _file:
+                if '.cti' in _file or '.yaml' in _file:
                     list_mech.append(cdef.Mech_data(_file))
                     print('mecanisme importé : ' + _file)
             os.chdir(cur_path)
@@ -1063,9 +1067,55 @@ class Population:
 #        pool.close()
 
         # Parallelisation 3 ---------------------------------------------------
-        if os.name == 'nt': multiprocessing.get_context('spawn')
-        with multiprocessing.Pool(num_cores) as p:
-            fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+        # if os.name == 'nt': multiprocessing.get_context('spawn')
+        # with multiprocessing.Pool(num_cores) as p:
+        #     fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+
+
+
+        # Parallelisation 4   (with simulation time check) --------------------
+        #  https://pythonhosted.org/Pebble/#pools
+        fit_list = []
+        with ProcessPool() as pool:
+            sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
+            try:
+                for fit in sim_results.result():
+                    fit_list.append(fit)
+            except TimeoutError:
+                print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 1.5 x ref simulation time)',mp)
+                print_("TimeoutError: aborting remaining computations",mp)
+                fit_list.sort(reverse=False, key=lambda col: col[1])
+                fitness_incomplete = copy.deepcopy(fit_list)
+                list_ind_eval = []
+                for ind_fit_inc in fitness_incomplete:
+                    list_ind_eval.append(ind_fit_inc[1])
+                n_sim=len(fitness_incomplete)
+                for _i in range(child_nb):
+                    try:
+                        if _i+optim_param.n_ind not in list_ind_eval:
+                            fit_list.insert(_i,(0,_i))
+                    except:
+                        fit_list.append((0,_i))
+                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                sim_results.cancel()
+            except:
+                print_('\n\nWarning : error in simulation',mp)
+                print_("aborting remaining computations",mp)
+                fit_list.sort(reverse=False, key=lambda col: col[1])
+                fitness_incomplete = copy.deepcopy(fit_list)
+                list_ind_eval = []
+                for ind_fit_inc in fitness_incomplete:
+                    list_ind_eval.append(ind_fit_inc[1])
+                n_sim=len(fitness_incomplete)
+                for _i in range(child_nb):
+                    try:
+                        if _i+optim_param.n_ind not in list_ind_eval:
+                            fit_list.insert(_i,(0,_i))
+                    except:
+                        fit_list.append((0,_i))
+                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                sim_results.cancel()
+
 
 
 
