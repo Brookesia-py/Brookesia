@@ -24,7 +24,7 @@ import cantera as ct
 import numpy as np
 import brookesia.Class_def   as cdef
 import brookesia.Computation as comp
-from  brookesia.Class_def import print_
+from   brookesia.Class_def import print_
 import pandas as pd
 import copy
 import sys
