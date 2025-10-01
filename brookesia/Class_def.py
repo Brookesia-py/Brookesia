@@ -396,6 +396,8 @@ class Errors:
         verbose           = conditions.simul_param.verbose
 
         pts_scatter       = ref_results.pts_scatter
+        pts_scatter_red   = red_results.pts_scatter
+        
         if conditions.conc_unit == 'volumic_concentration':
             conc_ref          = ref_results.conc
             conc_red          = red_results.conc
@@ -408,18 +410,24 @@ class Errors:
         QoI = []
 
         if error_calculation =="points":
-
+            
             for k in range(n_tspc):
 
                 index = gas_ref.species_index(tspc[k])
 
                 data1 = np.zeros(n_points)
-                data2 = np.zeros(n_points)
-                #data_ori = np.zeros(n_points)
+                data2_raw = np.zeros(n_points)
+                
+                
                 for i in range(n_points):
                     data1[i] = conc_ref[i][index]
-                    data2[i] = conc_red[i][index]
-                    #data_ori[i] = conc_ori[i][index]
+                    data2_raw[i] = conc_red[i][index]
+                    
+                # Creating the interpolation function from the 2nd series
+                interp_func = interp1d(pts_scatter_red, data2_raw, kind='linear', fill_value="extrapolate")
+                # Interpolating the values of the 2nd series at the timesteps of the 1st series
+                data2 = interp_func(pts_scatter)
+                    
                 if sum(data1)>0:      # absence of data if experimental optimization
                     sumDiff, sumDiff_ori = 0, 0
                     if error_type == "all":
@@ -456,12 +464,17 @@ class Errors:
         elif error_calculation == "QoI":
 
             for k in range(len(tspc)):
-                index = gas_ref.species_index(tspc[k])
-                data1 = []
-                data2 = []
+                index     = gas_ref.species_index(tspc[k])
+                data1     = []
+                data2_raw = []
                 for i in range(n_points-1):
                     data1.append(conc_ref[i][index])
-                    data2.append(conc_red[i][index])
+                    data2_raw.append(conc_red[i][index])
+                    
+                # Creating the interpolation function from the 2nd series
+                interp_func = interp1d(pts_scatter_red, data2_raw, kind='linear', fill_value="extrapolate")
+                # Interpolating the values of the 2nd series at the timesteps of the 1st series
+                data2 = interp_func(pts_scatter)
 
                 if sum(data1)>0:     # absence of data if experimental optimization
 
@@ -533,9 +546,15 @@ class Errors:
 
 
         pts_scatter       = ref_results.pts_scatter
+        pts_scatter_red   = red_results.pts_scatter        
         T_ref             = ref_results.T
-        T_red             = red_results.T
-        # T_ori             = ref_results.opt_refind_T
+        T_red_raw         = red_results.T
+
+        # Creating the interpolation function from the 2nd series
+        interp_func = interp1d(pts_scatter_red, T_red_raw, kind='linear', fill_value="extrapolate")
+        # Interpolating the values of the 2nd series at the timesteps of the 1st series
+        T_red = interp_func(pts_scatter)
+
 
         n_points = len(pts_scatter)
 
@@ -605,6 +624,7 @@ class Errors:
             print_(QoI_info,mp)
 
         return QoI
+
 
 
     def er_estim_Sl(self,conditions, ref_results, red_results):
