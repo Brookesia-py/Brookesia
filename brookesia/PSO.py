@@ -22,9 +22,9 @@
 
 import numpy as np
 
-import brookesia.Computation as comp
-import brookesia.Class_def as cdef
-from  brookesia.Class_def import print_
+import brookesia_dev.Computation as comp
+import brookesia_dev.Class_def as cdef
+from  brookesia_dev.Class_def import print_
 import os
 import sys
 import multiprocessing

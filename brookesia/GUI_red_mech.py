@@ -128,7 +128,7 @@ d_DRG_ISI               = True
 
 # CSP
 try:
-    import brookesia.CSP as csp
+    import brookesia_devLOI.CSP as csp
     CSP_method = True
 except:
     CSP_method = False
@@ -206,9 +206,9 @@ import cantera as ct
 ct.suppress_thermo_warnings()
 import copy
 import numpy as np
-import brookesia.GeneralFunctions as genf
-import brookesia.Class_def as cdef
-#import brookesia.__init__ as mred
+import brookesia_devLOI.GeneralFunctions as genf
+import brookesia_devLOI.Class_def as cdef
+#import brookesia_devLOI.__init__ as mred
 import os
 import sys
 import time as timer
@@ -1193,8 +1193,8 @@ class Ui_MainWindow(object):
         if ex.ext_res_conc_unit == "mol/m3": ex.ext_res_conc_unit = "mol_m3"
         self.ext_res_conc_unit = ex.ext_res_conc_unit
         # read external data
-        conditions_list, ref_results_list = genf.read_ref_data\
-        (fileName,self.gas_ref,self.ext_res_conc_unit,self.ext_res_file_type,'tspc',False)
+        # conditions_list, ref_results_list = genf.read_ref_data\
+        # (fileName,self.gas_ref,self.ext_res_conc_unit,self.ext_res_file_type,'tspc',False)
 
         # if optimization:
         if ex.opt_choice != 'No optimization':

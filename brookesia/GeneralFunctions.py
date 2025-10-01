@@ -27,23 +27,24 @@ import os                          as os
 import sys                         as sys
 import cantera                     as ct
 import time                        as timer
-import brookesia.Computation   as comp
-import brookesia.SA            as sa
-import brookesia.DRG           as drg
+import brookesia_devLOI.Computation   as comp
+import brookesia_devLOI.SA            as sa
+import brookesia_devLOI.LOI           as loi
+import brookesia_devLOI.DRG           as drg
 try:
-    import brookesia.CSP          as csp
+    import brookesia_devLOI.CSP          as csp
 except:
     a = 0
-import brookesia.GeneticAlgorithm as ga
-import brookesia.PSO              as pso
-import brookesia.Class_def        as cdef
+import brookesia_devLOI.GeneticAlgorithm as ga
+import brookesia_devLOI.PSO              as pso
+import brookesia_devLOI.Class_def        as cdef
 import gc
 import copy
 import datetime
 import traceback
 import multiprocessing
 
-from  brookesia.Class_def   import print_
+from  brookesia_devLOI.Class_def   import print_
 from scipy.interpolate       import interp1d
 from shutil import copyfile
 
@@ -185,6 +186,7 @@ def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
     if verbose >=1:
         print_('\n\n============================ ',mp)
         print_('Configuration: '+ conditions.config,mp)
+        print_(conditions.composition.X,mp)
         if conditions.config=='JSR':
             print_('T   = '+ str(conditions.simul_param.pts_scatter[0])+ '-'+ \
                             str(conditions.simul_param.pts_scatter[-1])+ ' K',mp)
@@ -210,7 +212,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
     path_lm = '/dev/null' ; path_w = 'nul'
 
     # maximum number of reduction iteration
-    n_it_max = 100
+    n_it_max = 200
 
     if conditions_list[0].import_data:
         ref_results_list_ext_data = copy_ref_results(ref_results_list)
@@ -259,6 +261,11 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         elif red_method == 'CSP':
             folderCreation(conditions_list[0].mech,'','','_','__CSP',verbose)
             if len(mech_data.spec.CSP_radicals)>0: mech_data.spec.CSP_radicals = []
+        elif 'LOI' in red_method:
+            n_it_max = 400
+            print_('            Species LOI reduction \n',mp)
+            folderCreation(conditions_list[0].mech,'','','_','__LOI_sp',verbose) 
+            # if len(mech_data.spec.LOI_radicals)>0: mech_data.spec.LOI_radicals = []            
         elif red_method == 'NULL' and not conditions_list[0].import_data:
             mech_results_list = ref_results_list
 
@@ -333,14 +340,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if red_data.optim_param.optim_on_meth:
                             red_data = drg.ric(red_data, mech_data, red_results)
                 elif 'SA' in red_method:
-                    if conditions.config=='JSR':
-                        print_('Warning: non sensitivity analysis for JSR configuration',mp)
-                        break
+                    # if conditions.config=='JSR':
+                    #     print_('Warning: non sensitivity analysis for JSR configuration',mp)
+                    #     break
                     # Sensitivity coefficients calculation
                     red_data = sa.sensitivities_computation_SA(red_data,mech_data,\
                                                             red_results)
                     if red_data.optim!='False':
                         red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                elif 'LOI' in red_method:
+                    # LOI coefficients calculation
+                    red_data = loi.LOI_computation(red_data,mech_data,\
+                                                            red_results)
+                    
+                    #if red_data.optim!='False':
+                    #    red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                        
                 elif 'CSP' in red_method:
                     if 'flame' in conditions.config:
                         print_('Warning: no CSP analysis for flame configurations',mp)
@@ -349,9 +364,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     mech_data.spec.CSP_radicals.append(CSP_radicals)
 
                 # eps definition
-                eps_init   = copy.deepcopy(red_data.red_op.eps_init)
-                delta_eps      = copy.deepcopy(red_data.red_op.delta_eps_init)
-                max_eps_config = copy.deepcopy(red_data.red_op.eps_max)
+                eps_init        = copy.deepcopy(red_data.red_op.eps_init)
+                delta_eps       = copy.deepcopy(red_data.red_op.delta_eps_init)                
+                if 'LOI' in red_method:
+                    _LOI = red_data.red_op.LOI_max
+                    # Filter values > 0 
+                    LOI_pos = _LOI[_LOI > 0]
+                    # 33% quantile
+                    q33 = np.quantile(LOI_pos, 0.33)
+                    eps_init    = [q33]*len(eps_init)
+                    delta_eps   = [q33]*len(eps_init)
+                max_eps_config  = copy.deepcopy(red_data.red_op.eps_max)
                 eps = copy.deepcopy(max_eps_config)
 
 
@@ -447,17 +470,52 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             (conditions,red_data,red_method,mech_data,eps)
                         active_r_pm,active_sp_pm = sa.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                    elif 'LOI' in red_method:
+                        # A MODIFIER #
+                        active_sp_pm = loi.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                        active_r_pm,active_sp_pm = loi.reactionWithdrawal\
+                            (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                            
+
                     elif 'CSP'in red_method:
                         active_r_pm,active_sp_pm = csp.reactions_withdrawal\
                         (conditions,red_data,mech_data,red_results,eps)
+
                     # testing new mech
-                    if active_sp_pm   != sp_prev \
-                    or active_r_pm    != r_prev  \
-                    or try_n==2:
+                    if active_sp_pm     != sp_prev \
+                       or  active_r_pm  != r_prev  \
+                       or try_n==2:
                         if verbose>3:
                             print_("  "+str(active_sp_pm.count(True))+\
                                   " species, "+ str(active_r_pm.count(True))+\
                                   " reactions remaining",mp)
+                        if verbose>=6:
+                            species_txt='Remaining species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)
+                        if verbose>=5:
+                            species_txt='Removed species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if not active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)           
+                        if verbose>=7:
+                            reaction_txt='Remaining reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)       
+                        if verbose>=7:
+                            reaction_txt='Removed reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if not active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)                                
+                            
+                                
                         os.chdir(conditions_list[0].main_path+'/__'+red_method)
                         if '.cti' in conditions_list[0].mech:
                             mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
@@ -468,20 +526,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         # -----------------------------------------------------
                         # -----   1. interpretation of the new mech
                         
-
-                        if verbose<8:
-                            with open(path_lm, 'w') as fnull:  
-                                with redirect_stdout(fnull):
-                                    if '.cti' in conditions_list[0].mech:
-                                        red_data.red_op.gas = ct.Solution('temp.cti')
-                                    else:
-                                        red_data.red_op.gas = ct.Solution('temp.yaml')
-                        else:
-                            if '.cti' in conditions_list[0].mech:
-                                red_data.red_op.gas = ct.Solution('temp.cti')
+                        if active_r_pm.count(True) != 0:
+                            if verbose<8:
+                                with open(path_lm, 'w') as fnull:  
+                                    with redirect_stdout(fnull):
+                                        if '.cti' in conditions_list[0].mech:
+                                            red_data.red_op.gas = ct.Solution('temp.cti')
+                                        else:
+                                            red_data.red_op.gas = ct.Solution('temp.yaml')
                             else:
-                                red_data.red_op.gas = ct.Solution('temp.yaml')
-
+                                if '.cti' in conditions_list[0].mech:
+                                    red_data.red_op.gas = ct.Solution('temp.cti')
+                                else:
+                                    red_data.red_op.gas = ct.Solution('temp.yaml')
+                        else:
+                            simulation_done = False
+                            is_debug_mode   = False
 
                         # -----   2. Simulation
                         manager = multiprocessing.Manager()
@@ -563,7 +623,16 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             if conditions.simul_param.show_plots:
                                 plotData(tspc[0:red_data.n_tspc],ref_results,red_results_loop)
 
-
+                    # elif active_r_pm.count(True) != 0:
+                    #     errors = cdef.Errors(conditions,ref_results,\
+                    #                 ref_results,red_data,red_data.red_op)
+                    #     errors.under_tol_T  = False  ; errors.qoi_T  = 1
+                    #     errors.under_tol_Sl = False  ; errors.qoi_Sl = 1
+                    #     errors.under_tol_K  = False  ; errors.qoi_K  = 1
+                    #     errors.under_tol_ig = False  ; errors.qoi_ig = 1
+                    #     errors.under_tol    = False
+                    #     for idx in range(red_data.n_tspc):
+                    #         errors.under_tol_s[idx]=False ; errors.qoi_s[idx]=1
 
                     elif  active_sp_pm == mech_data.spec.activ_p       \
                       and active_r_pm  == mech_data.react.activ_p      \
@@ -573,8 +642,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         break
 
                     else:
-                        if verbose > 5:
+                        if verbose > 9:
                             print_("     Mechanism already evaluated. No further reduction was achieved",mp)
+                            
 
                     # =============================================================
                     #                  Check Errors
@@ -592,7 +662,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_T)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -600,7 +670,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         id_sp=0
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -628,7 +698,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_Sl)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -637,7 +707,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         idx = tspc.index(conditions.error_param.sp_Sl[0])
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -666,7 +736,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -707,11 +777,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                             for sp_oic in range(len(active_r_pm)):
                                                 if sp_oic in tsp_idx:
                                                     OIC_sp.append(copy.deepcopy(red_data.red_op.sensi_sp[sp_oic]))
-                                        elif 'SA' in red_method:
+                                        elif 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
-    #                                    OIC_sp = copy.deepcopy(red_data.drg.OIC_sp)
                                         OIC_sp_tsp = np.zeros(len(tsp_idx))
                                         id_sp=0
                                         idx = tspc.index(conditions.error_param.sp_ig[0])
@@ -744,7 +813,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -898,9 +967,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     eps[idx] /= 2
 
                         #Acceleration of the iterative process
-                        if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
-                            delta_eps[idx] = delta_eps[idx]*2
-                            try_acc[idx]+=5
+                        if 'LOI' not in red_method:
+                            if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
+                                delta_eps[idx] = delta_eps[idx]*2
+                                try_acc[idx]+=5
 
                     # =============================================================
                     #                   Display informations
@@ -1101,10 +1171,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     print_("\n=>  "+str(mech_data.spec.activ_p.count(True))+\
                           " species, "+ str(mech_data.react.activ_p.count(True))+\
                           " reactions remaining",mp)
-                if verbose>8:
+                if verbose>=6:
                     species_txt='Remaining species: '
                     for sp in range(len(mech_data.spec.name)):
                         if mech_data.spec.activ_p[sp]:
+                            species_txt+=mech_data.spec.name[sp]+" "
+                    print_(species_txt,mp)
+                    species_txt='Removed species: '
+                    for sp in range(len(mech_data.spec.name)):
+                        if not mech_data.spec.activ_p[sp]:
                             species_txt+=mech_data.spec.name[sp]+" "
                     print_(species_txt,mp)
                     reaction_txt='Remaining reaction: '
@@ -1112,6 +1187,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if mech_data.react.activ_p[r]:
                             reaction_txt+=str(mech_data.react.number[r])+" "
                     print_(reaction_txt,mp)
+                    reaction_txt='Removed reaction: '
+                    for r in range(len(mech_data.react.number)):
+                        if not mech_data.react.activ_p[r]:
+                            reaction_txt+=str(mech_data.react.number[r])+" "
+                    print_(reaction_txt,mp)
+
+
+
 
                 simulation += 1
 
@@ -1133,8 +1216,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 mech_data.write_new_mech(new_filename)
             else:
                 mech_data.write_yaml_mech(new_filename)
-            if conditions_list[0].simul_param.write_ck:
-                mech_data.write_chemkin_mech(new_filename,conditions_list[0].version)
+#            if conditions_list[0].simul_param.write_ck:
+#                mech_data.write_chemkin_mech(new_filename,conditions_list[0].version)
             os.chdir(conditions_list[0].main_path)
 
 

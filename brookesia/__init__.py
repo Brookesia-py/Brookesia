@@ -24,7 +24,7 @@
 #==============================================================================
 global version
 
-version = '1.8.4'
+version = '1.8.4.2'
 __version__ = version
 
 #==============================================================================
@@ -36,13 +36,13 @@ import sys
 #from shutil import copyfile
 #import cantera as ct
 
-import brookesia.GeneralFunctions as genf
-import brookesia.Class_def as cdef
-#from   brookesia.Class_def import print_
-import brookesia.GUI_red_mech as bkgui
-import brookesia.write_conditions_input as wc
-import brookesia.write_kinetic_mech     as wk
-import brookesia.write_results_input    as wr
+import brookesia_devLOI.GeneralFunctions as genf
+import brookesia_devLOI.Class_def as cdef
+#from   brookesia_devLOI.Class_def import print_
+import brookesia_devLOI.GUI_red_mech as bkgui
+import brookesia_devLOI.write_conditions_input as wc
+import brookesia_devLOI.write_kinetic_mech     as wk
+import brookesia_devLOI.write_results_input    as wr
 
 import gc
 import pandas as pd
@@ -260,12 +260,12 @@ def plot_results_____sp_fileN_displaylegend(species = 'no_arg', fileName = ['0_r
         print('\n\n -------- Choix des paramètres -------- \n\n')
         os.system('kwrite _toolbox_Plot_species.py')
 
-        if 'brookesia._toolbox_Plot_species' in sys.modules:
-            del sys.modules["brookesia._toolbox_Plot_species"]
-        import brookesia._toolbox_Plot_species as plt
+        if 'brookesia_devLOI._toolbox_Plot_species' in sys.modules:
+            del sys.modules["brookesia_devLOI._toolbox_Plot_species"]
+        import brookesia_devLOI._toolbox_Plot_species as plt
         plt.plot_data_v7(c_path)
     else:
-        import brookesia._toolbox_Plot_species as plt
+        import brookesia_devLOI._toolbox_Plot_species as plt
         plt.plot_data_v7(c_path, species, fileName, display_legend)
     os.chdir(c_path)
 
@@ -278,12 +278,12 @@ def plot_fitness(see_file = False):
         print('\n\n -------- Choix des paramètres -------- \n\n')
         os.system('kwrite _toolbox_Plot_fitness.py')
 
-        if 'brookesia._toolbox_Plot_fitness' in sys.modules:
-            del sys.modules["brookesia._toolbox_Plot_fitness"]
-        import brookesia._toolbox_Plot_fitness as pltf
+        if 'brookesia_devLOI._toolbox_Plot_fitness' in sys.modules:
+            del sys.modules["brookesia_devLOI._toolbox_Plot_fitness"]
+        import brookesia_devLOI._toolbox_Plot_fitness as pltf
         pltf.plot_fitness(c_path)
     else:
-        import brookesia._toolbox_Plot_fitness as pltf
+        import brookesia_devLOI._toolbox_Plot_fitness as pltf
         pltf.plot_fitness(c_path)
     os.chdir(c_path)
 

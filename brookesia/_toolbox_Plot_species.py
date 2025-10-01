@@ -78,9 +78,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
     import matplotlib.ticker as ticker
     from matplotlib.ticker import (MultipleLocator,FormatStrFormatter,AutoMinorLocator)
 
-    #if 'brookesia.Class_def' not in sys.modules:
-        #del sys.modules["brookesia.Class_def"]
-    import brookesia.Class_def as cdef
+    #if 'brookesia_dev.Class_def' not in sys.modules:
+        #del sys.modules["brookesia_dev.Class_def"]
+    import brookesia_dev.Class_def as cdef
 
 
     # 3D tools
@@ -720,8 +720,8 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
     plt,fig = cdef.generate_plot_style(plt,fig, plot_style,delta_polices)
     fig.savefig(case_titles[last_case_nb] +".png",dpi=300)
 
-    #if 'brookesia.Class_def' in sys.modules:
-        #del sys.modules["brookesia.Class_def"]
+    #if 'brookesia_dev.Class_def' in sys.modules:
+        #del sys.modules["brookesia_dev.Class_def"]
 
     os.chdir('..')
 

@@ -22,8 +22,8 @@
 
 import cantera as ct
 import numpy as np
-import brookesia.Class_def as cdef
-from  brookesia.Class_def import print_
+import brookesia_devLOI.Class_def as cdef
+from  brookesia_devLOI.Class_def import print_
 import time as timer
 import os
 import sys
@@ -2043,7 +2043,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         sim = ct.ReactorNet([reactor])
         sim.rtol = conditions.simul_param.rtol_ts
         sim.atol = conditions.simul_param.atol_ts
-        time_r,temp = [],[]
+        time_r,temp = [0],[gas_red.T]
         while sim.time < timeVec[-1]:
             sim.step()
             time_r.append(sim.time)
