@@ -27,16 +27,19 @@ import os                          as os
 import sys                         as sys
 import cantera                     as ct
 import time                        as timer
-import brookesia.Computation   as comp
-import brookesia.SA            as sa
-import brookesia.DRG           as drg
+import brookesia.Computation       as comp
+import brookesia.SA                as sa
+import brookesia.DRG               as drg
 try:
-    import brookesia.CSP          as csp
+    import brookesia.CSP           as csp
 except:
     a = 0
-import brookesia.GeneticAlgorithm as ga
-import brookesia.PSO              as pso
-import brookesia.Class_def        as cdef
+import brookesia.Opt_GA            as ga
+import brookesia.Opt_PSO           as pso
+import brookesia.Class_def         as cdef
+
+import pandas                      as pd
+
 import gc
 import copy
 import datetime
@@ -185,16 +188,21 @@ def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
     if verbose >=1:
         print_('\n\n============================ ',mp)
         print_('Configuration: '+ conditions.config,mp)
-        if conditions.config=='JSR':
-            print_('T   = '+ str(conditions.simul_param.pts_scatter[0])+ '-'+ \
-                            str(conditions.simul_param.pts_scatter[-1])+ ' K',mp)
+        if 'JSR' in conditions.config:
+            print_('T   = '+ '%4.0f' %conditions.simul_param.pts_scatter[0]+ '-'+ \
+                            '%4.0f' %conditions.simul_param.pts_scatter[-1]+ ' K',mp)
         else:
-            print_('T   = '+str(conditions.state_var.T)+ ' K',mp)
-        print_('P   = '+str(conditions.state_var.P)+ ' Pa',mp)
+            print_('T   = '+'%4.0f' %conditions.state_var.T + ' K',mp)
+        print_('P   = '+'%4.0f' %conditions.state_var.P+ ' Pa',mp)
         if conditions.config=='pp_flame':
-            print_('phis = '+str(conditions.composition.phi)+' / '+str(conditions.composition.phi2),mp)
+            print_('phis = '+'%2.2f' %conditions.composition.phi+' / '+str(conditions.composition.phi2),mp)
+        elif 'diff' not in conditions.config:
+            print_('phi = '+'%2.2f' %conditions.composition.phi,mp)
+        if 'pp_flame' in conditions.config or 'diff' in conditions.config:
+            composition = '1- ' + conditions.composition.X + ';  2- ' + conditions.composition.X2
         else:
-            print_('phi = '+str(conditions.composition.phi),mp)
+            composition = conditions.composition.X
+        print_('Mixture: ' + composition,mp)
         print_('============================ \n\n',mp)
 
         results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
@@ -259,6 +267,11 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         elif red_method == 'CSP':
             folderCreation(conditions_list[0].mech,'','','_','__CSP',verbose)
             if len(mech_data.spec.CSP_radicals)>0: mech_data.spec.CSP_radicals = []
+        elif 'LOI' in red_method:
+            n_it_max = 400
+            print_('            Species LOI reduction \n',mp)
+            folderCreation(conditions_list[0].mech,'','','_','__LOI_sp',verbose) 
+            # if len(mech_data.spec.LOI_radicals)>0: mech_data.spec.LOI_radicals = []            
         elif red_method == 'NULL' and not conditions_list[0].import_data:
             mech_results_list = ref_results_list
 
@@ -333,14 +346,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if red_data.optim_param.optim_on_meth:
                             red_data = drg.ric(red_data, mech_data, red_results)
                 elif 'SA' in red_method:
-                    if conditions.config=='JSR':
-                        print_('Warning: non sensitivity analysis for JSR configuration',mp)
-                        break
+                    # if conditions.config=='JSR':
+                    #     print_('Warning: non sensitivity analysis for JSR configuration',mp)
+                    #     break
                     # Sensitivity coefficients calculation
                     red_data = sa.sensitivities_computation_SA(red_data,mech_data,\
                                                             red_results)
                     if red_data.optim!='False':
                         red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                elif 'LOI' in red_method:
+                    # LOI coefficients calculation
+                    red_data = loi.LOI_computation(red_data,mech_data,\
+                                                            red_results)
+                    
+                    #if red_data.optim!='False':
+                    #    red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                        
                 elif 'CSP' in red_method:
                     if 'flame' in conditions.config:
                         print_('Warning: no CSP analysis for flame configurations',mp)
@@ -349,9 +370,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     mech_data.spec.CSP_radicals.append(CSP_radicals)
 
                 # eps definition
-                eps_init   = copy.deepcopy(red_data.red_op.eps_init)
-                delta_eps      = copy.deepcopy(red_data.red_op.delta_eps_init)
-                max_eps_config = copy.deepcopy(red_data.red_op.eps_max)
+                eps_init        = copy.deepcopy(red_data.red_op.eps_init)
+                delta_eps       = copy.deepcopy(red_data.red_op.delta_eps_init)                
+                if 'LOI' in red_method:
+                    _LOI = red_data.red_op.LOI_max
+                    # Filter values > 0 
+                    LOI_pos = _LOI[_LOI > 0]
+                    # 33% quantile
+                    q33 = np.quantile(LOI_pos, 0.33)
+                    eps_init    = [q33]*len(eps_init)
+                    delta_eps   = [q33]*len(eps_init)
+                max_eps_config  = copy.deepcopy(red_data.red_op.eps_max)
                 eps = copy.deepcopy(max_eps_config)
 
 
@@ -447,6 +476,13 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             (conditions,red_data,red_method,mech_data,eps)
                         active_r_pm,active_sp_pm = sa.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                    elif 'LOI' in red_method:
+                        active_sp_pm = loi.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                        active_r_pm,active_sp_pm = loi.reactionWithdrawal\
+                            (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                            
+
                     elif 'CSP'in red_method:
                         active_r_pm,active_sp_pm = csp.reactions_withdrawal\
                         (conditions,red_data,mech_data,red_results,eps)
@@ -458,6 +494,32 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             print_("  "+str(active_sp_pm.count(True))+\
                                   " species, "+ str(active_r_pm.count(True))+\
                                   " reactions remaining",mp)
+                        if verbose>=6:
+                            species_txt='Remaining species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)
+                        if verbose>=5:
+                            species_txt='Removed species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if not active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)           
+                        if verbose>=7:
+                            reaction_txt='Remaining reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)       
+                        if verbose>=7:
+                            reaction_txt='Removed reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if not active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)                                
+                            
+                                
                         os.chdir(conditions_list[0].main_path+'/__'+red_method)
                         if '.cti' in conditions_list[0].mech:
                             mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
@@ -468,20 +530,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         # -----------------------------------------------------
                         # -----   1. interpretation of the new mech
                         
-
-                        if verbose<8:
-                            with open(path_lm, 'w') as fnull:  
-                                with redirect_stdout(fnull):
-                                    if '.cti' in conditions_list[0].mech:
-                                        red_data.red_op.gas = ct.Solution('temp.cti')
-                                    else:
-                                        red_data.red_op.gas = ct.Solution('temp.yaml')
-                        else:
-                            if '.cti' in conditions_list[0].mech:
-                                red_data.red_op.gas = ct.Solution('temp.cti')
+                        if active_r_pm.count(True) != 0:
+                            if verbose<8:
+                                with open(path_lm, 'w') as fnull:  
+                                    with redirect_stdout(fnull):
+                                        if '.cti' in conditions_list[0].mech:
+                                            red_data.red_op.gas = ct.Solution('temp.cti')
+                                        else:
+                                            red_data.red_op.gas = ct.Solution('temp.yaml')
                             else:
-                                red_data.red_op.gas = ct.Solution('temp.yaml')
-
+                                if '.cti' in conditions_list[0].mech:
+                                    red_data.red_op.gas = ct.Solution('temp.cti')
+                                else:
+                                    red_data.red_op.gas = ct.Solution('temp.yaml')
+                        else:
+                            simulation_done = False
+                            is_debug_mode   = False
 
                         # -----   2. Simulation
                         manager = multiprocessing.Manager()
@@ -573,8 +637,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         break
 
                     else:
-                        if verbose > 5:
+                        if verbose > 9:
                             print_("     Mechanism already evaluated. No further reduction was achieved",mp)
+                            
 
                     # =============================================================
                     #                  Check Errors
@@ -592,7 +657,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_T)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -600,7 +665,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         id_sp=0
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -628,7 +693,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_Sl)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -637,7 +702,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         idx = tspc.index(conditions.error_param.sp_Sl[0])
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -666,7 +731,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -707,11 +772,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                             for sp_oic in range(len(active_r_pm)):
                                                 if sp_oic in tsp_idx:
                                                     OIC_sp.append(copy.deepcopy(red_data.red_op.sensi_sp[sp_oic]))
-                                        elif 'SA' in red_method:
+                                        elif 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
-    #                                    OIC_sp = copy.deepcopy(red_data.drg.OIC_sp)
                                         OIC_sp_tsp = np.zeros(len(tsp_idx))
                                         id_sp=0
                                         idx = tspc.index(conditions.error_param.sp_ig[0])
@@ -744,7 +808,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -898,9 +962,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     eps[idx] /= 2
 
                         #Acceleration of the iterative process
-                        if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
-                            delta_eps[idx] = delta_eps[idx]*2
-                            try_acc[idx]+=5
+                        if 'LOI' not in red_method:
+                            if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
+                                delta_eps[idx] = delta_eps[idx]*2
+                                try_acc[idx]+=5
 
                     # =============================================================
                     #                   Display informations
@@ -1101,10 +1166,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     print_("\n=>  "+str(mech_data.spec.activ_p.count(True))+\
                           " species, "+ str(mech_data.react.activ_p.count(True))+\
                           " reactions remaining",mp)
-                if verbose>8:
+                if verbose>=6:
                     species_txt='Remaining species: '
                     for sp in range(len(mech_data.spec.name)):
                         if mech_data.spec.activ_p[sp]:
+                            species_txt+=mech_data.spec.name[sp]+" "
+                    print_(species_txt,mp)
+                    species_txt='Removed species: '
+                    for sp in range(len(mech_data.spec.name)):
+                        if not mech_data.spec.activ_p[sp]:
                             species_txt+=mech_data.spec.name[sp]+" "
                     print_(species_txt,mp)
                     reaction_txt='Remaining reaction: '
@@ -1112,6 +1182,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if mech_data.react.activ_p[r]:
                             reaction_txt+=str(mech_data.react.number[r])+" "
                     print_(reaction_txt,mp)
+                    reaction_txt='Removed reaction: '
+                    for r in range(len(mech_data.react.number)):
+                        if not mech_data.react.activ_p[r]:
+                            reaction_txt+=str(mech_data.react.number[r])+" "
+                    print_(reaction_txt,mp)
+
+
+
 
                 simulation += 1
 
@@ -1833,7 +1911,14 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
 def get_reduction_parameters(filename):
 
     try :   fs = open('_conditions_input/'+filename, 'r')
-    except: fs = open(filename, 'r')
+    except:
+        try:
+            fs = open(filename, 'r')
+        except:
+            print("Current working directory: \n" + os.getcwd() + '\n\n\n')
+            fs = open(filename, 'r')
+
+
 
     caution_opt_jsr      = True
     caution_opt_fflame   = True
@@ -2716,4 +2801,150 @@ def copytree(src, dst, symlinks=False, ignore=None):
         else:
             if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
                 shutil.copy2(s, d)
+
+
+
+def wd_config_path(root_path):
+    if os.name == 'nt': #different python path on windows
+        python_path = root_path.split('lib')[0] + 'python.exe'
+    else:
+        python_path = root_path.split('/lib/')[0] + '/bin/python'
+    if os.name != 'nt': # for Linux or Mac
+        pers_config_path = '~/.Brookesia'
+        try:
+            os.chdir(os.path.expanduser(pers_config_path))
+        except:
+            os.chdir(os.path.expanduser('~'))
+            try:
+                os.mkdir('.Brookesia')
+            except:
+                a=False
+            os.chdir('.Brookesia')
+            pers_config_path = os.getcwd()
+    else: # for windows
+        pers_config_path = root_path
+    
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+    
+    return pers_config_path
+
+def shorten_path(path, max_length=30):
+    """Shorten long path segments by replacing them with '...'."""
+    if len(path) <= max_length:
+        return path
+    parts = path.split('/')
+    if len(parts) < 3:
+        return path
+
+    # Replace central part by: '...'
+    short_path = f"{'/'.join(parts[:2])}/.../{'/'.join(parts[-2:])}"
+    return short_path
+
+
+def selected_wd(workdir_table,nwd,pers_config_path,MainWD=False):
+    """update wd_activ.txt file"""
+    
+    # workdir_table['directory'].iloc[int(nwd)]
+    WD_name = workdir_table['working_dir_name'].iloc[nwd]
+    WD_path = workdir_table['directory'].iloc[nwd]
+
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+
+    fd = open('wd_activ.txt', 'w')
+    fd.write(WD_name + ';' + WD_path)
+
+    timer.sleep(0.2)
+
+    if MainWD: MainWD.close() # close gui windows
+
+
+
+def select_wd_pg(pers_config_path, WD_path_pg=True):
+    """non gui working directory selection"""
+
+    # open and select wd path    
+    workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+
+    
+    ready4select = False # becomes True if the table contains, at list, one path
+    if 'working_dir.txt' in os.listdir():
+        workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+        if len(workdir_table['directory'])>=1:
+            ready4select = True
+
+    if ready4select:
+        # shorten path in working dir 
+        workdir_table['directory_short'] = workdir_table['directory'].apply(shorten_path)
+        
+        wd_path_ok = False
+        while not wd_path_ok:
+            print('---------------------------------------------------\n')
+            # print('=> To Modify (add or remove) the working directories, type: M\n\n')
+            
+            # clean the indexation of working_dir
+            workdir_table = workdir_table.reset_index(drop=True)
+            workdir_table.index = range(1, len(workdir_table) + 1)           
+            
+            print(workdir_table[['working_dir_name', 'directory_short']])      
+            
+            wdi = input('\n\nSelect your Working Directory or type M to modify the table: ')
+            if wdi.upper() == 'M':
+                
+                print('Type: ')
+                print('- R to Remove a working directory')
+                print('- A to Add a new working directory')
+                add_or_remove = input()
+                if add_or_remove.upper() =='A':
+                    new_WD_name = input('New Working dir name: ')
+                    new_WD_path = input('New Working dir path: ')
+                    new_WD_path_s = shorten_path(new_WD_path)
+                    
+                    new_row = pd.DataFrame({'working_dir_name': [new_WD_name], 
+                                            'directory': [new_WD_path],
+                                            'directory_short': [new_WD_path_s]})
+                    workdir_table = pd.concat([workdir_table, new_row], ignore_index=True)
+                    
+                elif add_or_remove.upper() == 'R':
+                    wdr = input('Select the working directory number you want to remove: ')
+                    workdir_table = workdir_table.drop(index=int(wdr))
+                    
+                workdir_table.to_csv('working_dir.txt', sep=';')
+                    
+            else: 
+                # update wd_activ.txt file
+                selected_wd(workdir_table,int(wdi)-1,pers_config_path)
+                
+                WD_name = workdir_table['working_dir_name'].loc[int(wdi)]
+                WD_path = workdir_table['directory'].loc[int(wdi)]
+                print('\nCurrent Working dir name:  '  + WD_name)
+                print('Current Working dir path:  '  + WD_path)
+                print('\n\n')                
+                
+                try:
+                    os.chdir(WD_path)
+                    wd_path_ok = True
+                except:
+                    print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
+                    print('Brookesia cannot access to the working directory:' + WD_path)
+                    print('Please, change the path of this working directory')
+                    print('working directory name: ' + WD_name + ')')
+                    print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
+
+    else:
+        new_WD_name = input('New Working dir name: ')
+        new_WD_path = input('New Working dir path: ')
+        new_WD_path_s = shorten_path(new_WD_path)
+        
+        workdir_table = pd.DataFrame({'working_dir_name': [new_WD_name], 
+                                'directory': [new_WD_path],
+                                'directory_short': [new_WD_path_s]})
+        # WD_path, WD_name = create_wd()
+        # data = {'working_dir_name':[WD_name],
+        #         'directory': [WD_path]}
+        # workdir_table = pd.DataFrame(data=data)
+        workdir_table.to_csv('working_dir.txt', sep=';')
+
+    os.chdir(WD_path)
 
