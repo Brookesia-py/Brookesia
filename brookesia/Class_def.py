@@ -286,7 +286,7 @@ class conditions :
 class Red_operator :
     def __init__(self,target_species,optimization=False,n_points=20,          \
                  max_error_sp=30, max_error_T=10, max_error_ig = 10,          \
-                 max_error_Sl=10, max_error_K=20, inter_sp_inter = True,                      \
+                 max_error_Sl=10, max_error_K=20, inter_sp_inter = False,     \
                  eps_init=0.06,delta_eps_init=0.005,eps_max=2.0,              \
                  r_withdraw_intensity = 10,\
 #                 sp_interaction_coeffs=[],r_interaction_coeffs=[]\
