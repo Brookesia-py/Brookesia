@@ -558,8 +558,6 @@ def plot_data_v7(c_path, Var_list, fileName, display_legend, kwargs):
                 #        plt.title(Var_name[var])
                         for var in range(len(Var_name)):
                             axes = plt.subplot(len(Var_name), 1, var+1)
-
-                            # Set the abscissa axis and legend
                             if "reactor" in case_titles[case]:
                                 if (("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw) or scatter:
                                     axes.scatter(abscissa, data2plot[var], \
