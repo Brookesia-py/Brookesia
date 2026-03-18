@@ -100,6 +100,8 @@ class Composition :
         self.diluent     = diluent
         self.phi         = phi
         self.diluent_ratio = diluent_ratio
+        self.idx2sp      = {}
+        self.sp2idx      = {}
 
         # 2nd burner for cflow_flame:
         self.fuel2        = fuel
@@ -109,6 +111,13 @@ class Composition :
         self.diluent_ratio2 = diluent_ratio
         self.mixt         = False
         self.X2           = False
+        if self.gas_ref != False:
+            self.create_dic_sp_idx()
+
+    def create_dic_sp_idx(self):
+        for _sp in range(self.gas_ref.n_species):
+            self.idx2sp[_sp] = self.gas_ref.species_name(_sp)
+            self.sp2idx[self.gas_ref.species_name(_sp)] = _sp
 
 
     def molarFraction(self, gas,composition_2=False):
@@ -253,15 +262,7 @@ class conditions :
         path_lm = '/dev/null' ; path_w = 'nul'
         # # --------------------------------------------------------------------------------
         # # interpretation of the new mech
-        try:
-            # with open(path_lm, 'w') as fnull:  
-            #     with redirect_stdout(fnull):
-            try:
-                gas = get_gas_ct('_kinetic_mech/'+mech)
-            except:
-                gas = get_gas_ct(mech)
-        except:
-            print('\n\n\n ! ! ! ! !\n\nmech: '+mech+' not found\n\n\n\n\n')
+        gas = get_gas_with_fallback(mech)
 #
         self.mech        = mech
         self.mech_ext    = mech
@@ -387,7 +388,7 @@ class Errors:
         mp = conditions.main_path
 
         # main variables
-        gas_ref           = conditions.composition.gas_ref
+        # gas_ref           = conditions.composition.gas_ref
 #        gas_red           = red_data.gas_loop
         tspc              = red_data.tspc
         n_tspc            = red_data.n_tspc
@@ -411,7 +412,7 @@ class Errors:
 
             for k in range(n_tspc):
 
-                index = gas_ref.species_index(tspc[k])
+                index = conditions.composition.sp2idx[tspc[k]]
 
                 data1 = np.zeros(n_points)
                 data2 = np.zeros(n_points)
@@ -456,7 +457,7 @@ class Errors:
         elif error_calculation == "QoI":
 
             for k in range(len(tspc)):
-                index = gas_ref.species_index(tspc[k])
+                index = conditions.composition.sp2idx[tspc[k]]
                 data1 = []
                 data2 = []
                 for i in range(n_points-1):
@@ -3155,8 +3156,8 @@ class Mech_data:
         # -----
 
         if len(filename)>3:
-            if filename[-4:]=='.cti':
-                filename = filename[:-4] + '.ck'
+            if filename[-4:]=='.cti':    filename = filename[:-4] + '.ck'
+            elif filename[-4:]=='yaml':  filename = filename[:-5] + '.ck'
 
         fd = open(filename, 'w')
 
@@ -3241,7 +3242,7 @@ class Mech_data:
 
 
         fd.write("!-------------------------------------------------------------------------------\n")
-        fd.write("! Thermophysical properties\n")
+        fd.write("! Thermodynamics data\n")
         fd.write("!-------------------------------------------------------------------------------\n")
         fd.write("THERMO ALL\n   300.0  1000.0  5000.0 \n")
 
@@ -3253,16 +3254,18 @@ class Mech_data:
                 l_name += ' '
             atoms = self.spec.atoms[sp].split(' ')
             l_atoms = ''
-            for atom in atoms:
-                l_atoms += atom.split(':')[0] + ' ' + atom.split(':')[1] + '  '
+            #for atom in atoms:
+            for i in range(1, len(atoms), 2):
+                l_atoms += atoms[i-1].split(':')[0] + ' ' + atoms[i].split(',')[0] + '  '
+                #l_atoms += atom.split(':')[0] + ' ' + atom.split(':')[1] + '  '
             for i in range(20-len(l_atoms)):
                 l_atoms += ' '
             l_atoms +='G   '
             if float(self.spec.thermo_coeff_lT[sp][0])<1000: l_atoms+='  '
             else:                                   l_atoms+=' '
             l_T =  '%0.1f' %self.spec.thermo_temp[sp][0]  + '    ' + \
-                   '%0.1f' %self.spec.thermo_temp[sp][1]  + '  ' + \
-                   '%0.1f' %self.spec.thermo_temp[sp][2]
+                   '%0.1f' %self.spec.thermo_temp[sp][2]  + '  ' + \
+                   '%0.1f' %self.spec.thermo_temp[sp][1]
             for i in range(29-len(l_T)):
                 l_T += ' '
             l_T += '1\n'
@@ -3749,7 +3752,7 @@ class Reactions:
         self.activ_p   = []
         self.activ_m   = []
         self.modif     = []
-        self.incert    = []
+        self.uncert    = []
         self.f_max     = []
         self.f_min     = []
         self.f_T_fit   = []
@@ -4363,6 +4366,28 @@ def get_screen_size():
     _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
 
     return _height,_height
+
+def get_gas_with_fallback(mech):
+    """Try to retrieve the gas file using several possible paths.."""
+    paths_to_try = [
+        f'_kinetic_mech/{mech}',
+        mech,
+        f'_kinetic_mech/{mech[:-4]}.yaml',
+        f'_kinetic_mech/{mech[:-5]}.cti',
+        f'{mech[:-4]}.yaml',
+        f'{mech[:-5]}.cti'
+    ]
+
+    for path in paths_to_try:
+        try:
+            gas = get_gas_ct(path)
+            return gas
+        except Exception as e:
+            continue
+
+    print(f"\n\n\n ! ! ! ! !\n\nFile '{mech}' not found.\n\n\n\n\n")
+    return None
+
 
 def get_gas_ct(mech):
 

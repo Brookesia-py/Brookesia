@@ -1292,7 +1292,7 @@ class Ui_MainWindow(object):
 
             if os.name == 'nt': #different python path on windows
                 python_path = self.root_path.split('lib')[0] + 'python.exe'
-            else:
+            else: # for Linux or Mac
                 python_path = self.root_path.split('/lib/')[0] + '/bin/python'
 
             os.system(python_path + ' ' + self.root_path + "wd_select_gui.py " + self.root_path)

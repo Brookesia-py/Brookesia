@@ -68,7 +68,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         else:                                                  refine_grid = True
 
         # Flame computation
-        print_("   Reference mecanism flame computation",mp)
+        print_("   Reference mechanism flame computation",mp)
 
 
         loglevel = 0
@@ -1534,7 +1534,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1627,7 +1627,8 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind = gas_red.species_index(conditions.composition.idx2sp[sp])
+                    # sp_ind=gas_red.species_index(gas_ref.species_name(sp))
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1758,7 +1759,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1947,7 +1948,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         conc_t=[]
         for sp in range(len(act_sp)):
             if act_sp[sp]:
-                sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                 conc_t.append(reactor.thermo.concentrations[sp_ind])
             else:
                 conc_t.append(0)
@@ -2009,7 +2010,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_t=[]
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_t.append(reactor.thermo.concentrations[sp_ind])
                 else:
                     conc_t.append(0)
@@ -2085,7 +2086,10 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
         # 1- based on heat release (default)
         if hr!= "no_heat_release":
-            ign_time_hr = time_r[heat_release.index(max(heat_release))]
+            try:
+                ign_time_hr = time_r[heat_release.index(max(heat_release))]
+            except:
+                ign_time_hr = False
         else: ign_time_hr=False
            # 2- based on fuel gradients (if heat relase calculation issues)
         for t in range(len(time_r)-3):
@@ -2231,7 +2235,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             # saving spec concentrations
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_T.append(stirredReactor.thermo.concentrations[sp_ind])
                 else:
                     conc_T.append(0)
