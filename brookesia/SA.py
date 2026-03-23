@@ -99,13 +99,45 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
 
     if 'flame' in conditions.config:
+        
+        
+        if conditions.mech_prev_red:
+            # in this configuration, the flame object red_results.f come from 
+            # the reference simulation (as defined in the first lines of 
+            # the function reduction() in GeneralFunction.py
+            # => calculation of the flame object from the reduced mech
+            red_results = comp.red_computation(
+                conditions,
+                gas_red,
+                mech_data.spec.activ_p,
+                mech_data.react.activ_p)
 
+            
+            # grid_points = red_results.f.grid
+            # f = ct.FreeFlame(gas_red)
+            # f.flame.grid = grid_points
+            # ratio_ff = conditions.simul_param.ratio_ff
+            # slope_ff = conditions.simul_param.slope_ff
+            # curve_ff = conditions.simul_param.curve_ff
+            # prune_ff = conditions.simul_param.prune_ff
+            # f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff,prune=prune_ff)
+        
+            # f.max_grid_points=3000
+            # f.solve(loglevel=0,auto=True,)
+
+
+        # else:
         f = red_results.f
         T = f.T
 
         # Sensitivity calculation
 
         if 'free' in conditions.config:
+            
+            
+            
+            
+            
             if conditions.error_param.Sl_check:
                 # if verbose >=3: print_("Sl sensitivity analysis...",mp)
                 sensi_Sl = f.get_flame_speed_reaction_sensitivities()
@@ -873,7 +905,8 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, eps):
     #sensi_AB = red_data.red_op.sensi_sp
     sensi_AB = copy.deepcopy(red_data.red_op.sensi_sp)
     for sp in range(len(sensi_AB)):
-        sensi_AB[sp]=sensi_AB[sp]/max(sensi_AB[sp])
+        if max(sensi_AB[sp])>0:
+            sensi_AB[sp]=sensi_AB[sp]/max(sensi_AB[sp]) # normalization
 
     tsp_idx = red_data.targetSpeciesIdx
     verbose=conditions.simul_param.verbose
@@ -958,6 +991,7 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, eps):
                     #if sensi_AB[t][spB]>eps[t] and not active_species[spB]:
                         #active_species[spB]=True
 
+    sp_rank = np.zeros(ns)
     if '_sp' in red_method:
         # Species sensitivities based withdrawal
         for t in range(len(tsp_idx)):
@@ -967,8 +1001,12 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, eps):
                 if not mech_data.spec.activ_m[spB]:
                     active_species[spB] = False
                 else:
+                    sp_rank[spB] = max(sp_rank[spB],sensi_AB[t][spB])
                     if sensi_AB[t][spB]>eps[t] and not active_species[spB]:
                         active_species[spB]=True
+
+
+    red_data.red_op.sp_rank = sp_rank
 
     return active_species
 

@@ -10,7 +10,7 @@ True                  : afficher la légende sur le graph (True : oui / False : 
 '''
 
 #def plot_data_v7(c_path, Var_list = 'T, CH4, CO, CO2, C2H6, C2H4', fileName = ['all.csv'], display_legend = False):
-def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_results.csv', display_legend = False):
+def plot_data_v7(c_path, Var_list, fileName, display_legend, kwargs):
 #def plot_data_v7(c_path, Var_list = 'CO$_2$', fileName = ['all.csv'], display_legend = False):
 #def plot_data_v7(c_path, Var_list = 'CO', fileName = ['all.csv'], display_legend = True):
 
@@ -20,29 +20,81 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
     #==============================================================================
 
 
-    # Zoom
-    zoom = "n"         # y / n
-    x_min = 0
-    x_max = .005
+    #  plot_style (presentation / paper / paper_latex / poster)
+    if 'plot_style' not in kwargs:      plot_style = 'paper'
+    else:                               plot_style = kwargs['plot_style']
 
-    Plot_Sl  = False
-    Plot_Igt = False #(! ne fonctionne pas correctement si plusieurs pressions)
+    # Y_log (True/False)
+    if 'Y_log' not in kwargs:           Y_log = False
+    else:                               Y_log = kwargs['Y_log']
+    # X_log (True/False)
+    if 'X_log' not in kwargs:           X_log = False
+    else:                               X_log = kwargs['X_log']
 
-    #fileName = ["0_reduction_results.csv"] # if fileName not in input options
 
-    plot_raw    = True  # scat for exp
-    plot_smooth = False
+    # grid (True/False)
+    if 'grid' not in kwargs:            grid = False
+    else:                               grid = kwargs['grid']
+
+    # Zoom (True/False)
+    zoom_y = False
+    if 'y_min' not in kwargs:           y_min = False
+    else:                               y_min = kwargs['y_min'] ; zoom_y = True
+    if 'y_max' not in kwargs:           y_max = False
+    else:                               y_max = kwargs['y_max'] ; zoom_y = True
+
+    # Zoom_x (True/False)
+    zoom_x = False
+    if 'x_min' not in kwargs:           x_min = False
+    else:                               x_min = kwargs['x_min']; zoom_x = True
+    if 'x_max' not in kwargs:           x_max = False
+    else:                               x_max = kwargs['x_max']; zoom_x = True
+
+    # fig_show (True/False)
+    if 'fig_show' not in kwargs:        fig_show = False
+    else:                               fig_show = kwargs['fig_show']
+
+    # fig_save (True/False)
+    if 'fig_save' not in kwargs:        fig_save = False
+    else:                               fig_save = kwargs['fig_save']
+
+    # fig_save (True/False)
+    if 'base_fn' not in kwargs:         base_fn  = ''
+    else:                               base_fn  = kwargs['base_fn']
+
+    if 'latex' in plot_style:
+        legend = [a.replace('_','\_') for a in legend]
+
+    if 'xlabel' not in kwargs:          _xlabel  = False
+    else:                               _xlabel  = kwargs['xlabel']
+    if 'ylabel' not in kwargs:          _ylabel  = False
+    else:                               _ylabel  = kwargs['ylabel']
+
+    if 'x_sci' not in kwargs:           _x_sci   = False
+    else:                               _x_sci  = kwargs['x_sci']
+    if 'y_sci' not in kwargs:           _y_sci   = False
+    else:                               _y_sci  = kwargs['y_sci']
+
+    if 'Plot_Sl' not in kwargs:         Plot_Sl   = False
+    else:                               Plot_Sl  = kwargs['Plot_Sl']
+    if 'Plot_Igt' not in kwargs:        Plot_Igt   = False
+    else:                               Plot_Igt  = kwargs['Plot_Igt']
+    # don't work if several pressures
+
+    if 'plot_raw' not in kwargs:        plot_raw   = True  # scat for exp
+    else:                               plot_raw  = kwargs['plot_raw']
+    if 'plot_smooth' not in kwargs:     plot_smooth   = False
+    else:                               plot_smooth  = kwargs['plot_smooth']
+
+    if 'scatter' not in kwargs:         scatter   = False
+    else:                               scatter  = kwargs['scatter']
+
 
 
     txt_size = 12
 
     fig_width = 4.5
     left_shift = 0.3
-
-    plot_style = 'paper' #      'paper' 'paper_latex'  'presentation'  'poster'
-
-
-
 
 
     # pour adapter les polices (si besoin)
@@ -506,12 +558,10 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                 #        plt.title(Var_name[var])
                         for var in range(len(Var_name)):
                             axes = plt.subplot(len(Var_name), 1, var+1)
-
-                            # Set the abscissa axis and legend
                             if "reactor" in case_titles[case]:
-                                if ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw:
+                                if (("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw) or scatter:
                                     axes.scatter(abscissa, data2plot[var], \
-                                    marker=scatter_styles[steps], color="black")
+                                    marker=scatter_styles[steps], color="black",s=5)
                                 elif ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and not plot_raw:
                                     a=2
                                 elif "smooth" in case_steps[case][steps]:
@@ -527,9 +577,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                                 else: axes.set_xlabel("Time (s)")
 
                             if "PFR" in case_titles[case]:
-                                if ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw:
+                                if (("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw) or scatter:
                                     axes.scatter(abscissa, data2plot[var], \
-                                    marker=scatter_styles[steps], color="black")
+                                    marker=scatter_styles[steps], color="black",s=5)
                                 elif ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and not plot_raw:
                                     a=2
                                 elif "smooth" in case_steps[case][steps]:
@@ -545,9 +595,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                                 else: axes.set_xlabel("Z (m)")
 
                             elif "JSR" in case_titles[case]:
-                                if ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw:
+                                if (("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw) or scatter:
                                     axes.scatter(abscissa, data2plot[var], \
-                                    marker=scatter_styles[steps], color="black")
+                                    marker=scatter_styles[steps], color="black",s=5)
                                 elif ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and not plot_raw:
                                     a=2
                                 elif "smooth" in case_steps[case][steps]:
@@ -575,9 +625,9 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                                 axes.set_xlabel("T (K)")
 
                             elif "flame" in case_titles[case]:
-                                if ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw:
+                                if (("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and plot_raw) or scatter:
                                     axes.scatter(abscissa, data2plot[var], \
-                                    marker=scatter_styles[steps], color="black")
+                                    marker=scatter_styles[steps], color="black",s=5)
                                 elif ("(raw)" in case_steps[case][steps] or "Experimental data" in case_steps[case][steps]) and not plot_raw:
                                     a=2
                                 elif "smooth" in case_steps[case][steps]:
@@ -608,7 +658,7 @@ def plot_data_v7(c_path, Var_list = 'CH4, CO, CO2', fileName = '0_reduction_resu
                                 #axes.legend(case_steps[case])
                                 #axes.set_xlabel("Z(m)")
 
-                            if zoom == "y":
+                            if zoom_x == "y":
                                 axes.set_xlim(x_min, x_max)
                             # axes.ticklabel_format(axis='y', style='sci', scilimits=(-2,+4))
 

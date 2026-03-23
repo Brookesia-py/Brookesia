@@ -448,23 +448,50 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     if conditions.error_param.ig_check and 'reactor' in conditions.config:
                         if sp in tspc: idx = tspc.index(sp) ; eps_stop[idx] = False
 
-                eps_cre  = [False]*n_tspecies   # stop reduction if cross reduction errors
-                eps_prev = list(eps)
-
+                eps_cre   = [False]*n_tspecies   # stop reduction if cross reduction errors
+                eps_prev  = list(eps)
+                oneby1_sp = False
+                
+                red_data.red_op.inter_sp_inter = False
+                
                 while not stop_reduction:
                     print_('\nStep:'+str(try_n)+' ('+red_method+')',mp); try_n+=1
                     sp_try[:] += 1
                     T_try+=1;ig_try+=1;Sl_try+=1;K_try+=1
                     sp_inter_flag = [False]*len(tspc)
 
-                    # Active species and reactions definition
+                    # -----   Active species and reactions definition   -----
+                    # a) species selection
+                    if oneby1_sp:
+                        eps = copy.deepcopy(eps_prev)
                     if 'DRG' in red_method:
-                        # species selection
                         if red_method == 'DRGEP_sp':
                             active_sp_pm   = drg.graphSearch_DRGEP(conditions,red_data,mech_data,eps)
                         elif red_method == 'DRG_sp':
                             active_sp_pm   = drg.graphSearch(conditions,red_data,mech_data,eps)
-                        # reaction selection
+                    elif 'SA' in red_method:
+                        active_sp_pm = sa.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                    elif 'LOI' in red_method:
+                        active_sp_pm = loi.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                    elif 'CSP' in red_method:
+                        active_r_pm,active_sp_pm = csp.reactions_withdrawal\
+                        (conditions,red_data,mech_data,red_results,eps)
+                    if oneby1_sp and '_sp' in red_method and 'CSP' not in red_method:
+                        active_sp_pm = np.array(active_sp_pm)
+                        sp_prev_arr  = np.array(sp_prev)
+                        if list(active_sp_pm) == list(sp_prev_arr):
+                            stop_reduction = True
+                            active_sp_pm   = list(active_sp_pm)
+                        else:
+                            idx_diff     = np.where(active_sp_pm != sp_prev_arr)[0]
+                            max_index    = idx_diff[np.argmax(red_data.red_op.sp_rank[idx_diff])]
+                            sp_prev_arr[max_index] = True
+                            active_sp_pm = list(sp_prev_arr)                        
+                        
+                    # b) reaction selection
+                    if 'DRG' in red_method:
                         if '_sp' in red_method:
                             active_r_pm, active_sp_pm = drg.reactionWithdrawal\
                                 (mech_data,red_data,red_method,eps,conditions,active_sp_pm)
@@ -472,11 +499,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             active_r_pm, active_sp_pm = drg.reactionWithdrawal\
                                 (mech_data,red_data,red_method,eps,conditions)
                     elif 'SA' in red_method:
-                        active_sp_pm = sa.speciesWithdrawal\
-                            (conditions,red_data,red_method,mech_data,eps)
                         active_r_pm,active_sp_pm = sa.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
                     elif 'LOI' in red_method:
+<<<<<<< HEAD
                         active_sp_pm = loi.speciesWithdrawal\
                             (conditions,red_data,red_method,mech_data,eps)
                         active_r_pm,active_sp_pm = loi.reactionWithdrawal\
@@ -487,6 +513,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         active_r_pm,active_sp_pm = csp.reactions_withdrawal\
                         (conditions,red_data,mech_data,red_results,eps)
                     # testing new mech
+=======
+                        active_r_pm,active_sp_pm = loi.reactionWithdrawal\
+                            (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                        
+                        
+                    # -----------------------------------------------------
+                    #         Simulation with the reduced mechanism
+                    # -----------------------------------------------------
+>>>>>>> origin/Brookesia_1.9.1.1
                     if active_sp_pm   != sp_prev \
                     or active_r_pm    != r_prev  \
                     or try_n==2:
@@ -500,7 +535,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                 if active_sp_pm[sp]:
                                     species_txt+=mech_data.spec.name[sp]+" "
                             print_(species_txt,mp)
+<<<<<<< HEAD
                         if verbose>=5:
+=======
+                        if verbose>=4:
+                            active_sp_pm = np.array(active_sp_pm)
+                            sp_prev_arr  = np.array(sp_prev)
+                            idx_diff     = np.where(active_sp_pm != sp_prev_arr)[0]
+                            if len(idx_diff)>0:
+                                if oneby1_sp: species_txt='  Add species:'
+                                else:         species_txt='  Last species removed:'
+                                for sp in range(len(idx_diff)):
+                                    species_txt+=' '+mech_data.spec.name[idx_diff[sp]]
+                                print_(species_txt,mp)
+                            active_sp_pm   = list(active_sp_pm)
+                        if verbose>=6:
+>>>>>>> origin/Brookesia_1.9.1.1
                             species_txt='Removed species: '
                             for sp in range(len(mech_data.spec.name)):
                                 if not active_sp_pm[sp]:
@@ -525,11 +575,13 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
                         else:
                             mech_data.write_yaml_mech("temp.yaml",active_sp_pm,active_r_pm)
-                        # -----------------------------------------------------
-                        #         Simulation with the reduced mechanism
-                        # -----------------------------------------------------
+                            
+                            
                         # -----   1. interpretation of the new mech
+<<<<<<< HEAD
                         
+=======
+>>>>>>> origin/Brookesia_1.9.1.1
                         if active_r_pm.count(True) != 0:
                             if verbose<8:
                                 with open(path_lm, 'w') as fnull:  
@@ -833,8 +885,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     first_try =   [First_try_T_error]  + [First_try_ig_error]\
                                 + [First_try_Sl_error] +  [First_try_K_error]\
                                 +  First_try_sp_error
-                    if not cross_red_error:
+                        
+                    if not red_data.red_op.inter_sp_inter \
+                        or (not cross_red_error and red_data.red_op.inter_sp_inter):
                         if True in first_try or not errors.under_tol: # if reduced mech fails to respect the accuracy requirements
+                            if True not in first_try              \
+                            and not red_data.red_op.inter_sp_inter\
+                            and '_sp' in red_method: 
+                                oneby1_sp = True
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
                                 for sp in conditions.error_param.sp_T:
@@ -859,8 +917,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             for sp in range(red_data.n_tspc):
                                 if First_try_sp_error[sp] or sp_error[sp]:#errors.under_tol:
                                     eps_evol[sp] = 'decrease'
-                        else: # if reduced mech respects the accuracy requirements
+                        else: # if reduced mech respects the accuracy requirements    
                             one_simul_success = True
+                            eps_prev          = copy.deepcopy(eps)
                             if conditions.error_param.T_check and conditions.config!='JSR':
                                 for sp in conditions.error_param.sp_T:
                                     idx = tspc.index(sp)
@@ -904,7 +963,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_evol[idx] = 'decrease'
                                         eps_stop[idx] = True; eps[idx]=eps_prev[idx]
                                     else:
-                                        eps_evol[idx] = 'increase'
+                                        eps_evol[idx] = 'increase'                                
+                                        
                     elif True in first_try:
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
@@ -942,7 +1002,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
 
 
-                    eps_prev = list(eps)
+                    
 
                     # =============================================================
                     #                   New eps calculation
@@ -960,6 +1020,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     eps[idx] -= delta_eps[idx]
                                 else:
                                     eps[idx] /= 2
+                            if oneby1_sp:
+                                eps = copy.deepcopy(eps_prev)
 
                         #Acceleration of the iterative process
                         if 'LOI' not in red_method:
@@ -980,16 +1042,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_T+='% > '
                             txt_T+=str(red_data.red_op.max_error_T)+'%    '
                             if First_try_T_error: txt_T+='(!) 1st try '
-                            txt_T += '-> '
-                            for sp in conditions.error_param.sp_T:
-                                idx = tspc.index(sp)
-                                txt_T += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_T += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_T += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_T += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_T += '(+):'
-                                if eps[idx]>0.0049: txt_T += '%2.3f' %eps[idx]+'  '
-                                else:               txt_T += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_T += '-> '                                
+                                for sp in conditions.error_param.sp_T:
+                                    idx = tspc.index(sp)
+                                    txt_T += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_T += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_T += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_T += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_T += '(+):'
+                                    if eps[idx]>0.0049: txt_T += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_T += '%1.2e' %eps[idx]+'  '
                             print_(txt_T,mp)
                         if conditions.error_param.Sl_check and 'free_flame' in conditions.config:
                             txt_Sl='  Flame speed error:   '+'%0.1f' %(errors.qoi_Sl*100)
@@ -999,16 +1062,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_Sl+='% > '
                             txt_Sl+=str(red_data.red_op.max_error_Sl)+'%    '
                             if First_try_Sl_error: txt_Sl+='(!) 1st try '
-                            txt_Sl += '-> '
-                            for sp in conditions.error_param.sp_Sl:
-                                idx = tspc.index(sp)
-                                txt_Sl += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_Sl += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_Sl += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_Sl += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_Sl += '(+):'
-                                if eps[idx]>0.0049: txt_Sl += '%2.3f' %eps[idx]+'  '
-                                else:               txt_Sl += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_Sl += '-> '                                
+                                for sp in conditions.error_param.sp_Sl:
+                                    idx = tspc.index(sp)
+                                    txt_Sl += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_Sl += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_Sl += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_Sl += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_Sl += '(+):'
+                                    if eps[idx]>0.0049: txt_Sl += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_Sl += '%1.2e' %eps[idx]+'  '
                             print_(txt_Sl,mp)
                         if conditions.error_param.K_check \
                         and ('diff_flame' in conditions.config or 'diff_flame' in conditions.config):
@@ -1019,16 +1083,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_K+='% > '
                             txt_K+=str(red_data.red_op.max_error_K)+'%    '
                             if First_try_K_error: txt_K+='(!) 1st try '
-                            txt_K += '-> '
-                            for sp in conditions.error_param.sp_K:
-                                idx = tspc.index(sp)
-                                txt_K += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_K += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_K += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_K += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_K += '(+):'
-                                if eps[idx]>0.0049: txt_K += '%2.3f' %eps[idx]+'  '
-                                else:               txt_K += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_K += '-> '                                
+                                for sp in conditions.error_param.sp_K:
+                                    idx = tspc.index(sp)
+                                    txt_K += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_K += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_K += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_K += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_K += '(+):'
+                                    if eps[idx]>0.0049: txt_K += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_K += '%1.2e' %eps[idx]+'  '
                             print_(txt_K,mp)
 
                         if conditions.error_param.ig_check and 'reactor' in conditions.config:
@@ -1039,16 +1104,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_ig+='% > '
                             txt_ig+=str(red_data.red_op.max_error_ig)+'%    '
                             if First_try_ig_error: txt_ig+='(!) 1st try '
-                            txt_ig += '-> '
-                            for sp in conditions.error_param.sp_ig:
-                                idx = tspc.index(sp)
-                                txt_ig += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_ig += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_ig += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_ig += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_ig += '(+):'
-                                if eps[idx]>0.0049: txt_ig += '%2.3f' %eps[idx]+'  '
-                                else:               txt_ig += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_ig += '-> '
+                                for sp in conditions.error_param.sp_ig:
+                                    idx = tspc.index(sp)
+                                    txt_ig += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_ig += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_ig += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_ig += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_ig += '(+):'
+                                    if eps[idx]>0.0049: txt_ig += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_ig += '%1.2e' %eps[idx]+'  '
                             print_(txt_ig,mp)
                         for idx in range(red_data.n_tspc):
                             sp = tspc[idx]
@@ -1060,13 +1126,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                       txt_sp+='% > '
                             txt_sp+=str(red_data.red_op.max_error_sp[idx])+'%    '
                             if First_try_sp_error[idx]: txt_sp+='(!) 1st try '
-                            txt_sp += '-> '
-                            if eps_stop[idx]:                 txt_sp += 'eps(#):'
-                            elif eps_evol[idx] == 'decrease': txt_sp += 'eps(-):'
-                            elif eps_evol[idx] == 'equal':    txt_sp += 'eps(=):'
-                            elif eps_evol[idx] == 'increase': txt_sp += 'eps(+):'
-                            if eps[idx]>0.0049: txt_sp += '%2.3f' %eps[idx]+'  '
-                            else:               txt_sp += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_sp += '-> '
+                                if eps_stop[idx]:                 txt_sp += 'eps(#):'
+                                elif eps_evol[idx] == 'decrease': txt_sp += 'eps(-):'
+                                elif eps_evol[idx] == 'equal':    txt_sp += 'eps(=):'
+                                elif eps_evol[idx] == 'increase': txt_sp += 'eps(+):'
+                                if eps[idx]>0.0049: txt_sp += '%2.3f' %eps[idx]+'  '
+                                else:               txt_sp += '%1.2e' %eps[idx]+'  '
                             print_(txt_sp,mp)
 
 
@@ -1128,15 +1195,25 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 #                        for i in range(red_data.n_tspc):
 
 
-                    if max_eps_config == eps \
-                    or not eps_continue_bis\
-                    or errors.above_tol\
+                    
+                        
+                    if not oneby1_sp                   \
+                    and (max_eps_config == eps         \
+                    or not eps_continue_bis            \
+                    or errors.above_tol                \
                     or max(eps)<=min(eps_init)/n_it_max\
                     or max(sp_try)>=n_it_max or T_try>=n_it_max or ig_try>=n_it_max or Sl_try>=n_it_max or K_try>=n_it_max\
-                    or global_max_error==0:
+                    or global_max_error==0):
+                        stop_reduction=True
+                        
+                    if oneby1_sp                                  \
+                    and False not in errors.under_tol_s      \
+                    and errors.under_tol_T and errors.under_tol_Sl\
+                    and errors.under_tol_K and errors.under_tol_ig:
                         stop_reduction=True
 
-                    if cross_red_error:
+
+                    if cross_red_error and red_data.red_op.inter_sp_inter:
                         print_('\n    ERROR FROM AN OTHER SPECIES REDUCTION',mp)
                         if red_data.red_op.inter_sp_inter and not eps_stop[idx] and 'CSP' not in red_method:
                             print_('\n    Main coupled species:'+tspc[best_ICsp]+\
@@ -2947,4 +3024,8 @@ def select_wd_pg(pers_config_path, WD_path_pg=True):
         workdir_table.to_csv('working_dir.txt', sep=';')
 
     os.chdir(WD_path)
+<<<<<<< HEAD
+=======
+    return WD_path
+>>>>>>> origin/Brookesia_1.9.1.1
 
