@@ -503,6 +503,7 @@ def graphSearch_DRGEP(conditions,red_data,mech_data,eps):
     new_target_tsp = False
     for tsp in range(len(target_species)):
         tsp_idx = target_species[tsp]
+        active_species[tsp_idx] = True
         IC_tsp = 0
         for p in range(points):
             mpq_list = []

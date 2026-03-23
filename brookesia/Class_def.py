@@ -1564,6 +1564,7 @@ class Mech_data:
                         if l == len(txt):
                             print("problem while reading the description section in the new mechanism " + mech)
                             break
+                        l+=1
 
             if l == len(txt):
                 print("problem while reading the description section in the new mechanism " + mech)
@@ -3309,7 +3310,7 @@ class Mech_data:
 # =============================================================================
 
 
-        if self.spec.trans_model is not False:
+        if False not in self.spec.trans_model:
             fd.write("!-------------------------------------------------------------------------------\n")
             fd.write("! Transport properties\n")
             fd.write("!-------------------------------------------------------------------------------\n")
@@ -3838,7 +3839,7 @@ class Simul_param :
                  tol_ss = [1.0e-5, 1.0e-8],                                  \
                  verbose = 0,                                                \
                  tign_nPoints = 450, tign_dt = 1e-09,                        \
-                 n_pts = 250, delta_npts = 20, t_max_coeff = 5,              \
+                 n_pts = 100, delta_npts = 20, t_max_coeff = 5,              \
                  Scal_ref = 'H2O', grad_curv_ratio = 0.5):
 
         self.pts_scatter      = pts_scatter      # time stepping  or  grid
@@ -4399,9 +4400,17 @@ def get_gas_ct(mech):
     while error:
         try:
             if float(ct.__version__[0:3])>2.4:
-                gas = ct.Solution(mech, transport_model = 'mixture-averaged')
+                try:
+                    gas = ct.Solution(mech, transport_model = 'mixture-averaged')
+                except:
+                    gas = ct.Solution(mech)
+                    print('Warning: no transport data')
             else:
-                gas = ct.Solution(mech, transport_model = 'Mix')
+                try:
+                    gas = ct.Solution(mech, transport_model = 'Mix')
+                except:
+                    gas = ct.Solution(mech)
+                    print('Warning: no transport data')
             error = False
         except ct.CanteraError as e:
 

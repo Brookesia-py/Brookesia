@@ -3004,4 +3004,5 @@ def select_wd_pg(pers_config_path, WD_path_pg=True):
         workdir_table.to_csv('working_dir.txt', sep=';')
 
     os.chdir(WD_path)
+    return WD_path
 

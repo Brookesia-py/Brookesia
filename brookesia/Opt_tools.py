@@ -1665,12 +1665,13 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
     os.chdir(opt)
 
     # Fitness calculation
-
     if sys.gettrace() is not None:
         is_debug_mode = True
     else:
         is_debug_mode = False
     # is_debug_mode = True
+
+    is_debug_mode = True
 
     # no parallelisation --------------------------------------------------
     if is_debug_mode:
