@@ -1665,21 +1665,13 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
     os.chdir(opt)
 
     # Fitness calculation
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/Brookesia_1.9.1.1
     if sys.gettrace() is not None:
         is_debug_mode = True
     else:
         is_debug_mode = False
     # is_debug_mode = True
 
-<<<<<<< HEAD
-=======
-    is_debug_mode = True
-
->>>>>>> origin/Brookesia_1.9.1.1
     # no parallelisation --------------------------------------------------
     if is_debug_mode:
         fit_list = []
@@ -2286,13 +2278,8 @@ class Individual:
          gas = cdef.get_gas_ct(filename)
 
          txt_f          = '\n'
-<<<<<<< HEAD
-         qoi_tot        = [];
-         pond           = 0;
-=======
          qoi_tot        = []
          pond           = 0
->>>>>>> origin/Brookesia_1.9.1.1
          qoi_tot_mean   = 0
          for i in range(len(conditions_list)):
 

@@ -502,18 +502,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         active_r_pm,active_sp_pm = sa.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
                     elif 'LOI' in red_method:
-<<<<<<< HEAD
-                        active_sp_pm = loi.speciesWithdrawal\
-                            (conditions,red_data,red_method,mech_data,eps)
-                        active_r_pm,active_sp_pm = loi.reactionWithdrawal\
-                            (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
-                            
-
-                    elif 'CSP'in red_method:
-                        active_r_pm,active_sp_pm = csp.reactions_withdrawal\
-                        (conditions,red_data,mech_data,red_results,eps)
-                    # testing new mech
-=======
                         active_r_pm,active_sp_pm = loi.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
                         
@@ -521,7 +509,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     # -----------------------------------------------------
                     #         Simulation with the reduced mechanism
                     # -----------------------------------------------------
->>>>>>> origin/Brookesia_1.9.1.1
                     if active_sp_pm   != sp_prev \
                     or active_r_pm    != r_prev  \
                     or try_n==2:
@@ -535,9 +522,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                 if active_sp_pm[sp]:
                                     species_txt+=mech_data.spec.name[sp]+" "
                             print_(species_txt,mp)
-<<<<<<< HEAD
-                        if verbose>=5:
-=======
                         if verbose>=4:
                             active_sp_pm = np.array(active_sp_pm)
                             sp_prev_arr  = np.array(sp_prev)
@@ -550,7 +534,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                 print_(species_txt,mp)
                             active_sp_pm   = list(active_sp_pm)
                         if verbose>=6:
->>>>>>> origin/Brookesia_1.9.1.1
                             species_txt='Removed species: '
                             for sp in range(len(mech_data.spec.name)):
                                 if not active_sp_pm[sp]:
@@ -578,10 +561,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             
                             
                         # -----   1. interpretation of the new mech
-<<<<<<< HEAD
-                        
-=======
->>>>>>> origin/Brookesia_1.9.1.1
                         if active_r_pm.count(True) != 0:
                             if verbose<8:
                                 with open(path_lm, 'w') as fnull:  
@@ -3024,8 +3003,4 @@ def select_wd_pg(pers_config_path, WD_path_pg=True):
         workdir_table.to_csv('working_dir.txt', sep=';')
 
     os.chdir(WD_path)
-<<<<<<< HEAD
-=======
-    return WD_path
->>>>>>> origin/Brookesia_1.9.1.1
 

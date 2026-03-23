@@ -53,11 +53,7 @@ def PSO(conditions_list,mech_data,ref_results_list,red_data_list):
 
     print_ ('\n\n ----------------------------------------------------',mp)
     print_('       Particle Swarm Optimization \n',mp)
-<<<<<<< HEAD
-    print_(str(optim_param.n_gen)+ ' generations  /  '+\
-=======
     print_('    ' + str(optim_param.n_gen)+ ' generations  /  '+\
->>>>>>> origin/Brookesia_1.9.1.1
                         str(optim_param.n_ind)+' individuals\n',mp)
 
     os.chdir(mp)
@@ -78,10 +74,7 @@ def PSO(conditions_list,mech_data,ref_results_list,red_data_list):
         print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
     best_ind = copy.deepcopy(ref_ind)
 
-<<<<<<< HEAD
-=======
     # Population creation
->>>>>>> origin/Brookesia_1.9.1.1
     size_tot   = optim_param.n_ind
     pop = Population(conditions_list,mech_data,red_data_list,ref_results_list,size_tot)
     pop = ot.fitness_eval_newchilds(pop,optim_param,conditions_list,ref_results_list,n_it,'PSO')

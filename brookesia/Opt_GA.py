@@ -55,11 +55,7 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
 
     print_ ('\n\n ----------------------------------------------------',mp)
     print_('           Genetic Algorithm  \n',mp)
-<<<<<<< HEAD
-    print_(str(optim_param.n_gen)+ ' generations  /  '+\
-=======
     print_('    ' + str(optim_param.n_gen)+ ' generations  /  '+\
->>>>>>> origin/Brookesia_1.9.1.1
                         str(optim_param.n_ind)+' individuals\n',mp)
 
     os.chdir(mp)
@@ -69,8 +65,6 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     gen=0
 
 
-<<<<<<< HEAD
-=======
     # Reference ind
     mech_data = ot.get_uncertainty(mech_data,optim_param,conditions_list,'GA')
     ref_ind = ot.Individual(conditions_list,mech_data,\
@@ -80,7 +74,6 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
         print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
 
 
->>>>>>> origin/Brookesia_1.9.1.1
     # Population creation, composed of:
     # 1- selected individuals
     # 2- childs from Xover
@@ -96,16 +89,6 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
 
     pop2keep = pop.def_pop2keep()
 
-<<<<<<< HEAD
-    # Reference ind
-    mech_data = ot.get_uncertainty(mech_data,optim_param,conditions_list,'GA')
-    ref_ind = ot.Individual(conditions_list,mech_data,\
-                         ref_results_list,red_data_list,'GA',False)
-    ref_ind.fitness = ref_ind.fitness_eval(conditions_list,optim_param,ref_results_list,'GA',0,True)
-    if verbose >= 1 :
-        print_("Non optimized reduced mechanism fitness: "+"%.3f"%(ref_ind.fitness),mp)
-=======
->>>>>>> origin/Brookesia_1.9.1.1
     best_ind = copy.deepcopy(ref_ind)
 
 

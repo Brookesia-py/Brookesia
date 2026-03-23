@@ -24,11 +24,7 @@
 #==============================================================================
 global version
 
-<<<<<<< HEAD
-version = '1.9.1'
-=======
 version = '1.9.1.2'
->>>>>>> origin/Brookesia_1.9.1.1
 __version__ = version
 
 #==============================================================================
@@ -72,11 +68,6 @@ python_path = root_path.split('/lib/')[0] + '/bin/python'
 # else: # for windows
 #     pers_config_path = root_path
 pers_config_path = genf.wd_config_path(root_path)
-<<<<<<< HEAD
-
-global WD_path
-=======
->>>>>>> origin/Brookesia_1.9.1.1
 
 global WD_path
 
@@ -248,11 +239,7 @@ def select_wd():
     try:    os.chdir(pers_config_path)
     except: os.chdir(os.path.expanduser(pers_config_path))
     
-<<<<<<< HEAD
     genf.select_wd_pg(pers_config_path)
-=======
-    WD_path = genf.select_wd_pg(pers_config_path)
->>>>>>> origin/Brookesia_1.9.1.1
     
 
 def select_wd_gui(WD_path_gui=True):
