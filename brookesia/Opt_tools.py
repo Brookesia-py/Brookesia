@@ -1665,7 +1665,6 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
     os.chdir(opt)
 
     # Fitness calculation
-
     if sys.gettrace() is not None:
         is_debug_mode = True
     else:
@@ -1694,7 +1693,7 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
                     fit_list.append(fit)
             except TimeoutError:
                 print_(
-                    '\n\nWarning : simulation time > ' + '%.0f' % simul_time_limit + 's (> 1.5 x ref simulation time)',
+                    '\n\nWarning : simulation time > ' + '%.0f' % simul_time_limit + 's (> 2 x ref simulation time)',
                     mp)
                 print_("TimeoutError: aborting remaining computations", mp)
                 fit_list.sort(reverse=False, key=lambda col: col[1])
@@ -1704,8 +1703,12 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
                     list_ind_eval.append(ind_fit_inc[1])
                 n_sim = len(fitness_incomplete)
                 for _i in range(ind_nb):
+                    if gen == 0 or opt != 'GA':
+                        idx_ind = _i
+                    else: 
+                        idx_ind = _i + optim_param.n_ind #if GA and gen>0, evaluate new childs only
                     try:
-                        if _i + optim_param.n_ind not in list_ind_eval:
+                        if idx_ind not in list_ind_eval:
                             fit_list.insert(_i, (0, _i))
                     except:
                         fit_list.append((0, _i))
@@ -1721,8 +1724,12 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
                     list_ind_eval.append(ind_fit_inc[1])
                 n_sim = len(fitness_incomplete)
                 for _i in range(ind_nb):
+                    if gen == 0 or opt != 'GA':
+                        idx_ind = _i
+                    else: 
+                        idx_ind = _i + optim_param.n_ind #if GA and gen>0, evaluate new childs only                    
                     try:
-                        if _i + optim_param.n_ind not in list_ind_eval:
+                        if idx_ind not in list_ind_eval:
                             fit_list.insert(_i, (0, _i))
                     except:
                         fit_list.append((0, _i))
@@ -1736,10 +1743,7 @@ def fitness_eval_newchilds(pop, optim_param, conditions_list, ref_results_list, 
             ind = _i
         else: 
             ind = optim_param.n_ind + _i
-        try:
-            pop.individual[ind].fitness = fit_list[_i][0]
-        except: 
-            print('toto')
+        pop.individual[ind].fitness = fit_list[_i][0]
 
     bar.update(ind_nb, title)
     print('\n')
@@ -1810,7 +1814,7 @@ class Individual:
      def find_r2opt(self, red_data_list, optim_param, conditions_list):
 
          if optim_param.optim_on_meth != 'False':
-             n_tspc = red_data_list[0].n_tspc
+             n_tspc = len(red_data_list[0].tspc)
              n_r2opt = optim_param.nb_r2opt  # total number of react to opt
              self.mech.react.modif = [False] * len(self.mech.react.modif)
              mp = optim_param.main_path
@@ -1963,8 +1967,8 @@ class Individual:
                              if n_r2opt_sp == n_r2opt_sp_max: break
                          if n_r2opt_sp == n_r2opt_sp_max: break
 
-             if 'DRG' in red_data_list[0].reduction_operator \
-                     or optim_param.optim_on_meth == 'DRG':
+             elif 'DRG' in red_data_list[0].reduction_operator \
+                     or optim_param.optim_on_meth != 'False':
                  if n_tspc != 0: n_r2opt_sp_max = round(
                      n_r2opt / n_tspc)  # number of react to opt per target data (spec / Sl / ...)
                  max_coeffs_list = np.zeros((n_tspc, len(red_data_list[0].red_op.r_interaction_coeffs[0])))

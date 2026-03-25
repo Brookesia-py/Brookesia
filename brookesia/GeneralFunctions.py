@@ -1299,15 +1299,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         # Optimization
         if 'GA' in red_data_list[op][0].optim or 'PSO' in red_data_list[op][0].optim:
             if red_method == 'NULL':
-                if 'DRG' in red_data_list[op][0].optim_param.optim_on_meth:
-                    for i in range(len(red_data_list[op])):
-                        red_data_list[op][i]=drg.dic(red_data_list[op][i],mech_data,mech_results_list[i])
-                        red_data_list[op][i]=drg.ric(red_data_list[op][i],mech_data,mech_results_list[i])
                 if 'SA'  in red_data_list[op][0].optim_param.optim_on_meth:
                     for i in range(len(red_data_list[op])):
                         red_data_list[op][i]=sa.sensitivities_computation_SA(red_data_list[op][i],\
                                      mech_data,mech_results_list[i])
-
+                else:
+                    for i in range(len(red_data_list[op])):
+                        red_data_list[op][i]=drg.dic(red_data_list[op][i],mech_data,mech_results_list[i])
+                        red_data_list[op][i]=drg.ric(red_data_list[op][i],mech_data,mech_results_list[i])
 
             clock_opt = cdef.Clock(red_data_list[op][0].optim) ; clock_opt.start()
             if red_data_list[op][0].optim == 'GA':
@@ -1463,13 +1462,7 @@ def input_results_treatment(conditions_list,ref_results_list,mech_data):
             ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
             ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
             conditions_list[i].simul_param.pts_scatter=list(pts_scatter_mech)
-#        else:
-#            ref_results_list_smooth = copy.copy(ref_results_list)
-#            for i in range(len(conditions_list)):
-#                ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
-#                ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
-#                ref_results_list_smooth[i].X2conc()
-#                mech_results_list[i].X2conc()
+
     else:
         # saving and suppression of unpickable variables
         gas = ref_results_list[0].gas
@@ -2007,7 +2000,8 @@ def get_reduction_parameters(filename):
             write_ck    = str2bool(txt[1])
         if txt[0] == 'tspc':
             tspc          = txt2list_string(txt[1])
-            n_tspc = len(tspc)
+            if tspc==['']: n_tspc = 0
+            else:          n_tspc = len(tspc)
         if txt[0] == 'T_check':           T_check       = str2bool(txt[1])
         if txt[0] == 'sp_T':              sp_T          = txt2list_string(txt[1])
         if txt[0] == 'Sl_check':          Sl_check      = str2bool(txt[1])
@@ -2189,6 +2183,8 @@ def get_reduction_parameters(filename):
                             conditions_list[-1].simul_param.grad_curv_ratio = grad_curv_ratio
                         if 'tign_nPoints' in locals():
                             conditions_list[-1].simul_param.tign_nPoints = int(tign_nPoints)
+                        if 't_max_react' in locals():
+                            conditions_list[-1].simul_param.t_max_react = t_max_react
                         if 'tign_dt' in locals():
                             conditions_list[-1].simul_param.tign_dt = tign_dt
                         # options for jsr
@@ -2391,6 +2387,7 @@ def get_reduction_parameters(filename):
             if 'restore_flame_folder' in locals(): del restore_flame_folder
             save_conditions = False
 
+    
     if external_results:
         # gas
         try:
@@ -2438,6 +2435,8 @@ def get_reduction_parameters(filename):
     else:
         main_path = r_path + date + main_path_ext
         main_folder = False
+    mp = main_path
+
 
     for cond in conditions_list:
         # main parameters
@@ -2615,7 +2614,14 @@ def get_reduction_parameters(filename):
                             red_data.optim_param.Arrh_max_variation = Arrh_max_variation
                             red_data.optim_param.Arrh_var = True
                         if 'f_uncert'          in locals(): red_data.optim_param.f_default          = f_uncert                        
-                        if 'optim_on_meth'      in locals(): red_data.optim_param.optim_on_meth      = optim_on_meth
+                        if 'optim_on_meth'      in locals(): 
+                            if optim_on_meth not in ('False', 'DRG', 'SA'):
+                                if not os.path.exists(mp):  os.mkdir(mp)
+                                print_('Warning: Reduction/optimization parameters #' + str(len(red_data_list)),mp)
+                                print_('optim_on_meth = ' + str(optim_on_meth) + '   instead of False / DRG / SA ',mp)
+                                print_('optim_on_meth = DRG   is considered\n',mp)
+                                optim_on_meth = 'DRG'
+                            red_data.optim_param.optim_on_meth      = optim_on_meth
                         if 'nb_r2opt'           in locals(): red_data.optim_param.nb_r2opt           = nb_r2opt
                         if 'reactions2opt'      in locals(): red_data.optim_param.reactions2opt      = reactions2opt
                         if 'import_mech'        in locals(): red_data.optim_param.import_mech        = import_mech
@@ -2731,6 +2737,9 @@ def get_reduction_parameters(filename):
 
     for num in range(len(conditions_list)):
         conditions_list[num].num = str(num+1)+'_'
+
+    # if warning generated after the input file parsing:
+    if os.path.exists(mp):  print_('------\n',mp)  
 
     return conditions_list, red_data_list, ref_results_list
 

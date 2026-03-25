@@ -1,8 +1,15 @@
 [1.9.1.1]
+Added:
+- Reduciton iteration now can go species-by-species when the error threshold is exceeded (default option)
 
-correction SA si importation modèle
-amélioration discretisation temps
-implémentation recherche espèce par espèce lorsque le seuil d'erreur est passé
+Changed
+- Improved time discretization for reactor simulations
+
+Fixed 
+- sensitivity analysis (SA) on the reduced mechanism when mech_prev_red is used
+- Fixed convergence issues in calculations during optimization via GA/PSO
+- Corrected consideration of proxy species for flame speed/ignition delay time/stretch for the identification of reactions to optimize via DRG analysis
+
 
 
 [1.9.1.0]

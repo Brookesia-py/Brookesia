@@ -1002,42 +1002,36 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 timeVec_ignit.append(time_init)
                 time_init/=1.05
             timeVec_ignit.reverse()
-            H2O = np.zeros(init_points-1, 'd')
-            X_Scal = np.zeros(init_points-1, 'd')
-            dH2O = np.zeros(init_points-2, 'd')
-
+            X_H2O = np.zeros(init_points, 'd')
+            X_Scal = np.zeros(init_points, 'd')
 
             if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
                 X_Scal[0] = reactor.T
             else:
                 X_Scal[0] = gas.X[gas.species_index(Scal_ref)]
             try:
-                H2O[0] = gas.X[gas.species_index("H2O")]
+                X_H2O[0] = gas.X[gas.species_index("H2O")]
             except:
-                H2O[0] = 0
+                X_H2O[0] = 0
 
-            for n in range(1, init_points-1):
-    #            timeVec_ignit[n] = timeVec_ignit[n-1] + dt
+            for n in range(1, init_points):
                 sim.advance(timeVec_ignit[n])
-
                 if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
                     X_Scal[n] = reactor.T
                 else:
                     X_Scal[n] = gas.X[gas.species_index(Scal_ref)]
+                X_H2O[n] = gas.X[gas.species_index("H2O")]
 
-                try:
-                    H2O[n] = gas.X[gas.species_index("H2O")]
-                    dH2O[n-1] = (H2O[n]-H2O[n-1]) *0.5
-                except:
-                    H2O[n] = 0
-                    dH2O[n-1] = np.abs(X_Scal[n]-X_Scal[n-1]) *0.5
-
+            dH2O = np.gradient(X_H2O, timeVec_ignit)
             idx_maxgrad = np.where(dH2O==max(dH2O)) # find max grad index
             tign = timeVec_ignit[idx_maxgrad[0][0]]
             if verbose >=4:
-                if H2O[0]*1.2>H2O[-1] or tign>0.97*timeVec_ignit[-1]:
+                if X_H2O[0]*1.2>X_H2O[-1] or tign>0.97*timeVec_ignit[-1]:
                     print_("    WARNING : No ignition was detected in the first "+
                           str(tmax_react)+"s" +".",mp)
+                    print_(" -> increase the t_max for ignition detection (now:" + str(tmax_react) + "s",mp)
+                    print_(" -> in the Simulation cases parameters, add the option:",mp)
+                    print_("    tign_det_tmax_sec      = xx     (default: 1 second)",mp)
                 elif verbose>7:
                     print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'us',mp)
 
@@ -1051,44 +1045,28 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
 
             # Grad and curve vectors calculation
-            grad_vect = np.gradient(X_Scal,    timeVec_ignit[:-1])
-            curv_vect = np.gradient(grad_vect, timeVec_ignit[:-1])
-            # grad_vect_0 = [] ; curv_vect = []
-            # # grad calculation
-            # for i in range(len(X_Scal)-1):
-            #     grad_vect_0.append((X_Scal[i+1]-X_Scal[i])/(timeVec_ignit[i+1]-timeVec_ignit[i]))
-            # # curv calculation
-            # for i in range(len(grad_vect_0)-1):
-            #     curv_vect.append((grad_vect_0[i+1]-grad_vect_0[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
-            # # grad recomputed, for corresponding to the curv values
-            # grad_vect = []
-            # for i in range(len(X_Scal)-2):
-            #     grad_vect.append((X_Scal[i+2]-X_Scal[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
-
+            grad_vect = np.gradient(X_Scal,    timeVec_ignit)
+            curv_vect = np.gradient(grad_vect, timeVec_ignit)
 
             time_stepping_calc=True; pt_coeff=2e5
             # coeff_dtmax = n_pts/10 ; dtmin = tmax/(n_pts*200)
             dtmax = tmax/(n_pts/20) ; dtmin = tmax/(n_pts*200)
             time_stepping_calc_try=0
-            print('grad_curv_ratio: ' + str(grad_curv_ratio))
             
             # =============================
             # while time_stepping_calc:
             # time stepping
             timeVec = [0]
             # first point => considering only grad_vect_0 (curve data not available)
-            # timeVec.append(tmax/((grad_vect_0[0]/np.sum([grad_vect_0[0]]))*n_pts))
             # Next points => considering grad_vect (curve data available)
             idx = 0
             while timeVec[-1]<tmax:
                 # Find the index of the value in timeVec_ignit closest to the last value of timeVec
                 idx = np.argmin(np.abs(np.array(timeVec_ignit) - timeVec[-1]))
-                # idx = min((np.abs(timeVec_ignit-timeVec[-1])).argmin()-2,len(grad_vect)-1)
                 dt = (tmax/(n_pts*pt_coeff))/(
                     abs(grad_vect[idx]/np.sum(np.abs([grad_vect])))*grad_curv_ratio
                    +abs(curv_vect[idx]/np.sum(np.abs([curv_vect])))*(1-grad_curv_ratio)
                     )
-                # idx+=1
                 if dt<dtmin: #dt<(tign/coeff_dtmin)
                     timeVec.append(timeVec[-1]+dtmin)
                 elif dt>dtmax: #(tign/coeff_dtmax)
@@ -1098,23 +1076,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
             timeVec = resample_time(timeVec, n_pts)
                 
-            #     if len(timeVec)>n_pts-delta_npts and len(timeVec)<n_pts+delta_npts:
-            #         time_stepping_calc=False
-            #     else:
-            #         if verbose>4:
-            #             print_("Bad number of time steps:"+str(len(timeVec))+". Recomputing time vector",mp)
-            #         pt_coeff=pt_coeff*(n_pts/len(timeVec))**2
-            #         time_stepping_calc=True
-            #         time_stepping_calc_try+=1
-            #         if time_stepping_calc_try>50:  time_stepping_calc=False
-            #         if pt_coeff<1e-5:
-            #             print_("Warning : larger time steps imposed for the calculation",mp)
-            #             # pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
-            #             pt_coeff = 2e5 ; dtmax = dtmax/4                        
-            #         if pt_coeff>1e20:
-            #             print_("Warning : smaller time steps imposed for the calculation",mp)
-            #             # pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
-            #             pt_coeff = 2e5 ; dtmin = dtmin*4
             
             if verbose>3:
                 print_("    - time vector contains: "+str(len(timeVec))+" points",mp)
