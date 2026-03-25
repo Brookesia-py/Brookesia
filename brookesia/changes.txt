@@ -1,15 +1,16 @@
-[1.9.1.1]
+[1.9.1.2]
 Added:
 - Reduciton iteration now can go species-by-species when the error threshold is exceeded (default option)
-
-Changed
-- Improved time discretization for reactor simulations
 
 Fixed 
 - sensitivity analysis (SA) on the reduced mechanism when mech_prev_red is used
 - Fixed convergence issues in calculations during optimization via GA/PSO
 - Corrected consideration of proxy species for flame speed/ignition delay time/stretch for the identification of reactions to optimize via DRG analysis
 
+
+[1.9.1.1]
+Changed
+- Improved time discretization for reactor simulations
 
 
 [1.9.1.0]
