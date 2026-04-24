@@ -24,7 +24,7 @@
 #==============================================================================
 global version
 
-version = '1.8.4'
+version = '1.9.1.2'
 __version__ = version
 
 #==============================================================================
@@ -47,45 +47,41 @@ import brookesia.write_results_input    as wr
 import gc
 import pandas as pd
 
+if 'TERM' not in os.environ:
+    os.environ['TERM'] = 'xterm-256color'
 
 # path
 root_path   = __file__.split('__init__.py')[0]
 python_path = root_path.split('/lib/')[0] + '/bin/python'
-if os.name != 'nt': # for Linux or Mac
-    pers_config_path = '~/.Brookesia'
-    try:
-        os.chdir(os.path.expanduser(pers_config_path))
-    except:
-        os.chdir(os.path.expanduser('~'))
-        try:
-            os.mkdir('.Brookesia')
-        except:
-            a=False
-        os.chdir('.Brookesia')
-        pers_config_path = os.getcwd()
-else: # for windows
-    pers_config_path = root_path
+# if os.name != 'nt': # for Linux or Mac
+#     pers_config_path = '~/.Brookesia'
+#     try:
+#         os.chdir(os.path.expanduser(pers_config_path))
+#     except:
+#         os.chdir(os.path.expanduser('~'))
+#         try:
+#             os.mkdir('.Brookesia')
+#         except:
+#             a=False
+#         os.chdir('.Brookesia')
+#         pers_config_path = os.getcwd()
+# else: # for windows
+#     pers_config_path = root_path
+pers_config_path = genf.wd_config_path(root_path)
 
+global WD_path
 
-
-#import shutil
-#path2python = shutil.which("python")
-
-# set language parameters (for xml cantera files)
-#import locale as lc
-#lc.setlocale(lc.LC_ALL, 'en_GB.utf8')
-#==============================================================================
 
 def run_reduction(filename):
     global version
-#    global WD_path
+    global WD_path
     gc.collect()
     genf.main_redopt_algo(filename,WD_path,version)
     os.chdir(WD_path)
 
 def test_examples():
     global version
-#    global WD_path
+    global WD_path
     gc.collect()
     genf.main_redopt_algo('1_reactor.inp',WD_path,version)
     genf.main_redopt_algo('2_JSR.inp',WD_path,version)
@@ -116,13 +112,15 @@ def convert_2_cti(mech):
 
 
 def gui():
-#    global WD_path
+    global WD_path
 #    global WD_name
     os.chdir(WD_path)
     bkgui.display_gui(WD_path, WD_name, root_path)
     os.chdir(WD_path)
 
 def create_wd():
+    global WD_path
+
     wd_path_ok = False
     while not wd_path_ok:
         WD_path, WD_name = bkgui.get_wd_folder()
@@ -150,40 +148,120 @@ def create_wd():
     return WD_path, WD_name
 
 def check_wd():
+    global WD_path
 
     try:    os.chdir(pers_config_path)
     except: os.chdir(os.path.expanduser(pers_config_path))
+
+    print('\n\nTo manage the working directories, type: bk.select_wd() or: bk.select_wd_gui()\n')
+
 
     ready4select = False
     create_wd_file = False
 
     if 'working_dir.txt' in os.listdir():
         workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+        # shorten path in working dir 
+        workdir_table['directory_short'] = workdir_table['directory'].apply(genf.shorten_path)
+        # clean the indexation of working_dir
+        workdir_table = workdir_table.reset_index(drop=True)
+        workdir_table.index = range(1, len(workdir_table) + 1)
+        
         if len(workdir_table['directory'])>=1:
             ready4select = True
+                
+            
+            print('======================================================================')
+            print('                     List of Working directories')
+            print('======================================================================')
+            print(workdir_table[['working_dir_name', 'directory_short']])
+            print('\n\n')
+            
     else:
         create_wd_file = True
 
 
     if ready4select: # is some working dir already exist
-        if len(workdir_table['directory'])==1:
-            WD_name = workdir_table['working_dir_name'].iloc[0]
-            WD_path = workdir_table['directory'].iloc[0]
-            try:
-                os.chdir(WD_path)
-            except:
-                print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
-                print('Brookesia cannot access to the working directory:' + WD_path)
-                print('Please, select a new working directory')
-                print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
+        fs = open('wd_activ.txt', 'r')
+        txt = fs.readline()
+        WD_name = txt.split(';')[0]
+        WD_path = txt.split(';')[1]
+        try:
+            os.chdir(WD_path)
+            wd_path_ok = True
+        except:
+            print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
+            print('Brookesia cannot access to the working directory:' + WD_path)
+            print('Please, change the path of this working directory')
+            print('working directory name: ' + WD_name + ')')
+            print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
 
-                create_wd_file = True
-        else:
+        print('Current Working dir name:  '  + WD_name)
+        print('Current Working dir path:  '  + WD_path)
+        print('\n\n')
+        
+    #     if len(workdir_table['directory'])==1: # if only 1 working dir
+    #         WD_name = workdir_table['working_dir_name'].iloc[0]
+    #         WD_path = workdir_table['directory'].iloc[0]
+    #         try:
+    #             os.chdir(WD_path)
+    #         except:
+    #             print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
+    #             print('Brookesia cannot access to the working directory:' + WD_path)
+    #             print('Please, select a new working directory')
+    #             print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
+
+    #             create_wd_file = True
+    #     else:  # if more than 1 working dir => select one of them
+    #         wd_path_ok = False
+    #         while not wd_path_ok:
+    #             select_wd()
+
+    # if create_wd_file:
+    #     WD_path, WD_name = create_wd()
+    #     data = {'working_dir_name':[WD_name],
+    #             'directory': [WD_path]}
+    #     workdir_table = pd.DataFrame(data=data)
+    #     try:    os.chdir(pers_config_path)
+    #     except: os.chdir(os.path.expanduser(pers_config_path))
+    #     workdir_table.to_csv('working_dir.txt', sep=';')
+
+    # os.chdir(WD_path)
+
+    return WD_path, WD_name
+
+
+def select_wd():
+    """non gui working directory selection"""
+    global WD_path
+
+    # go in pers_config_path to open configuration files
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+    
+    genf.select_wd_pg(pers_config_path)
+    
+
+def select_wd_gui(WD_path_gui=True):
+    global WD_path
+
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+
+    workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+
+    ready4select = False
+    if 'working_dir.txt' in os.listdir():
+        workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+        if len(workdir_table['directory'])>=1:
+            ready4select = True
+
+    if ready4select:
+        if WD_path_gui == True:
             wd_path_ok = False
             while not wd_path_ok:
-                select_wd()
-                try:    os.chdir(pers_config_path)
-                except: os.chdir(os.path.expanduser(pers_config_path))
+    #            select_wd()
+                os.system(python_path + ' ' + root_path + "wd_select_gui.py " + root_path)
                 fs = open('wd_activ.txt', 'r')
                 txt = fs.readline()
                 WD_name = txt.split(';')[0]
@@ -197,50 +275,15 @@ def check_wd():
                     print('Please, change the path of this working directory')
                     print('working directory name: ' + WD_name + ')')
                     print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
-
-    if create_wd_file:
-        WD_path, WD_name = create_wd()
-        data = {'working_dir_name':[WD_name],
-                'directory': [WD_path]}
-        workdir_table = pd.DataFrame(data=data)
-        try:    os.chdir(pers_config_path)
-        except: os.chdir(os.path.expanduser(pers_config_path))
-        workdir_table.to_csv('working_dir.txt', sep=';')
-
-    os.chdir(WD_path)
-
-    return WD_path, WD_name
-
-
-def select_wd():
-    try:    os.chdir(pers_config_path)
-    except: os.chdir(os.path.expanduser(pers_config_path))
-
-    workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
-
-    ready4select = False
-    if 'working_dir.txt' in os.listdir():
-        workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
-        if len(workdir_table['directory'])>=1:
-            ready4select = True
-
-    if ready4select:
-        wd_path_ok = False
-        while not wd_path_ok:
-#            select_wd()
-            os.system(python_path + ' ' + root_path + "wd_select_gui.py " + root_path)
-            fs = open('wd_activ.txt', 'r')
-            txt = fs.readline()
-            WD_name = txt.split(';')[0]
-            WD_path = txt.split(';')[1]
+        else:
             try:
+                WD_path = WD_path_gui
                 os.chdir(WD_path)
                 wd_path_ok = True
             except:
                 print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
                 print('Brookesia cannot access to the working directory:' + WD_path)
                 print('Please, change the path of this working directory')
-                print('working directory name: ' + WD_name + ')')
                 print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
 
     else:
@@ -290,4 +333,3 @@ def plot_fitness(see_file = False):
 
 os.chdir(root_path)
 WD_path, WD_name = check_wd()
-

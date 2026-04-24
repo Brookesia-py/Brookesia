@@ -342,31 +342,3 @@ ui.setupUi(MainWD)
 MainWD.show()
 sys.exit(app.exec_())
 
-
-#
-#
-#def get_wd_folder():
-#    global sz_w
-#    global sz_h
-#    global WD_path
-#
-#    app = QtWidgets.QApplication(sys.argv)
-#    Window_f = QtWidgets.QMainWindow()
-#
-#    _height = QtWidgets.QDesktopWidget().screenGeometry(-1).height()
-#    _width = QtWidgets.QDesktopWidget().screenGeometry(-1).width()
-#    sz_w = _width/1366
-#    sz_h = _height/768
-#
-#    Window_f.setObjectName("Brookesia")
-#    Window_f.resize(790*sz_w, 671*sz_h)
-#
-#    A=Files_windows()
-#    options = QtWidgets.QFileDialog.Options()
-#    options |= QtWidgets.QFileDialog.DontUseNativeDialog
-#    WD_path = QtWidgets.QFileDialog.getExistingDirectory(A, "Select the new working directory", options=options)
-#    WD_name, ok = QtWidgets.QInputDialog.getText(A, 'Text Input Dialog', 'Enter the new name:')
-#    return WD_path, WD_name
-
-
-

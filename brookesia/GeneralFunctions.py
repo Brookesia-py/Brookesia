@@ -27,16 +27,19 @@ import os                          as os
 import sys                         as sys
 import cantera                     as ct
 import time                        as timer
-import brookesia.Computation   as comp
-import brookesia.SA            as sa
-import brookesia.DRG           as drg
+import brookesia.Computation       as comp
+import brookesia.SA                as sa
+import brookesia.DRG               as drg
 try:
-    import brookesia.CSP          as csp
+    import brookesia.CSP           as csp
 except:
     a = 0
-import brookesia.GeneticAlgorithm as ga
-import brookesia.PSO              as pso
-import brookesia.Class_def        as cdef
+import brookesia.Opt_GA            as ga
+import brookesia.Opt_PSO           as pso
+import brookesia.Class_def         as cdef
+
+import pandas                      as pd
+
 import gc
 import copy
 import datetime
@@ -185,16 +188,21 @@ def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
     if verbose >=1:
         print_('\n\n============================ ',mp)
         print_('Configuration: '+ conditions.config,mp)
-        if conditions.config=='JSR':
-            print_('T   = '+ str(conditions.simul_param.pts_scatter[0])+ '-'+ \
-                            str(conditions.simul_param.pts_scatter[-1])+ ' K',mp)
+        if 'JSR' in conditions.config:
+            print_('T   = '+ '%4.0f' %conditions.simul_param.pts_scatter[0]+ '-'+ \
+                            '%4.0f' %conditions.simul_param.pts_scatter[-1]+ ' K',mp)
         else:
-            print_('T   = '+str(conditions.state_var.T)+ ' K',mp)
-        print_('P   = '+str(conditions.state_var.P)+ ' Pa',mp)
+            print_('T   = '+'%4.0f' %conditions.state_var.T + ' K',mp)
+        print_('P   = '+'%4.0f' %conditions.state_var.P+ ' Pa',mp)
         if conditions.config=='pp_flame':
-            print_('phis = '+str(conditions.composition.phi)+' / '+str(conditions.composition.phi2),mp)
+            print_('phis = '+'%2.2f' %conditions.composition.phi+' / '+str(conditions.composition.phi2),mp)
+        elif 'diff' not in conditions.config:
+            print_('phi = '+'%2.2f' %conditions.composition.phi,mp)
+        if 'pp_flame' in conditions.config or 'diff' in conditions.config:
+            composition = '1- ' + conditions.composition.X + ';  2- ' + conditions.composition.X2
         else:
-            print_('phi = '+str(conditions.composition.phi),mp)
+            composition = conditions.composition.X
+        print_('Mixture: ' + composition,mp)
         print_('============================ \n\n',mp)
 
         results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
@@ -259,6 +267,11 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         elif red_method == 'CSP':
             folderCreation(conditions_list[0].mech,'','','_','__CSP',verbose)
             if len(mech_data.spec.CSP_radicals)>0: mech_data.spec.CSP_radicals = []
+        elif 'LOI' in red_method:
+            n_it_max = 400
+            print_('            Species LOI reduction \n',mp)
+            folderCreation(conditions_list[0].mech,'','','_','__LOI_sp',verbose) 
+            # if len(mech_data.spec.LOI_radicals)>0: mech_data.spec.LOI_radicals = []            
         elif red_method == 'NULL' and not conditions_list[0].import_data:
             mech_results_list = ref_results_list
 
@@ -333,14 +346,22 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if red_data.optim_param.optim_on_meth:
                             red_data = drg.ric(red_data, mech_data, red_results)
                 elif 'SA' in red_method:
-                    if conditions.config=='JSR':
-                        print_('Warning: non sensitivity analysis for JSR configuration',mp)
-                        break
+                    # if conditions.config=='JSR':
+                    #     print_('Warning: non sensitivity analysis for JSR configuration',mp)
+                    #     break
                     # Sensitivity coefficients calculation
                     red_data = sa.sensitivities_computation_SA(red_data,mech_data,\
                                                             red_results)
                     if red_data.optim!='False':
                         red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                elif 'LOI' in red_method:
+                    # LOI coefficients calculation
+                    red_data = loi.LOI_computation(red_data,mech_data,\
+                                                            red_results)
+                    
+                    #if red_data.optim!='False':
+                    #    red_data.optim_param.target_r.append(red_data.red_op.sensi_r)
+                        
                 elif 'CSP' in red_method:
                     if 'flame' in conditions.config:
                         print_('Warning: no CSP analysis for flame configurations',mp)
@@ -349,9 +370,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     mech_data.spec.CSP_radicals.append(CSP_radicals)
 
                 # eps definition
-                eps_init   = copy.deepcopy(red_data.red_op.eps_init)
-                delta_eps      = copy.deepcopy(red_data.red_op.delta_eps_init)
-                max_eps_config = copy.deepcopy(red_data.red_op.eps_max)
+                eps_init        = copy.deepcopy(red_data.red_op.eps_init)
+                delta_eps       = copy.deepcopy(red_data.red_op.delta_eps_init)                
+                if 'LOI' in red_method:
+                    _LOI = red_data.red_op.LOI_max
+                    # Filter values > 0 
+                    LOI_pos = _LOI[_LOI > 0]
+                    # 33% quantile
+                    q33 = np.quantile(LOI_pos, 0.33)
+                    eps_init    = [q33]*len(eps_init)
+                    delta_eps   = [q33]*len(eps_init)
+                max_eps_config  = copy.deepcopy(red_data.red_op.eps_max)
                 eps = copy.deepcopy(max_eps_config)
 
 
@@ -419,23 +448,50 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     if conditions.error_param.ig_check and 'reactor' in conditions.config:
                         if sp in tspc: idx = tspc.index(sp) ; eps_stop[idx] = False
 
-                eps_cre  = [False]*n_tspecies   # stop reduction if cross reduction errors
-                eps_prev = list(eps)
-
+                eps_cre   = [False]*n_tspecies   # stop reduction if cross reduction errors
+                eps_prev  = list(eps)
+                oneby1_sp = False
+                
+                red_data.red_op.inter_sp_inter = False
+                
                 while not stop_reduction:
                     print_('\nStep:'+str(try_n)+' ('+red_method+')',mp); try_n+=1
                     sp_try[:] += 1
                     T_try+=1;ig_try+=1;Sl_try+=1;K_try+=1
                     sp_inter_flag = [False]*len(tspc)
 
-                    # Active species and reactions definition
+                    # -----   Active species and reactions definition   -----
+                    # a) species selection
+                    if oneby1_sp:
+                        eps = copy.deepcopy(eps_prev)
                     if 'DRG' in red_method:
-                        # species selection
                         if red_method == 'DRGEP_sp':
                             active_sp_pm   = drg.graphSearch_DRGEP(conditions,red_data,mech_data,eps)
                         elif red_method == 'DRG_sp':
                             active_sp_pm   = drg.graphSearch(conditions,red_data,mech_data,eps)
-                        # reaction selection
+                    elif 'SA' in red_method:
+                        active_sp_pm = sa.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                    elif 'LOI' in red_method:
+                        active_sp_pm = loi.speciesWithdrawal\
+                            (conditions,red_data,red_method,mech_data,eps)
+                    elif 'CSP' in red_method:
+                        active_r_pm,active_sp_pm = csp.reactions_withdrawal\
+                        (conditions,red_data,mech_data,red_results,eps)
+                    if oneby1_sp and '_sp' in red_method and 'CSP' not in red_method:
+                        active_sp_pm = np.array(active_sp_pm)
+                        sp_prev_arr  = np.array(sp_prev)
+                        if list(active_sp_pm) == list(sp_prev_arr):
+                            stop_reduction = True
+                            active_sp_pm   = list(active_sp_pm)
+                        else:
+                            idx_diff     = np.where(active_sp_pm != sp_prev_arr)[0]
+                            max_index    = idx_diff[np.argmax(red_data.red_op.sp_rank[idx_diff])]
+                            sp_prev_arr[max_index] = True
+                            active_sp_pm = list(sp_prev_arr)                        
+                        
+                    # b) reaction selection
+                    if 'DRG' in red_method:
                         if '_sp' in red_method:
                             active_r_pm, active_sp_pm = drg.reactionWithdrawal\
                                 (mech_data,red_data,red_method,eps,conditions,active_sp_pm)
@@ -443,14 +499,16 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             active_r_pm, active_sp_pm = drg.reactionWithdrawal\
                                 (mech_data,red_data,red_method,eps,conditions)
                     elif 'SA' in red_method:
-                        active_sp_pm = sa.speciesWithdrawal\
-                            (conditions,red_data,red_method,mech_data,eps)
                         active_r_pm,active_sp_pm = sa.reactionWithdrawal\
                             (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
-                    elif 'CSP'in red_method:
-                        active_r_pm,active_sp_pm = csp.reactions_withdrawal\
-                        (conditions,red_data,mech_data,red_results,eps)
-                    # testing new mech
+                    elif 'LOI' in red_method:
+                        active_r_pm,active_sp_pm = loi.reactionWithdrawal\
+                            (conditions,mech_data,active_sp_pm,red_data,red_method,eps)
+                        
+                        
+                    # -----------------------------------------------------
+                    #         Simulation with the reduced mechanism
+                    # -----------------------------------------------------
                     if active_sp_pm   != sp_prev \
                     or active_r_pm    != r_prev  \
                     or try_n==2:
@@ -458,30 +516,67 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             print_("  "+str(active_sp_pm.count(True))+\
                                   " species, "+ str(active_r_pm.count(True))+\
                                   " reactions remaining",mp)
+                        if verbose>=6:
+                            species_txt='Remaining species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)
+                        if verbose>=4:
+                            active_sp_pm = np.array(active_sp_pm)
+                            sp_prev_arr  = np.array(sp_prev)
+                            idx_diff     = np.where(active_sp_pm != sp_prev_arr)[0]
+                            if len(idx_diff)>0:
+                                if oneby1_sp: species_txt='  Add species:'
+                                else:         species_txt='  Last species removed:'
+                                for sp in range(len(idx_diff)):
+                                    species_txt+=' '+mech_data.spec.name[idx_diff[sp]]
+                                print_(species_txt,mp)
+                            active_sp_pm   = list(active_sp_pm)
+                        if verbose>=6:
+                            species_txt='Removed species: '
+                            for sp in range(len(mech_data.spec.name)):
+                                if not active_sp_pm[sp]:
+                                    species_txt+=mech_data.spec.name[sp]+" "
+                            print_(species_txt,mp)           
+                        if verbose>=7:
+                            reaction_txt='Remaining reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)       
+                        if verbose>=7:
+                            reaction_txt='Removed reaction: '
+                            for r in range(len(mech_data.react.number)):
+                                if not active_r_pm[r]:
+                                    reaction_txt+=str(mech_data.react.number[r])+" "
+                            print_(reaction_txt,mp)                                
+                            
+                                
                         os.chdir(conditions_list[0].main_path+'/__'+red_method)
                         if '.cti' in conditions_list[0].mech:
                             mech_data.write_new_mech("temp.cti",active_sp_pm,active_r_pm)
                         else:
                             mech_data.write_yaml_mech("temp.yaml",active_sp_pm,active_r_pm)
-                        # -----------------------------------------------------
-                        #         Simulation with the reduced mechanism
-                        # -----------------------------------------------------
+                            
+                            
                         # -----   1. interpretation of the new mech
-                        
-
-                        if verbose<8:
-                            with open(path_lm, 'w') as fnull:  
-                                with redirect_stdout(fnull):
-                                    if '.cti' in conditions_list[0].mech:
-                                        red_data.red_op.gas = ct.Solution('temp.cti')
-                                    else:
-                                        red_data.red_op.gas = ct.Solution('temp.yaml')
-                        else:
-                            if '.cti' in conditions_list[0].mech:
-                                red_data.red_op.gas = ct.Solution('temp.cti')
+                        if active_r_pm.count(True) != 0:
+                            if verbose<8:
+                                with open(path_lm, 'w') as fnull:  
+                                    with redirect_stdout(fnull):
+                                        if '.cti' in conditions_list[0].mech:
+                                            red_data.red_op.gas = ct.Solution('temp.cti')
+                                        else:
+                                            red_data.red_op.gas = ct.Solution('temp.yaml')
                             else:
-                                red_data.red_op.gas = ct.Solution('temp.yaml')
-
+                                if '.cti' in conditions_list[0].mech:
+                                    red_data.red_op.gas = ct.Solution('temp.cti')
+                                else:
+                                    red_data.red_op.gas = ct.Solution('temp.yaml')
+                        else:
+                            simulation_done = False
+                            is_debug_mode   = False
 
                         # -----   2. Simulation
                         manager = multiprocessing.Manager()
@@ -573,8 +668,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         break
 
                     else:
-                        if verbose > 5:
+                        if verbose > 9:
                             print_("     Mechanism already evaluated. No further reduction was achieved",mp)
+                            
 
                     # =============================================================
                     #                  Check Errors
@@ -592,7 +688,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_T)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -600,7 +696,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         id_sp=0
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -628,7 +724,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_Sl)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -637,7 +733,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         idx = tspc.index(conditions.error_param.sp_Sl[0])
                                         for sp_tsp in range(len(mech_data.spec.activ_m)):
                                             if sp_tsp in tsp_idx:
-                                                if 'SA' in red_method:
+                                                if 'SA' in red_method or 'LOI' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[sp_tsp])+1e-6
                                                 elif 'DRG' in red_method:
                                                     OIC_sp_tsp[id_sp] = max(OIC_sp_tsp[id_sp],OIC_sp[idx][sp_tsp])+1e-6
@@ -666,7 +762,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -707,11 +803,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                             for sp_oic in range(len(active_r_pm)):
                                                 if sp_oic in tsp_idx:
                                                     OIC_sp.append(copy.deepcopy(red_data.red_op.sensi_sp[sp_oic]))
-                                        elif 'SA' in red_method:
+                                        elif 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
-    #                                    OIC_sp = copy.deepcopy(red_data.drg.OIC_sp)
                                         OIC_sp_tsp = np.zeros(len(tsp_idx))
                                         id_sp=0
                                         idx = tspc.index(conditions.error_param.sp_ig[0])
@@ -744,7 +839,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     cross_red_error = True    # check cross reduction induced error
                                     if red_data.red_op.inter_sp_inter and 'CSP' not in red_method:
                                         # Define the most interactive spec among the target species
-                                        if 'SA' in red_method:
+                                        if 'SA' in red_method or 'LOI' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.sensi_sp)
                                         elif 'DRG' in red_method:
                                             OIC_sp = copy.deepcopy(red_data.red_op.OIC_sp)
@@ -769,8 +864,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     first_try =   [First_try_T_error]  + [First_try_ig_error]\
                                 + [First_try_Sl_error] +  [First_try_K_error]\
                                 +  First_try_sp_error
-                    if not cross_red_error:
+                        
+                    if not red_data.red_op.inter_sp_inter \
+                        or (not cross_red_error and red_data.red_op.inter_sp_inter):
                         if True in first_try or not errors.under_tol: # if reduced mech fails to respect the accuracy requirements
+                            if True not in first_try              \
+                            and not red_data.red_op.inter_sp_inter\
+                            and '_sp' in red_method: 
+                                oneby1_sp = True
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
                                 for sp in conditions.error_param.sp_T:
@@ -795,8 +896,9 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             for sp in range(red_data.n_tspc):
                                 if First_try_sp_error[sp] or sp_error[sp]:#errors.under_tol:
                                     eps_evol[sp] = 'decrease'
-                        else: # if reduced mech respects the accuracy requirements
+                        else: # if reduced mech respects the accuracy requirements    
                             one_simul_success = True
+                            eps_prev          = copy.deepcopy(eps)
                             if conditions.error_param.T_check and conditions.config!='JSR':
                                 for sp in conditions.error_param.sp_T:
                                     idx = tspc.index(sp)
@@ -840,7 +942,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                         eps_evol[idx] = 'decrease'
                                         eps_stop[idx] = True; eps[idx]=eps_prev[idx]
                                     else:
-                                        eps_evol[idx] = 'increase'
+                                        eps_evol[idx] = 'increase'                                
+                                        
                     elif True in first_try:
                             if (conditions.error_param.T_check and conditions.config!='JSR')\
                             and (First_try_T_error or T_error):#errors.under_tol):
@@ -878,7 +981,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
 
 
-                    eps_prev = list(eps)
+                    
 
                     # =============================================================
                     #                   New eps calculation
@@ -896,11 +999,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                     eps[idx] -= delta_eps[idx]
                                 else:
                                     eps[idx] /= 2
+                            if oneby1_sp:
+                                eps = copy.deepcopy(eps_prev)
 
                         #Acceleration of the iterative process
-                        if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
-                            delta_eps[idx] = delta_eps[idx]*2
-                            try_acc[idx]+=5
+                        if 'LOI' not in red_method:
+                            if sp_try[idx] > try_acc[idx] and not eps_stop[idx]:
+                                delta_eps[idx] = delta_eps[idx]*2
+                                try_acc[idx]+=5
 
                     # =============================================================
                     #                   Display informations
@@ -915,16 +1021,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_T+='% > '
                             txt_T+=str(red_data.red_op.max_error_T)+'%    '
                             if First_try_T_error: txt_T+='(!) 1st try '
-                            txt_T += '-> '
-                            for sp in conditions.error_param.sp_T:
-                                idx = tspc.index(sp)
-                                txt_T += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_T += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_T += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_T += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_T += '(+):'
-                                if eps[idx]>0.0049: txt_T += '%2.3f' %eps[idx]+'  '
-                                else:               txt_T += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_T += '-> '                                
+                                for sp in conditions.error_param.sp_T:
+                                    idx = tspc.index(sp)
+                                    txt_T += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_T += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_T += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_T += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_T += '(+):'
+                                    if eps[idx]>0.0049: txt_T += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_T += '%1.2e' %eps[idx]+'  '
                             print_(txt_T,mp)
                         if conditions.error_param.Sl_check and 'free_flame' in conditions.config:
                             txt_Sl='  Flame speed error:   '+'%0.1f' %(errors.qoi_Sl*100)
@@ -934,16 +1041,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_Sl+='% > '
                             txt_Sl+=str(red_data.red_op.max_error_Sl)+'%    '
                             if First_try_Sl_error: txt_Sl+='(!) 1st try '
-                            txt_Sl += '-> '
-                            for sp in conditions.error_param.sp_Sl:
-                                idx = tspc.index(sp)
-                                txt_Sl += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_Sl += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_Sl += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_Sl += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_Sl += '(+):'
-                                if eps[idx]>0.0049: txt_Sl += '%2.3f' %eps[idx]+'  '
-                                else:               txt_Sl += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_Sl += '-> '                                
+                                for sp in conditions.error_param.sp_Sl:
+                                    idx = tspc.index(sp)
+                                    txt_Sl += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_Sl += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_Sl += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_Sl += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_Sl += '(+):'
+                                    if eps[idx]>0.0049: txt_Sl += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_Sl += '%1.2e' %eps[idx]+'  '
                             print_(txt_Sl,mp)
                         if conditions.error_param.K_check \
                         and ('diff_flame' in conditions.config or 'diff_flame' in conditions.config):
@@ -954,16 +1062,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_K+='% > '
                             txt_K+=str(red_data.red_op.max_error_K)+'%    '
                             if First_try_K_error: txt_K+='(!) 1st try '
-                            txt_K += '-> '
-                            for sp in conditions.error_param.sp_K:
-                                idx = tspc.index(sp)
-                                txt_K += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_K += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_K += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_K += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_K += '(+):'
-                                if eps[idx]>0.0049: txt_K += '%2.3f' %eps[idx]+'  '
-                                else:               txt_K += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_K += '-> '                                
+                                for sp in conditions.error_param.sp_K:
+                                    idx = tspc.index(sp)
+                                    txt_K += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_K += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_K += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_K += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_K += '(+):'
+                                    if eps[idx]>0.0049: txt_K += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_K += '%1.2e' %eps[idx]+'  '
                             print_(txt_K,mp)
 
                         if conditions.error_param.ig_check and 'reactor' in conditions.config:
@@ -974,16 +1083,17 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                  txt_ig+='% > '
                             txt_ig+=str(red_data.red_op.max_error_ig)+'%    '
                             if First_try_ig_error: txt_ig+='(!) 1st try '
-                            txt_ig += '-> '
-                            for sp in conditions.error_param.sp_ig:
-                                idx = tspc.index(sp)
-                                txt_ig += 'eps('+tspc[idx]+')'
-                                if eps_stop[idx]:                 txt_ig += '(#):'
-                                elif eps_evol[idx] == 'decrease': txt_ig += '(-):'
-                                elif eps_evol[idx] == 'equal':    txt_ig += '(=):'
-                                elif eps_evol[idx] == 'increase': txt_ig += '(+):'
-                                if eps[idx]>0.0049: txt_ig += '%2.3f' %eps[idx]+'  '
-                                else:               txt_ig += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_ig += '-> '
+                                for sp in conditions.error_param.sp_ig:
+                                    idx = tspc.index(sp)
+                                    txt_ig += 'eps('+tspc[idx]+')'
+                                    if eps_stop[idx]:                 txt_ig += '(#):'
+                                    elif eps_evol[idx] == 'decrease': txt_ig += '(-):'
+                                    elif eps_evol[idx] == 'equal':    txt_ig += '(=):'
+                                    elif eps_evol[idx] == 'increase': txt_ig += '(+):'
+                                    if eps[idx]>0.0049: txt_ig += '%2.3f' %eps[idx]+'  '
+                                    else:               txt_ig += '%1.2e' %eps[idx]+'  '
                             print_(txt_ig,mp)
                         for idx in range(red_data.n_tspc):
                             sp = tspc[idx]
@@ -995,13 +1105,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             else:                       txt_sp+='% > '
                             txt_sp+=str(red_data.red_op.max_error_sp[idx])+'%    '
                             if First_try_sp_error[idx]: txt_sp+='(!) 1st try '
-                            txt_sp += '-> '
-                            if eps_stop[idx]:                 txt_sp += 'eps(#):'
-                            elif eps_evol[idx] == 'decrease': txt_sp += 'eps(-):'
-                            elif eps_evol[idx] == 'equal':    txt_sp += 'eps(=):'
-                            elif eps_evol[idx] == 'increase': txt_sp += 'eps(+):'
-                            if eps[idx]>0.0049: txt_sp += '%2.3f' %eps[idx]+'  '
-                            else:               txt_sp += '%1.2e' %eps[idx]+'  '
+                            if not oneby1_sp:
+                                txt_sp += '-> '
+                                if eps_stop[idx]:                 txt_sp += 'eps(#):'
+                                elif eps_evol[idx] == 'decrease': txt_sp += 'eps(-):'
+                                elif eps_evol[idx] == 'equal':    txt_sp += 'eps(=):'
+                                elif eps_evol[idx] == 'increase': txt_sp += 'eps(+):'
+                                if eps[idx]>0.0049: txt_sp += '%2.3f' %eps[idx]+'  '
+                                else:               txt_sp += '%1.2e' %eps[idx]+'  '
                             print_(txt_sp,mp)
 
 
@@ -1063,15 +1174,25 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 #                        for i in range(red_data.n_tspc):
 
 
-                    if max_eps_config == eps \
-                    or not eps_continue_bis\
-                    or errors.above_tol\
+                    
+                        
+                    if not oneby1_sp                   \
+                    and (max_eps_config == eps         \
+                    or not eps_continue_bis            \
+                    or errors.above_tol                \
                     or max(eps)<=min(eps_init)/n_it_max\
                     or max(sp_try)>=n_it_max or T_try>=n_it_max or ig_try>=n_it_max or Sl_try>=n_it_max or K_try>=n_it_max\
-                    or global_max_error==0:
+                    or global_max_error==0):
+                        stop_reduction=True
+                        
+                    if oneby1_sp                                  \
+                    and False not in errors.under_tol_s      \
+                    and errors.under_tol_T and errors.under_tol_Sl\
+                    and errors.under_tol_K and errors.under_tol_ig:
                         stop_reduction=True
 
-                    if cross_red_error:
+
+                    if cross_red_error and red_data.red_op.inter_sp_inter:
                         print_('\n    ERROR FROM AN OTHER SPECIES REDUCTION',mp)
                         if red_data.red_op.inter_sp_inter and not eps_stop[idx] and 'CSP' not in red_method:
                             print_('\n    Main coupled species:'+tspc[best_ICsp]+\
@@ -1101,10 +1222,15 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     print_("\n=>  "+str(mech_data.spec.activ_p.count(True))+\
                           " species, "+ str(mech_data.react.activ_p.count(True))+\
                           " reactions remaining",mp)
-                if verbose>8:
+                if verbose>=6:
                     species_txt='Remaining species: '
                     for sp in range(len(mech_data.spec.name)):
                         if mech_data.spec.activ_p[sp]:
+                            species_txt+=mech_data.spec.name[sp]+" "
+                    print_(species_txt,mp)
+                    species_txt='Removed species: '
+                    for sp in range(len(mech_data.spec.name)):
+                        if not mech_data.spec.activ_p[sp]:
                             species_txt+=mech_data.spec.name[sp]+" "
                     print_(species_txt,mp)
                     reaction_txt='Remaining reaction: '
@@ -1112,6 +1238,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         if mech_data.react.activ_p[r]:
                             reaction_txt+=str(mech_data.react.number[r])+" "
                     print_(reaction_txt,mp)
+                    reaction_txt='Removed reaction: '
+                    for r in range(len(mech_data.react.number)):
+                        if not mech_data.react.activ_p[r]:
+                            reaction_txt+=str(mech_data.react.number[r])+" "
+                    print_(reaction_txt,mp)
+
+
+
 
                 simulation += 1
 
@@ -1165,15 +1299,14 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
         # Optimization
         if 'GA' in red_data_list[op][0].optim or 'PSO' in red_data_list[op][0].optim:
             if red_method == 'NULL':
-                if 'DRG' in red_data_list[op][0].optim_param.optim_on_meth:
-                    for i in range(len(red_data_list[op])):
-                        red_data_list[op][i]=drg.dic(red_data_list[op][i],mech_data,mech_results_list[i])
-                        red_data_list[op][i]=drg.ric(red_data_list[op][i],mech_data,mech_results_list[i])
                 if 'SA'  in red_data_list[op][0].optim_param.optim_on_meth:
                     for i in range(len(red_data_list[op])):
                         red_data_list[op][i]=sa.sensitivities_computation_SA(red_data_list[op][i],\
                                      mech_data,mech_results_list[i])
-
+                else:
+                    for i in range(len(red_data_list[op])):
+                        red_data_list[op][i]=drg.dic(red_data_list[op][i],mech_data,mech_results_list[i])
+                        red_data_list[op][i]=drg.ric(red_data_list[op][i],mech_data,mech_results_list[i])
 
             clock_opt = cdef.Clock(red_data_list[op][0].optim) ; clock_opt.start()
             if red_data_list[op][0].optim == 'GA':
@@ -1329,13 +1462,7 @@ def input_results_treatment(conditions_list,ref_results_list,mech_data):
             ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
             ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
             conditions_list[i].simul_param.pts_scatter=list(pts_scatter_mech)
-#        else:
-#            ref_results_list_smooth = copy.copy(ref_results_list)
-#            for i in range(len(conditions_list)):
-#                ref_results_list_smooth[i].kf=list(mech_results_list[i].kf)
-#                ref_results_list_smooth[i].kr=list(mech_results_list[i].kr)
-#                ref_results_list_smooth[i].X2conc()
-#                mech_results_list[i].X2conc()
+
     else:
         # saving and suppression of unpickable variables
         gas = ref_results_list[0].gas
@@ -1833,7 +1960,14 @@ def plotData(spec2plot,ref_results,red_results=False,opt_results=False):
 def get_reduction_parameters(filename):
 
     try :   fs = open('_conditions_input/'+filename, 'r')
-    except: fs = open(filename, 'r')
+    except:
+        try:
+            fs = open(filename, 'r')
+        except:
+            print("Current working directory: \n" + os.getcwd() + '\n\n\n')
+            fs = open(filename, 'r')
+
+
 
     caution_opt_jsr      = True
     caution_opt_fflame   = True
@@ -1866,7 +2000,8 @@ def get_reduction_parameters(filename):
             write_ck    = str2bool(txt[1])
         if txt[0] == 'tspc':
             tspc          = txt2list_string(txt[1])
-            n_tspc = len(tspc)
+            if tspc==['']: n_tspc = 0
+            else:          n_tspc = len(tspc)
         if txt[0] == 'T_check':           T_check       = str2bool(txt[1])
         if txt[0] == 'sp_T':              sp_T          = txt2list_string(txt[1])
         if txt[0] == 'Sl_check':          Sl_check      = str2bool(txt[1])
@@ -2048,6 +2183,8 @@ def get_reduction_parameters(filename):
                             conditions_list[-1].simul_param.grad_curv_ratio = grad_curv_ratio
                         if 'tign_nPoints' in locals():
                             conditions_list[-1].simul_param.tign_nPoints = int(tign_nPoints)
+                        if 't_max_react' in locals():
+                            conditions_list[-1].simul_param.t_max_react = t_max_react
                         if 'tign_dt' in locals():
                             conditions_list[-1].simul_param.tign_dt = tign_dt
                         # options for jsr
@@ -2250,6 +2387,7 @@ def get_reduction_parameters(filename):
             if 'restore_flame_folder' in locals(): del restore_flame_folder
             save_conditions = False
 
+    
     if external_results:
         # gas
         try:
@@ -2297,6 +2435,8 @@ def get_reduction_parameters(filename):
     else:
         main_path = r_path + date + main_path_ext
         main_folder = False
+    mp = main_path
+
 
     for cond in conditions_list:
         # main parameters
@@ -2474,7 +2614,14 @@ def get_reduction_parameters(filename):
                             red_data.optim_param.Arrh_max_variation = Arrh_max_variation
                             red_data.optim_param.Arrh_var = True
                         if 'f_uncert'          in locals(): red_data.optim_param.f_default          = f_uncert                        
-                        if 'optim_on_meth'      in locals(): red_data.optim_param.optim_on_meth      = optim_on_meth
+                        if 'optim_on_meth'      in locals(): 
+                            if optim_on_meth not in ('False', 'DRG', 'SA'):
+                                if not os.path.exists(mp):  os.mkdir(mp)
+                                print_('Warning: Reduction/optimization parameters #' + str(len(red_data_list)),mp)
+                                print_('optim_on_meth = ' + str(optim_on_meth) + '   instead of False / DRG / SA ',mp)
+                                print_('optim_on_meth = DRG   is considered\n',mp)
+                                optim_on_meth = 'DRG'
+                            red_data.optim_param.optim_on_meth      = optim_on_meth
                         if 'nb_r2opt'           in locals(): red_data.optim_param.nb_r2opt           = nb_r2opt
                         if 'reactions2opt'      in locals(): red_data.optim_param.reactions2opt      = reactions2opt
                         if 'import_mech'        in locals(): red_data.optim_param.import_mech        = import_mech
@@ -2590,6 +2737,9 @@ def get_reduction_parameters(filename):
 
     for num in range(len(conditions_list)):
         conditions_list[num].num = str(num+1)+'_'
+
+    # if warning generated after the input file parsing:
+    if os.path.exists(mp):  print_('------\n',mp)  
 
     return conditions_list, red_data_list, ref_results_list
 
@@ -2716,4 +2866,150 @@ def copytree(src, dst, symlinks=False, ignore=None):
         else:
             if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
                 shutil.copy2(s, d)
+
+
+
+def wd_config_path(root_path):
+    if os.name == 'nt': #different python path on windows
+        python_path = root_path.split('lib')[0] + 'python.exe'
+    else:
+        python_path = root_path.split('/lib/')[0] + '/bin/python'
+    if os.name != 'nt': # for Linux or Mac
+        pers_config_path = '~/.Brookesia'
+        try:
+            os.chdir(os.path.expanduser(pers_config_path))
+        except:
+            os.chdir(os.path.expanduser('~'))
+            try:
+                os.mkdir('.Brookesia')
+            except:
+                a=False
+            os.chdir('.Brookesia')
+            pers_config_path = os.getcwd()
+    else: # for windows
+        pers_config_path = root_path
+    
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+    
+    return pers_config_path
+
+def shorten_path(path, max_length=30):
+    """Shorten long path segments by replacing them with '...'."""
+    if len(path) <= max_length:
+        return path
+    parts = path.split('/')
+    if len(parts) < 3:
+        return path
+
+    # Replace central part by: '...'
+    short_path = f"{'/'.join(parts[:2])}/.../{'/'.join(parts[-2:])}"
+    return short_path
+
+
+def selected_wd(workdir_table,nwd,pers_config_path,MainWD=False):
+    """update wd_activ.txt file"""
+    
+    # workdir_table['directory'].iloc[int(nwd)]
+    WD_name = workdir_table['working_dir_name'].iloc[nwd]
+    WD_path = workdir_table['directory'].iloc[nwd]
+
+    try:    os.chdir(pers_config_path)
+    except: os.chdir(os.path.expanduser(pers_config_path))
+
+    fd = open('wd_activ.txt', 'w')
+    fd.write(WD_name + ';' + WD_path)
+
+    timer.sleep(0.2)
+
+    if MainWD: MainWD.close() # close gui windows
+
+
+
+def select_wd_pg(pers_config_path, WD_path_pg=True):
+    """non gui working directory selection"""
+
+    # open and select wd path    
+    workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+
+    
+    ready4select = False # becomes True if the table contains, at list, one path
+    if 'working_dir.txt' in os.listdir():
+        workdir_table = pd.read_table("working_dir.txt",sep =';',header = 0, index_col=[0])
+        if len(workdir_table['directory'])>=1:
+            ready4select = True
+
+    if ready4select:
+        # shorten path in working dir 
+        workdir_table['directory_short'] = workdir_table['directory'].apply(shorten_path)
+        
+        wd_path_ok = False
+        while not wd_path_ok:
+            print('---------------------------------------------------\n')
+            # print('=> To Modify (add or remove) the working directories, type: M\n\n')
+            
+            # clean the indexation of working_dir
+            workdir_table = workdir_table.reset_index(drop=True)
+            workdir_table.index = range(1, len(workdir_table) + 1)           
+            
+            print(workdir_table[['working_dir_name', 'directory_short']])      
+            
+            wdi = input('\n\nSelect your Working Directory or type M to modify the table: ')
+            if wdi.upper() == 'M':
+                
+                print('Type: ')
+                print('- R to Remove a working directory')
+                print('- A to Add a new working directory')
+                add_or_remove = input()
+                if add_or_remove.upper() =='A':
+                    new_WD_name = input('New Working dir name: ')
+                    new_WD_path = input('New Working dir path: ')
+                    new_WD_path_s = shorten_path(new_WD_path)
+                    
+                    new_row = pd.DataFrame({'working_dir_name': [new_WD_name], 
+                                            'directory': [new_WD_path],
+                                            'directory_short': [new_WD_path_s]})
+                    workdir_table = pd.concat([workdir_table, new_row], ignore_index=True)
+                    
+                elif add_or_remove.upper() == 'R':
+                    wdr = input('Select the working directory number you want to remove: ')
+                    workdir_table = workdir_table.drop(index=int(wdr))
+                    
+                workdir_table.to_csv('working_dir.txt', sep=';')
+                    
+            else: 
+                # update wd_activ.txt file
+                selected_wd(workdir_table,int(wdi)-1,pers_config_path)
+                
+                WD_name = workdir_table['working_dir_name'].loc[int(wdi)]
+                WD_path = workdir_table['directory'].loc[int(wdi)]
+                print('\nCurrent Working dir name:  '  + WD_name)
+                print('Current Working dir path:  '  + WD_path)
+                print('\n\n')                
+                
+                try:
+                    os.chdir(WD_path)
+                    wd_path_ok = True
+                except:
+                    print('\n\n ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ')
+                    print('Brookesia cannot access to the working directory:' + WD_path)
+                    print('Please, change the path of this working directory')
+                    print('working directory name: ' + WD_name + ')')
+                    print(' ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! \n\n')
+
+    else:
+        new_WD_name = input('New Working dir name: ')
+        new_WD_path = input('New Working dir path: ')
+        new_WD_path_s = shorten_path(new_WD_path)
+        
+        workdir_table = pd.DataFrame({'working_dir_name': [new_WD_name], 
+                                'directory': [new_WD_path],
+                                'directory_short': [new_WD_path_s]})
+        # WD_path, WD_name = create_wd()
+        # data = {'working_dir_name':[WD_name],
+        #         'directory': [WD_path]}
+        # workdir_table = pd.DataFrame(data=data)
+        workdir_table.to_csv('working_dir.txt', sep=';')
+
+    os.chdir(WD_path)
 
