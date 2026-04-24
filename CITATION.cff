@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Brookesia: An open-source tool for reduction and optimization of kinetic mechanisms"
+version: "2.0.0"
+date-released: 2026-04-24
+
+authors:
+  - family-names: Matynia
+    given-names: Alexis
+    orcid: "https://orcid.org/0000-0002-5044-5396"
+
+  - family-names: Delaroque
+    given-names: Aurélie
+    orcid: "https://orcid.org/0000-0002-3707-0585"
+
+  - family-names: Chakravarty
+    given-names: Harish Kumar
+    orcid: "https://orcid.org/0000-0002-2768-6765"
+
+repository-code: "https://github.com/Brookesia-py/Brookesia"
+
+license: "GPL-3.0-or-later"
