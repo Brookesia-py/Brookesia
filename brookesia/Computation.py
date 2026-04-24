@@ -68,7 +68,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         else:                                                  refine_grid = True
 
         # Flame computation
-        print_("   Reference mecanism flame computation",mp)
+        print_("   Reference mechanism flame computation",mp)
 
 
         loglevel = 0
@@ -102,6 +102,13 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         f.flame.set_transient_tolerances(default=[1.0e-3, 1.0e-6])
         f.set_max_jac_age(10, 10)
         f.set_time_step(1e-5, [2, 5, 10, 20])
+        
+        ratio_ff = conditions.simul_param.ratio_ff
+        slope_ff = conditions.simul_param.slope_ff
+        curve_ff = conditions.simul_param.curve_ff
+        prune_ff = conditions.simul_param.prune_ff
+
+
 
 
         simul_success = False
@@ -153,7 +160,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                                 f.restore(flame_file, 'solution')
 
                         os.chdir(conditions.main_path)
-    
+                        
+                        f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
                         f.solve(auto = False, loglevel = 0, refine_grid = False)
                         simul_success = True
     
@@ -172,44 +180,41 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         if not conditions.simul_param.restore_flame or not flame_file or not simul_success:
             # Grid refinement
             ##  energy disabled
-            if verbose >= 3 and conditions.simul_param.restore_flame:
-                print("Try from scratch with progressive mesh refinement ")
-            f.energy_enabled = False
-            f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
-    #        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
-            f.solve(loglevel, refine_grid)
-            if verbose >=5 : print_("(energy disabled) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+    #         if verbose >= 3 and conditions.simul_param.restore_flame:
+    #             print("Try from scratch with progressive mesh refinement ")
+    #         f.energy_enabled = False
+    #         f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
+    # #        f.set_time_step(5.0e-6,[10,20,50,80,120,150])
+    #         f.solve(loglevel, refine_grid)
+    #         if verbose >=5 : print_("(energy disabled) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            ##  energy enabled
-            if 'burner' not in conditions.config:
-                f.energy_enabled = True
-                _auto            = True
-            else: _auto = False
+    #         ##  energy enabled
+    #         if 'burner' not in conditions.config:
+    #             f.energy_enabled = True
+    #             _auto            = True
+    #         else: _auto = False
 
-            f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
-            f.solve(loglevel)
-            if verbose >=5 : print_("(energy enabled 1) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            # f.set_refine_criteria(ratio = 10.0, slope = 1, curve = 1)
+            # f.solve(loglevel)
+            # if verbose >=5 : print_("(energy enabled 1) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            f.set_refine_criteria(ratio = 10.0, slope = 0.9, curve = 0.9)
-            f.solve(loglevel)
-            if verbose >=5 : print_("(energy enabled 2) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            # f.set_refine_criteria(ratio = 10.0, slope = 0.9, curve = 0.9)
+            # f.solve(loglevel)
+            # if verbose >=5 : print_("(energy enabled 2) Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            f.set_refine_criteria(ratio=2.0, slope=0.5, curve=0.5)
-            #f.set_refine_criteria(ratio=4.0, slope=0.4, curve=0.4, prune=0.01)
+            # f.set_refine_criteria(ratio=2.0, slope=0.5, curve=0.5)
+            # #f.set_refine_criteria(ratio=4.0, slope=0.4, curve=0.4, prune=0.01)
 
-            f.solve(loglevel)
-            if verbose >=5 : print_("(energy enabled 3)  Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            # f.solve(loglevel)
+            # if verbose >=5 : print_("(energy enabled 3)  Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
 
-            f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
-            f.solve(loglevel, auto = _auto)
-            if verbose >=2 : print_("1- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
+            # f.set_refine_criteria(ratio=2.0, slope=0.1, curve=0.1, prune=0.01)
+            # f.solve(loglevel, auto = _auto)
+            # if verbose >=2 : print_("1- Problem solved on ["+ str(f.flame.n_points)+ "] point grid",mp)
 
-            ratio_ff = conditions.simul_param.ratio_ff
-            slope_ff = conditions.simul_param.slope_ff
-            curve_ff = conditions.simul_param.curve_ff
-            prune_ff = conditions.simul_param.prune_ff
             f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
+            f.max_grid_points = 3000
             f.flame.set_steady_tolerances(default=tol_ss)
             f.flame.set_transient_tolerances(default=tol_ts)
             f.solve(loglevel, refine_grid)
@@ -966,7 +971,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             z1      = np.insert(z1,0,0)
 
 
-        else:
+        else:  # reactor
 
             init_points = int(conditions.simul_param.tign_nPoints)      # max number of time step
             n_pts       = conditions.simul_param.n_pts
@@ -977,7 +982,8 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             grad_curv_ratio = conditions.simul_param.grad_curv_ratio
             tmax_react  = conditions.simul_param.t_max_react
 
-            #   Auto ignition time Detection
+            #   ===============================================================
+            #    1- Auto ignition time Detection
                  # Record the scalar evolution and check ignition
                  # with H2O variation (considered if variation >20%)
             time1 = timer.time()
@@ -996,46 +1002,41 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 timeVec_ignit.append(time_init)
                 time_init/=1.05
             timeVec_ignit.reverse()
-            H2O = np.zeros(init_points-1, 'd')
-            X_Scal = np.zeros(init_points-1, 'd')
-            dH2O = np.zeros(init_points-2, 'd')
-
+            X_H2O = np.zeros(init_points, 'd')
+            X_Scal = np.zeros(init_points, 'd')
 
             if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
                 X_Scal[0] = reactor.T
             else:
                 X_Scal[0] = gas.X[gas.species_index(Scal_ref)]
             try:
-                H2O[0] = gas.X[gas.species_index("H2O")]
+                X_H2O[0] = gas.X[gas.species_index("H2O")]
             except:
-                H2O[0] = 0
+                X_H2O[0] = 0
 
-            for n in range(1, init_points-1):
-    #            timeVec_ignit[n] = timeVec_ignit[n-1] + dt
+            for n in range(1, init_points):
                 sim.advance(timeVec_ignit[n])
-
                 if Scal_ref == "T" or Scal_ref == "T(K)" or Scal_ref == "Temp":
                     X_Scal[n] = reactor.T
                 else:
                     X_Scal[n] = gas.X[gas.species_index(Scal_ref)]
+                X_H2O[n] = gas.X[gas.species_index("H2O")]
 
-                try:
-                    H2O[n] = gas.X[gas.species_index("H2O")]
-                    dH2O[n-1] = (H2O[n]-H2O[n-1]) *0.5
-                except:
-                    H2O[n] = 0
-                    dH2O[n-1] = np.abs(X_Scal[n]-X_Scal[n-1]) *0.5
-
+            dH2O = np.gradient(X_H2O, timeVec_ignit)
             idx_maxgrad = np.where(dH2O==max(dH2O)) # find max grad index
             tign = timeVec_ignit[idx_maxgrad[0][0]]
             if verbose >=4:
-                if H2O[0]*1.2>H2O[-1] or tign>0.97*timeVec_ignit[-1]:
+                if X_H2O[0]*1.2>X_H2O[-1] or tign>0.97*timeVec_ignit[-1]:
                     print_("    WARNING : No ignition was detected in the first "+
                           str(tmax_react)+"s" +".",mp)
+                    print_(" -> increase the t_max for ignition detection (now:" + str(tmax_react) + "s",mp)
+                    print_(" -> in the Simulation cases parameters, add the option:",mp)
+                    print_("    tign_det_tmax_sec      = xx     (default: 1 second)",mp)
                 elif verbose>7:
-                    print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'µs',mp)
+                    print_("    - first ignition time estimation:  "+"%5.3f" %(tign*1e6)+'us',mp)
 
 
+            # =================================================================
             # Computing the time vector according to the selected scalar variation
             if t_max_s is not False:
                 tmax = t_max_s
@@ -1044,59 +1045,38 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
 
             # Grad and curve vectors calculation
-            grad_vect_0 = [] ; curv_vect = []
-            # grad calculation
-            for i in range(len(X_Scal)-1):
-                grad_vect_0.append((X_Scal[i+1]-X_Scal[i])/(timeVec_ignit[i+1]-timeVec_ignit[i]))
-            # curv calculation
-            for i in range(len(grad_vect_0)-1):
-                curv_vect.append((grad_vect_0[i+1]-grad_vect_0[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
-            # grad recomputed, for corresponding to the curv values
-            grad_vect = []
-            for i in range(len(X_Scal)-2):
-                grad_vect.append((X_Scal[i+2]-X_Scal[i])/(2*(timeVec_ignit[i+1]-timeVec_ignit[i])))
-
-            if verbose>7:
-                print_("grad and curve calculation done",mp)
+            grad_vect = np.gradient(X_Scal,    timeVec_ignit)
+            curv_vect = np.gradient(grad_vect, timeVec_ignit)
 
             time_stepping_calc=True; pt_coeff=2e5
             # coeff_dtmax = n_pts/10 ; dtmin = tmax/(n_pts*200)
             dtmax = tmax/(n_pts/20) ; dtmin = tmax/(n_pts*200)
             time_stepping_calc_try=0
-            while time_stepping_calc:
-                # time stepping
-                timeVec = [0]
-                # first point => considering only grad_vect_0 (curve data not available)
-                timeVec.append(tmax/((grad_vect_0[0]/np.sum([grad_vect_0[0]]))*n_pts))
-                # Next points => considering only grad_vect_0 (curve data not available)
-                while timeVec[-1]<tmax:
-                    idx = min((np.abs(timeVec_ignit-timeVec[-1])).argmin()-2,len(grad_vect)-1)
-                    dt = (tmax/(n_pts*pt_coeff))/(abs((grad_vect[idx]/np.sum(np.abs([grad_vect])))*
-                         grad_curv_ratio+curv_vect[idx]/np.sum(np.abs([curv_vect]))*(1-grad_curv_ratio)))
-                    if dt<dtmin: #dt<(tign/coeff_dtmin)
-                        timeVec.append(timeVec[-1]+dtmin)
-                    elif dt>dtmax: #(tign/coeff_dtmax)
-                        timeVec.append(timeVec[-1]+dtmax)
-                    else:
-                        timeVec.append(timeVec[-1]+dt)
-
-                if len(timeVec)>n_pts-delta_npts and len(timeVec)<n_pts+delta_npts:
-                    time_stepping_calc=False
+            
+            # =============================
+            # while time_stepping_calc:
+            # time stepping
+            timeVec = [0]
+            # first point => considering only grad_vect_0 (curve data not available)
+            # Next points => considering grad_vect (curve data available)
+            idx = 0
+            while timeVec[-1]<tmax:
+                # Find the index of the value in timeVec_ignit closest to the last value of timeVec
+                idx = np.argmin(np.abs(np.array(timeVec_ignit) - timeVec[-1]))
+                dt = (tmax/(n_pts*pt_coeff))/(
+                    abs(grad_vect[idx]/np.sum(np.abs([grad_vect])))*grad_curv_ratio
+                   +abs(curv_vect[idx]/np.sum(np.abs([curv_vect])))*(1-grad_curv_ratio)
+                    )
+                if dt<dtmin: #dt<(tign/coeff_dtmin)
+                    timeVec.append(timeVec[-1]+dtmin)
+                elif dt>dtmax: #(tign/coeff_dtmax)
+                    timeVec.append(timeVec[-1]+dtmax)
                 else:
-                    if verbose>4:
-                        print_("Bad number of time steps:"+str(len(timeVec))+". Recomputing time vector",mp)
-                    pt_coeff=pt_coeff*(n_pts/len(timeVec))**2
-                    time_stepping_calc=True
-                    time_stepping_calc_try+=1
-                    if time_stepping_calc_try>50:  time_stepping_calc=False
-                    if pt_coeff<1e-5:
-                        print_("Warning : larger time steps imposed for the calculation",mp)
-                        # pt_coeff = 2e5 ; coeff_dtmax = coeff_dtmax/4
-                        pt_coeff = 2e5 ; dtmax = dtmax/4                        
-                    if pt_coeff>1e20:
-                        print_("Warning : smaller time steps imposed for the calculation",mp)
-                        # pt_coeff = 2e5 ; coeff_dtmin = coeff_dtmin*4
-                        pt_coeff = 2e5 ; dtmin = dtmin*4
+                    timeVec.append(timeVec[-1]+dt)
+
+            timeVec = resample_time(timeVec, n_pts)
+                
+            
             if verbose>3:
                 print_("    - time vector contains: "+str(len(timeVec))+" points",mp)
 
@@ -1240,7 +1220,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 if 'PFR' in conditions.config:
                     print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
                 else:
-                    print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'µs',mp)
+                    print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'us',mp)
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(timeVec), list(T), \
@@ -1425,7 +1405,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
     if 'free_flame' in conditions.config or 'burner_flame' in conditions.config:
 
         # Main variables
-        gas_ref    = conditions.composition.gas_ref
         tol_ss     = conditions.simul_param.tol_ss
         tol_ts     = [conditions.simul_param.rtol_ts, conditions.simul_param.atol_ts]
 
@@ -1486,6 +1465,11 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         os.chdir(conditions.main_path)
 
         try:
+            ratio_ff = conditions.simul_param.ratio_ff
+            slope_ff = conditions.simul_param.slope_ff
+            curve_ff = conditions.simul_param.curve_ff
+            prune_ff = conditions.simul_param.prune_ff
+            f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff, prune=prune_ff)
             f.solve(auto = False, loglevel = 0, refine_grid = False)
             simul_success = True
         except:
@@ -1510,7 +1494,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1540,7 +1524,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
     if 'tp_flame' in conditions.config:
 
         # Main variables
-        gas_ref   = conditions.composition.gas_ref
 
 
         f = ct.CounterflowTwinPremixedFlame(gas_red)
@@ -1603,7 +1586,8 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind = gas_red.species_index(conditions.composition.idx2sp[sp])
+                    # sp_ind=gas_red.species_index(gas_ref.species_name(sp))
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1634,7 +1618,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
     if 'diff_flame' in conditions.config or 'pp_flame' in conditions.config :
 
         # Main variables
-        gas_ref  = conditions.composition.gas_ref
         width    = conditions.simul_param.end_sim
 
 
@@ -1734,7 +1717,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_x = []
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_x.append(gas_red.concentrations[sp_ind])
                 else:
                     conc_x.append(0)
@@ -1882,7 +1865,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
         X_red = conditions.composition.X
         gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
-        gas_ref     = conditions.composition.gas_ref
 
         timeVec = conditions.simul_param.pts_scatter
 
@@ -1923,7 +1905,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         conc_t=[]
         for sp in range(len(act_sp)):
             if act_sp[sp]:
-                sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                 conc_t.append(reactor.thermo.concentrations[sp_ind])
             else:
                 conc_t.append(0)
@@ -1985,7 +1967,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             conc_t=[]
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_t.append(reactor.thermo.concentrations[sp_ind])
                 else:
                     conc_t.append(0)
@@ -2061,7 +2043,10 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
         # 1- based on heat release (default)
         if hr!= "no_heat_release":
-            ign_time_hr = time_r[heat_release.index(max(heat_release))]
+            try:
+                ign_time_hr = time_r[heat_release.index(max(heat_release))]
+            except:
+                ign_time_hr = False
         else: ign_time_hr=False
            # 2- based on fuel gradients (if heat relase calculation issues)
         for t in range(len(time_r)-3):
@@ -2089,7 +2074,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         # =============================================================================
         X_red = conditions.composition.X
 
-        gas_ref  = conditions.composition.gas_ref
         T_list = list(conditions.simul_param.pts_scatter)
         gas_red.TPX = T_list[0], conditions.state_var.P,X_red
         # Reactor parameters
@@ -2207,7 +2191,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             # saving spec concentrations
             for sp in range(len(act_sp)):
                 if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(gas_ref.species_name(sp))
+                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
                     conc_T.append(stirredReactor.thermo.concentrations[sp_ind])
                 else:
                     conc_T.append(0)
@@ -2269,3 +2253,17 @@ def transportModel(gas_ref, transport_model):
         print("Warning, unrecognized or unsupported transport model. Proceeding with the default model : ",gas_ref.transport_model)
     return gas_ref
 
+def resample_time(t, n_points):
+    
+    t = np.array(t)
+    
+    # original parameter (normalized index from 0 to 1)
+    s = np.linspace(0, 1, len(t))
+    
+    # new parameter with desired number of points
+    s_new = np.linspace(0, 1, int(n_points))
+    
+    # interpolate time values on the new parameter grid
+    t_new = np.interp(s_new, s, t)
+    
+    return t_new

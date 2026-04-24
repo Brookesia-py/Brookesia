@@ -330,17 +330,19 @@ def graphSearch(conditions,red_data,mech_data,eps):
 
     new_target_tsp = False
 
+    OIC_sp  = np.zeros((len(target_species),ns))
+    sp_rank = np.zeros(ns)
+
     if red_data.red_op.graph_search == 'DFS':
 
         # DFS graph analysis
-        OIC_sp = np.zeros((len(target_species),ns))
-
         for s in range(len(target_species)):
             IC_tsp = 0
             for n in range(points):
                 graph = []
                 OIC = []
                 for spA in range(ns):
+                    sp_rank[spA]=max(sp_rank[spA],IC[n][s, spA])
                     graph.append([])
                     OIC.append(IC[n][s, spA])
                     if IC[n][s, spA]>OIC_sp[s][spA]:
@@ -376,8 +378,6 @@ def graphSearch(conditions,red_data,mech_data,eps):
 
     elif red_data.red_op.graph_search == 'Dijkstra':
         # Dijkstra algorithm
-        OIC_sp = np.zeros((len(target_species),ns))
-
         for tsp in range(len(target_species)):
 #            print(target_species)
             tsp_idx = target_species[tsp]
@@ -387,6 +387,7 @@ def graphSearch(conditions,red_data,mech_data,eps):
                 # max-priority queue (mpq) construction
                 OIC = []
                 for spA in range(ns):
+                    sp_rank[spA]=max(sp_rank[spA],IC[p][tsp_idx, spA])
                     OIC.append(IC[p][tsp_idx, spA])
                     if IC[p][tsp_idx, spA]>OIC_sp[tsp][spA]:
                         OIC_sp[tsp][spA]=IC[p][tsp_idx, spA]
@@ -440,15 +441,16 @@ def graphSearch(conditions,red_data,mech_data,eps):
     #  Display options
     if verbose >= 5:
         print_("  time for graph search : "+'%3.0f' %(timeDRG_2-timeDRG_1)+'s',mp)
-    if verbose >= 6:
-        print_("     "+"kept species:",mp)
-        kept_species="     "
-        for k in range(len(active_species)):
-            if active_species[k]:
-                kept_species+=gas.species_name(k)+", "
-        print_(kept_species,mp)
+    # if verbose >= 6:
+    #     print_("     "+"kept species:",mp)
+    #     kept_species="     "
+    #     for k in range(len(active_species)):
+    #         if active_species[k]:
+    #             kept_species+=gas.species_name(k)+", "
+    #     print_(kept_species,mp)
 
-    red_data.red_op.OIC_sp = list(OIC_sp)
+    red_data.red_op.OIC_sp  = list(OIC_sp)
+    red_data.red_op.sp_rank = sp_rank
     red_data.red_op.new_targets_4_DRG_r = new_targets_4_DRG_r
 
     return active_species
@@ -495,10 +497,13 @@ def graphSearch_DRGEP(conditions,red_data,mech_data,eps):
             if not active_species[ind_spec]: active_species[ind_spec]=True
 
     # Dijkstra algorithm
-    OIC_sp = np.zeros((len(target_species),ns))
+    OIC_sp  = np.zeros((len(target_species),ns))
+    sp_rank = np.zeros(ns)
+
     new_target_tsp = False
     for tsp in range(len(target_species)):
         tsp_idx = target_species[tsp]
+        active_species[tsp_idx] = True
         IC_tsp = 0
         for p in range(points):
             mpq_list = []
@@ -524,8 +529,9 @@ def graphSearch_DRGEP(conditions,red_data,mech_data,eps):
                 for sp in range(ns):
                     R_max.append(OIC[mpq]*IC[p][mpq_idx,sp])
                     visited_sp.append([tsp,sp])
+                    sp_rank[sp]=max(sp_rank[sp],OIC[mpq]*IC[p][mpq_idx,sp])
                     if OIC[mpq]*IC[p][mpq_idx,sp] > eps[tsp]:
-                        active_species[sp] = True
+                        active_species[sp] = True                                             
                 R_max[tsp]=0 ; R_max[mpq]=0
 
                 # graph search
@@ -539,6 +545,7 @@ def graphSearch_DRGEP(conditions,red_data,mech_data,eps):
                     for sp in range(ns):
                         if sp not in visited_sp_node:
                             Ri.append(R_max[idx_node]*IC[p][idx_node,sp])
+                            sp_rank[sp]=max(sp_rank[sp],Ri[-1])                            
                             if Ri[-1]>eps[tsp]:
                                 active_species[sp] = True
                         else:
@@ -560,15 +567,17 @@ def graphSearch_DRGEP(conditions,red_data,mech_data,eps):
     #  Display options
     if verbose >= 5:
         print("  time for graph search : ", '%3.0f' %(timeDRG_2-timeDRG_1), 's')
-    if verbose >= 6:
-        print("     ", "kept species:")
-        kept_species="     "
-        for k in range(len(active_species)):
-            if active_species[k]:
-                kept_species+=gas.species_name(k)+", "
-        print(kept_species)
+    # if verbose >= 6:
+    #     print("     ", "kept species:")
+    #     kept_species="     "
+    #     for k in range(len(active_species)):
+    #         if active_species[k]:
+    #             kept_species+=gas.species_name(k)+", "
+    #     print(kept_species)
 
-    red_data.red_op.OIC_sp = list(OIC_sp)
+    red_data.red_op.OIC_sp  = list(OIC_sp)
+    red_data.red_op.sp_rank = sp_rank
+    
     red_data.red_op.new_targets_4_DRG_r = new_targets_4_DRG_r
 
 
