@@ -4303,11 +4303,11 @@ def restore_stdout(old_stdout):
 def print_(text,main_path,file_n='red_info.txt'):
     warnings.filterwarnings("ignore", category=ResourceWarning)
 
-    print(text)
+    print(str(text))
     cur_path = os.getcwd()
     if main_path!='': os.chdir(main_path)
     fichier_data = open(file_n, 'a')
-    fichier_data.write(text+'\n')
+    fichier_data.write(str(text)+'\n')
     os.chdir(cur_path)
 
 
