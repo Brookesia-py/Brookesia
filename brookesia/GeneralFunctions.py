@@ -29,6 +29,11 @@ import cantera                     as ct
 import time                        as timer
 import brookesia.Computation       as comp
 import brookesia.SA                as sa
+try:
+    import brookesia.LOI           as loi
+except:
+    a = 0
+
 import brookesia.DRG               as drg
 try:
     import brookesia.CSP           as csp
@@ -331,7 +336,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
 
                 if 'DRG' in red_method:
                     # Interaction coefficients calculation  (useful also for DRG_r to assess the interactions between target species (TSI loop))
-                    red_data = drg.dic(red_data,mech_data,red_results)
+                    red_data = drg.optimised_dic(red_data,mech_data,red_results)
                     # Reaction interaction coefficients calculation
                     if '_r' in red_method:
                         if i==0: red_data.red_op.first_step_DRG_r = True
@@ -473,7 +478,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                         active_sp_pm = sa.speciesWithdrawal\
                             (conditions,red_data,red_method,mech_data,eps)
                     elif 'LOI' in red_method:
-                        active_sp_pm = loi.speciesWithdrawal\
+                        active_sp_pm, red_data = loi.speciesWithdrawal\
                             (conditions,red_data,red_method,mech_data,eps)
                     elif 'CSP' in red_method:
                         active_r_pm,active_sp_pm = csp.reactions_withdrawal\
@@ -1305,7 +1310,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                                      mech_data,mech_results_list[i])
                 else:
                     for i in range(len(red_data_list[op])):
-                        red_data_list[op][i]=drg.dic(red_data_list[op][i],mech_data,mech_results_list[i])
+                        red_data_list[op][i]=drg.optimised_dic(red_data_list[op][i],mech_data,mech_results_list[i])
                         red_data_list[op][i]=drg.ric(red_data_list[op][i],mech_data,mech_results_list[i])
 
             clock_opt = cdef.Clock(red_data_list[op][0].optim) ; clock_opt.start()
