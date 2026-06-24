@@ -286,7 +286,143 @@ def ric(red_data, mech_data, red_results):
     return red_data
 
 
+def optimised_dic(red_data, mech_data,results):
+    """
+    Optimised function to compute the Direct Relation Graph
 
+    Uses non-zeros ids and concatenation
+
+    Parameters
+    ----------
+    red_data
+    mech_data
+    results
+
+    Returns
+    -------
+    red_data
+
+    """
+
+    mp = results.conditions.main_path
+
+    gas_ref = red_data.gas_ref
+    gas_red = red_data.gas_red
+
+    verbose = red_data.verbose
+
+
+    if verbose >=2 :
+        print_("\n  direct interaction coefficients computation ...",mp)
+
+    timeDRG_1 = timer.time()
+
+
+    ns = gas_ref.n_species                      # number of species
+    nr = gas_ref.n_reactions                    # number of elementary reactions
+    n_points = len(results.r_rate)
+
+    # stoechiometric coefficients : direct, reverse, net
+    if int(ct.__version__[0]) > 2:
+        nu_f = gas_ref.reactant_stoich_coeffs
+        nu_r = gas_ref.product_stoich_coeffs
+    else:
+        nu_f = gas_ref.reactant_stoich_coeffs()
+        nu_r = gas_ref.product_stoich_coeffs()
+
+    nu = nu_f - nu_r
+
+    # Computing a matrix saying if two species belong in the same reaction
+    spec_spec_correspondence = np.zeros([ns, ns], 'd')
+    # Loop through reactions
+    for reac in gas_ref.reactions():
+        # Concatenate reactants and products
+        slist = []
+        for spec, value in reac.reactants.items():
+            slist.append(spec)
+        for spec, value in reac.products.items():
+            slist.append(spec)
+
+        # For each species in reaction, append the reac name to the right [Si,Sj] entry
+        for spec in slist:
+            for spec2 in slist:
+                spec_spec_correspondence[gas_ref.species_index(spec)][gas_ref.species_index(spec2)] = 1
+
+    # Computing a matrix saying if a species is in a reaction
+    nuabs = np.array(abs(nu_r + nu_f))
+    nuabs[nuabs >= 1] = 1
+    spec_reac_correspondence = nuabs
+
+    index_sr_i, index_sr_k = np.nonzero(spec_reac_correspondence)
+    index_ss_i, index_ss_j = np.nonzero(spec_spec_correspondence)
+
+    # Making r_rate into a numpy array
+    net_rates = np.array(results.r_rate)
+
+    # Retrieving sampled data
+    drg_i = [] # Sampled points indices
+    ib = []
+
+    sampled_net_rates = []
+    for i in range(n_points):
+        if i % int(max(n_points/red_data.red_op.n_points, 1)) == 0 and i != 0:
+            drg_i.append(i)
+            ib.append(i)
+            sampled_net_rates.append(net_rates[i, :])
+
+    net_rates = np.array(sampled_net_rates)
+
+    n_samples = len(net_rates)
+    dic = np.zeros((ns, ns, n_samples))
+
+    # Computing the DIC on all points at the same time
+    for index_spec_i in range(ns):
+        # reactions containing species i
+        booli = index_sr_k[index_sr_i == index_spec_i]
+        indices_spec_j = index_ss_j[index_ss_i == index_spec_i]
+
+        # Computing creation and destruction rates (TODO: should be retrieved from the solution)
+        PA = 0
+        CA = 0
+
+        for local_index_reac in booli:
+
+            PA += np.maximum(0, nu[index_spec_i, local_index_reac] * net_rates[:, local_index_reac])
+            CA += np.maximum(0, -nu[index_spec_i, local_index_reac] * net_rates[:, local_index_reac])
+        normalisation = np.maximum(np.maximum(PA, CA), 1e-60)
+
+        for index_spec_j in indices_spec_j:
+            boolj = index_sr_k[index_sr_i == index_spec_j]  # reactions containing species j
+            indices_reac_k = np.intersect1d(booli, boolj)  # reactions containing species i and j
+
+            # Compute the DIC
+            for index_reac_k in indices_reac_k:
+
+                dic[index_spec_i, index_spec_j, :] += ((nu[index_spec_i, index_reac_k])
+                                                       * net_rates[:, index_reac_k] / normalisation)
+
+    dic = abs(dic)
+
+    interactionCoefficients = []
+    for i in range(n_samples):
+        interactionCoefficients.append(dic[:, :, i])
+
+    timeDRG_2 = timer.time()
+
+    #  Display options
+    if verbose >= 4:
+        print_("      time for the DIC computation: " + str(round(timeDRG_2 - timeDRG_1)) + 's', mp)
+    elif verbose >= 3:
+        print_("   completed", mp)
+
+    red_data.red_op.interaction_coeffs = list(interactionCoefficients)
+
+    del interactionCoefficients
+
+    if red_data.red_op.write_results:
+        write_sensitivities(red_data, results, drg_i)
+
+    return red_data
 
 
 def graphSearch(conditions,red_data,mech_data,eps):
