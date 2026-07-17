@@ -401,7 +401,6 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         if verbose>=2 and 'SARGEP' not in red_data.reduction_operator:
             bar.update(n_tsp*n_sp_ref,title)
         red_data.red_op.sensi_T   = sensi_T
-        if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
         
         del norm_S_react_x ; del norm_sensi_T_z ; del S_AB_tsp_z
 
@@ -611,7 +610,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         red_data.red_op.sensi_T   = sensi_T
         red_data.red_op.sensi_igt = np.array(sensi_igt)/np.max(sensi_igt)
 
-        if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
+        # if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
 
     elif 'JSR' in conditions.config:
 
@@ -651,7 +650,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         # Instrument parameters
         pressureValveCoefficient = .05
         # Simulation termination criterion
-        maxSimulationTime = 50 # seconds
+        maxSimulationTime = 1 # seconds
         bar = cdef.ProgressBar(len(T_list))
 
         # =============================================================================
@@ -715,28 +714,26 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                 reactorNetwork.rtol_sensitivity = conditions.simul_param.rtol_ts
                 reactorNetwork.atol_sensitivity = conditions.simul_param.atol_ts
 
-            for r in range(gas_red.n_reactions):
-                stirredReactor.add_sensitivity_reaction(r)
-
-            # Re-run the isothermal simulations
-            time_s = 0
-#            bar = cdef.ProgressBar(np.log10(maxSimulationTime),'SA_PSR: ')
-#            t_step = maxSimulationTime/10000
-#            while time_s <maxSimulationTime:
-#                reactorNetwork.advance(time_s)
-#                bar.update(time_s, str(time_s))
-#                time_s+=t_step
 
 
-            while time_s < maxSimulationTime:
-                time_s = reactorNetwork.step()
-#                bar.update(np.log10(time_s),'%.3e' %time_s)
-#            bar.update(np.log10(maxSimulationTime))
 
-
-            concentrations = stirredReactor.thermo.X
 
             if t!=0 and t%int(max(n_points/red_data.red_op.n_points,1))==0 :
+                
+                for r in range(gas_red.n_reactions):
+                    stirredReactor.add_sensitivity_reaction(r)
+                
+                # Re-run the isothermal simulations
+                time_s = 0
+                
+                while time_s < residenceTime*5: #maxSimulationTime
+                    time_s = reactorNetwork.step()
+                    # print(time_s)
+    
+                # record concentrations to speed up convergence of the next iteration 
+                concentrations = stirredReactor.thermo.X
+                
+                
 #            if t%int(max(n_points/red_data.red_op.n_points,1))==0 :
                 t_i+=1
                 sensi_scatter.append(t)
@@ -827,6 +824,8 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                                     S_react_filled = True
                         except:
                             a=2
+
+    if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
 
 
     time_end = timer.time()
@@ -1030,8 +1029,11 @@ def reactionWithdrawal(conditions, mech_data,active_species,red_data,red_method,
             sensi_sorted = list(sensi_r[tsp])
             sensi_sorted.sort()
             while 0 in sensi_sorted: sensi_sorted.remove(0)
-            lim_val = sensi_sorted[int((len(sensi_sorted)-1)
+            if len(sensi_sorted)>0:
+                lim_val = sensi_sorted[int((len(sensi_sorted)-1)
                                            *min(abs(eps_r[tsp]),1))]
+            else:
+                lim_val = 0
             for r in range(nr):
                 if not mech_data.react.activ_m[r]:
                     active_reactions[r] = False

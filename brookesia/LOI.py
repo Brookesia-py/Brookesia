@@ -29,28 +29,34 @@ def LOI_computation(red_data, mech_data, red_results):
     # gas = red_results.gas## Objet Cantera modifié au fil du temps dans Brookesia
     conditions = red_results.conditions 
     mp = conditions.main_path
-    gas = red_data.gas_ref
-    n_sp = gas.n_species  # n_sp_ref = red_data.gas_ref.n_species
-    J_diag = np.zeros(n_sp)
+    gas_ref = conditions.composition.gas_ref
     
-
+    # gas_red = gas_ref ; print_('gas_red = gas_ref',mp)
+    gas_red = red_results.gas #; print_('gas_red_ok',mp)
+    
+    
+    # gas = red_data.gas_ref
+    n_sp = gas_ref.n_species  # n_sp_ref = red_data.gas_ref.n_species
+    # J_diag = np.zeros(n_sp)
+    
 
     T = conditions.state_var.T
     P = conditions.state_var.P
     X_red = conditions.composition.X
-    gas.TPX = T, P, X_red
-    
+    gas_red.TPX = conditions.state_var.T, conditions.state_var.P, X_red    
     
     pts_scatter = red_results.pts_scatter
     n_points = len(pts_scatter)
     n_points_LOI = int(red_data.red_op.n_points)
     
     
-    # stockage des timescales
+    
+    # =============================================================================
+    # 1- timescales computation
+    # =============================================================================
+        
     timescales_all = np.ones((n_points_LOI, n_sp))
-    sensi_scatter = []
-    
-    
+       
     
     if "reactor" in conditions.config:
         
@@ -60,9 +66,9 @@ def LOI_computation(red_data, mech_data, red_results):
         
         
         if conditions.config == "reactor_UV":
-            reactor = ct.IdealGasReactor(gas)
+            reactor = ct.IdealGasReactor(gas_red)
         elif conditions.config == "reactor_HP":
-            reactor = ct.IdealGasConstPressureReactor(gas)
+            reactor = ct.IdealGasConstPressureReactor(gas_red)
         sim = ct.ReactorNet([reactor])
 
         # tolerances
@@ -74,46 +80,60 @@ def LOI_computation(red_data, mech_data, red_results):
             sim.advance(pts_scatter[t])
             if t != 0 and t % int(max(n_points/red_data.red_op.n_points, 1)) == 0:
                 t_i += 1
-                sensi_scatter.append(t)
+                # sensi_scatter.append(t)
     
-                conc_ref = gas.concentrations.copy()
-                omega_ref = gas.net_production_rates.copy()
+    
+            # for i in range(n_sp):
+
+            #     # conc_ref = gas_red.concentrations.copy()
+            #     # omega_ref = gas_red.net_production_rates.copy()
 
     
-                #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
-                timescales = np.ones(n_sp)
-                
-                for i in range(n_sp) : 
-                    conc_i = conc_ref[i]
+            #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
+            timescales = np.ones(n_sp)
+            omega_ref  = np.zeros(n_sp)
+            conc_ref = gas_red.concentrations
+            
+            for idx_mech1 in range(n_sp) : 
+                try:
+                    # ----- if spec i in gas_red:
+                    
+                    idx_red = gas_red.species_index(gas_ref.species_name(idx_mech1))
+                    # conc_ref[i]   = gas_red.concentrations[idx_sp_in_red]
+                    omega_ref[idx_mech1]  = gas_red.net_production_rates[idx_red]
+                    conc_i        = conc_ref[idx_red]
                     
                     #si la concentration est trop faible tau=1 par defaut
-                    if conc_i <= abs_tol:
-                        timescales[i] = 1.0
-                    else:
+                    if conc_i > abs_tol:
                         #calcul du pas de perturbation
                         dc = abs_tol + conc_i * rel_tol
                         
                         #etat perturbé
                         conc_pert = conc_ref.copy()
-                        conc_pert[i] += dc
+                        conc_pert[idx_red] += dc
                         
                         #mise a jour de l'etat cantera
-                        gas.TPX = T, P, conc_pert
-                        omega_pert = gas.net_production_rates.copy()
+                        gas_red.concentrations = conc_pert
+                        omega_pert_sp = gas_red.net_production_rates[idx_red]
+                        
                         
                         #approximation de la dérivée (Jacobien diagonal)
-                        J_diag[i]= (omega_pert[i] - omega_ref[i]) / dc
+                        J_diag_sp = (omega_pert_sp - omega_ref[idx_mech1]) / dc
                         
-                        #calcul implicite du timescale 
-                        if J_diag[i] != 0 and abs(J_diag[i]) < 1e30 : 
-                            timescales[i] = 1.0 / abs(J_diag[i])
-                        
+                        #calcul implicite du timescale avec borne max a 1.0
+                        if abs(J_diag_sp) > 1 : 
+                            timescales[idx_mech1] = 1.0 / abs(J_diag_sp)
                         else : 
-                            timescales[i] = 1.0
+                            timescales[idx_mech1] = 1.0                        
                         
-                        # borne max a 1.0
-                        if timescales[i] > 1.0:
-                            timescales[i] = 1.0
+                        
+                        # retrait de la perturbation
+                        gas_red.concentrations = conc_ref
+                            
+                    
+                except ValueError: #if spec not in red mech
+                    pass
+                
                         
                     
                 timescales_all[t_i] = timescales.copy()
@@ -121,40 +141,205 @@ def LOI_computation(red_data, mech_data, red_results):
     
     elif "flame" in conditions.config:
         
+        if conditions.mech_prev_red:
+            # in this configuration, the flame object red_results.f come from 
+            # the reference simulation (as defined in the first lines of 
+            # the function reduction() in GeneralFunction.py
+            # => calculation of the flame object from the reduced mech
+            red_results = comp.red_computation(
+                conditions,
+                gas_red,
+                mech_data.spec.activ_p,
+                mech_data.react.activ_p)
+
+        f = red_results.f
+        T_prof = f.T
+
+        
         # parametres de tolerance        
         abs_tol = conditions.simul_param.tol_ss[1]
         rel_tol = conditions.simul_param.tol_ss[0]
         
         
-        f = red_results.f
-        T_prof = f.T
         z_i = 0
         for z in range(n_points):
             if z % int(max(n_points/n_points_LOI, 1)) == 0 \
                and 0.01*(max(red_results.T)-min(red_results.T)) < T_prof[z]-T_prof[0] < 0.99*(max(red_results.T)-min(red_results.T)):
                 #sensi_scatter.append(z)
                 f.set_gas_state(z)
-                # vérifier si ca évolue avec z (f.gas.concentration())
-                conc_ref = f.gas.concentrations.copy()
-                omega_ref = f.gas.net_production_rates.copy()
+                
+                # conc_ref = f.gas.concentrations.copy()
+                # omega_ref = f.gas.net_production_rates.copy()
                 timescales = np.ones(n_sp)
-
-                for i in range(n_sp):
-                    conc_i = conc_ref[i]
-                    if conc_i > abs_tol:                        
-                        dc = abs_tol + conc_i * rel_tol
-                        conc_pert = conc_ref.copy()
-                        conc_pert[i] += dc
-                        gas.TPX = T_prof[z], P, conc_pert
-                        omega_pert = gas.net_production_rates.copy()
-                        J_ii = (omega_pert[i] - omega_ref[i]) / dc
-                        if J_ii != 0 and abs(J_ii) < 1e30:
-                            timescales[i] = 1.0 / abs(J_ii)
-                        if timescales[i] > 1.0:
-                            timescales[i] = 1.0
+                conc_ref = f.gas.concentrations
+                omega_ref = np.zeros(n_sp)
+                
+                for idx_mech1 in range(n_sp):
+                    try:
+                        idx_red = f.gas.species_index(gas_ref.species_name(idx_mech1))
+                        omega_ref[idx_mech1]  = f.gas.net_production_rates[idx_red]                    
+                        conc_i = conc_ref[idx_red]
+                        
+                        if conc_i > abs_tol:                        
+                            dc = abs_tol + conc_i * rel_tol
+                            conc_pert = conc_ref.copy()
+                            conc_pert[idx_red] += dc
+                            
+                            #mise a jour de l'etat cantera
+                            f.gas.concentrations = conc_pert
+                            omega_pert_sp = f.gas.net_production_rates[idx_red]
+                            J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                            
+                            #calcul implicite du timescale 
+                            if abs(J_diag) > 0 : 
+                                timescales[idx_mech1] = 1.0 / abs(J_diag)
+                            else : 
+                                timescales[idx_mech1] = 1.0                        
+                            # if J_ii != 0 and abs(J_ii) < 1e30:
+                            #     timescales[idx_mech1] = 1.0 / abs(J_ii)
+                            # if timescales[idx_mech1] > 1.0:
+                            #     timescales[idx_mech1] = 1.0
+                            
+                    except ValueError: #if spec not in red mech
+                        pass
                             
                 timescales_all[z_i] = timescales.copy()
                 z_i += 1
+   
+    
+    elif 'JSR' in conditions.config:
+        
+        abs_tol = conditions.simul_param.atol_ts
+        rel_tol = conditions.simul_param.rtol_ts
+        
+        # =============================================================================
+        # Reactor model
+        # =============================================================================
+        residenceTime            = conditions.simul_param.end_sim #s
+        reactorVolume            = 30.5*(1e-2)**3 #m3
+        pressureValveCoefficient = .05
+        maxSimulationTime        = 50 # seconds
+        
+        fuelAirMixtureTank       = ct.Reservoir(gas_red)
+        exhaust                  = ct.Reservoir(gas_red)
+        stirredReactor           = ct.IdealGasReactor(gas_red, energy='off', volume=reactorVolume)
+        massFlowController       = ct.MassFlowController(upstream=fuelAirMixtureTank,
+                                                   downstream=stirredReactor,
+                                                   mdot=stirredReactor.mass/residenceTime)
+        pressureRegulator        = ct.Valve(upstream=stirredReactor,
+                                     downstream=exhaust,
+                                     K=pressureValveCoefficient)
+        reactorNetwork           = ct.ReactorNet([stirredReactor])
+        # now compile a list of all variables for which we will store data
+        columnNames = [stirredReactor.component_name(item) for item in range(stirredReactor.n_vars)]
+        columnNames = ['pressure'] + columnNames
+        # use the above list to create a DataFrame
+        timeHistory = pd.DataFrame(columns=columnNames)
+
+        # =============================================================================
+        # Modeling data
+        # =============================================================================
+        # Create a data frame to store values for the above points
+        tempDependence            = pd.DataFrame(columns=timeHistory.columns)
+        tempDependence.index.name = 'Temperature'
+        inletConcentrations       = X_red
+        X_outlet                   = inletConcentrations
+        abs_tol = conditions.simul_param.atol_ts
+        rel_tol = conditions.simul_param.rtol_ts
+        
+        T_list  = list(red_results.pts_scatter)
+
+        t=-1 ; t_i=-1
+        for T in T_list:
+            t+=1
+            #Re-initialize the gas
+            reactorTemperature = T #Kelvin
+            reactorVolume = 30.5*(1e-2)**3 #m3
+            gas_red.TPX = reactorTemperature,conditions.state_var.P,inletConcentrations
+            # Re-initialize the dataframe used to hold values
+            timeHistory = pd.DataFrame(columns=columnNames)
+            # Re-initialize all the reactors, reservoirs, etc
+            fuelAirMixtureTank = ct.Reservoir(gas_red)
+            stirredReactor = ct.IdealGasReactor(gas_red, energy='off', volume=reactorVolume)
+
+            # use concentrations from the previous iteration to speed up convergence
+            # gas_red.TPX = reactorTemperature,conditions.state_var.P,concentrations
+            gas_red.X = X_outlet
+            exhaust = ct.Reservoir(gas_red)
+            
+            massFlowController = ct.MassFlowController(upstream=fuelAirMixtureTank,
+                                                       downstream=stirredReactor,
+                                                       mdot=stirredReactor.mass/residenceTime)
+            pressureRegulator  = ct.Valve(upstream=stirredReactor,
+                                         downstream=exhaust,
+                                         K=pressureValveCoefficient)
+            
+            reactorNetwork     = ct.ReactorNet([stirredReactor])
+            reactorNetwork.rtol = conditions.simul_param.rtol_ts
+            reactorNetwork.atol = conditions.simul_param.atol_ts
+            # if red_data.red_op.rtol_ts:
+            #     reactorNetwork.rtol_sensitivity = red_data.red_op.rtol_ts
+            #     reactorNetwork.atol_sensitivity = red_data.red_op.atol_ts
+            # else:
+            #     reactorNetwork.rtol_sensitivity = conditions.simul_param.rtol_ts
+            #     reactorNetwork.atol_sensitivity = conditions.simul_param.atol_ts
+
+            # for r in range(gas_red.n_reactions):
+            #     stirredReactor.add_sensitivity_reaction(r)
+
+            # Re-run the isothermal simulations
+            time_s = 0
+
+            while time_s < maxSimulationTime:
+                time_s = reactorNetwork.step()
+
+            # record concentrations to speed up convergence of the next iteration 
+            X_outlet = stirredReactor.thermo.X
+            
+            # conc_ref, omega_ref = np.zeros(n_sp), np.zeros(n_sp)
+            # timescales = np.ones(n_sp)
+            #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
+            timescales = np.ones(n_sp)
+            omega_ref  = np.zeros(n_sp)
+            conc_ref = gas_red.concentrations
+
+            for idx_mech1 in range(n_sp):
+                try:
+                    idx_red = gas_red.species_index(gas_ref.species_name(idx_mech1))
+                    omega_ref[idx_mech1]  = gas_red.net_production_rates[idx_red]
+                    conc_i                = conc_ref[idx_red]
+
+
+                    #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
+                                        
+                    #si la concentration est trop faible tau=1 par defaut
+                    if conc_i > abs_tol:
+                        #calcul du pas de perturbation
+                        dc = abs_tol + conc_i * rel_tol
+                        
+                        #etat perturbé
+                        conc_pert = conc_ref.copy()
+                        conc_pert[idx_red] += dc
+                        
+                        #mise a jour de l'etat cantera
+                        gas_red.concentrations = conc_pert
+                        omega_pert_sp = gas_red.net_production_rates[idx_red]
+
+                        #approximation de la dérivée (Jacobien diagonal)
+                        J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                        
+                        #calcul implicite du timescale avec borne max a 1.0
+                        if abs(J_diag) > 1 : 
+                            timescales[idx_mech1] = 1.0 / abs(J_diag)
+                        else : 
+                            timescales[idx_mech1] = 1.0                        
+                    
+                except ValueError: #if spec not in red mech
+                    pass
+
+                    
+                
+            timescales_all[t_i] = timescales.copy()
    
     
     timescales_all = np.array(timescales_all)   # taille (n_points_LOI, n_sp)
@@ -165,23 +350,26 @@ def LOI_computation(red_data, mech_data, red_results):
             +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)
     fn = fn.replace('.','p') + '.png'
 
-    plot_timescales_bars(timescales_all, gas.species_names, list(map(str, range(len(timescales_all)))), fn)
+    plot_timescales_bars(timescales_all, gas_ref.species_names, list(map(str, range(len(timescales_all)))), fn)
     
     
+    # =============================================================================
+    # 2- sensitivity analysis
+    # =============================================================================
     
-    # Load S(AB) matrix
     red_data = sa.sensitivities_computation_SA(red_data, mech_data,red_results,LOI_calc=True)
     S = red_data.red_op.S_AB_z
     
        
     
     
-        
+    # =============================================================================
+    # 3- LOI computation
+    # =============================================================================
     
     tsp_idx = red_data.targetSpeciesIdx
     n_tsp = len(tsp_idx)
     tsp_name = red_data.tspc
-    # #S_AB_z = np.zeros((n_points_SA, n_tsp, n_sp_ref))
     
     LOI = np.zeros((n_points_LOI, n_tsp, n_sp))
     
@@ -223,13 +411,13 @@ def LOI_computation(red_data, mech_data, red_results):
                    #  S(AB) x log normalized timescale : 
                    # print_('LOI: method 3',mp)
                    # log-space normalization of timescale
-                   tsc_log_norm = (np.log(np.max([timescales_all[t_i, i],min_tsc])) - np.log(min_tsc)) /  \
-                                  (np.log(max_tsc) - np.log(min_tsc))
-                   # LOI = log-average
-                   LOI[t_i, tsp, i] =  S[ t_i, tsp, i] * tsc_log_norm
+                   # tsc_log_norm = (np.log(np.max([timescales_all[t_i, i],min_tsc])) - np.log(min_tsc)) /  \
+                   #                (np.log(max_tsc) - np.log(min_tsc))
+                   # # LOI = log-average
+                   # LOI[t_i, tsp, i] =  S[ t_i, tsp, i] * tsc_log_norm
 
 
-# Calcul du maximum de LOI pour chaque (tsp, i)
+    # Calcul du maximum de LOI pour chaque (tsp, i)
     LOI_max = np.max(np.abs(LOI), axis=0)   # taille = (n_tsp, n_sp)
     for _t in range(len(LOI_max)):
         loi_max_targ = max(LOI_max[_t])

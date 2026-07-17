@@ -749,7 +749,7 @@ def reactionWithdrawal(mech_data,red_data,red_method,eps_r,conditions,active_spe
         print(  "  reactions removal ...")
 
 
-    if not red_data.red_op.OIC_sp:
+    if not red_data.red_op.OIC_sp and 'DRG' in red_method:
         IC              = red_data.red_op.interaction_coeffs
         points          = len(IC)
         ns              = len(IC[0][1,:])
