@@ -99,14 +99,13 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     # if not, replace worst ind of the current pop by the previous best ind
     pop,best_ind,new_best_ind = ot.compare_best_ind(pop,best_ind,optim_param,'GA',verbose)
 
-
     # save and display convergence informations
     warnings.filterwarnings("ignore", category=ResourceWarning)
 
     if verbose >= 1 : print_('Initial population:',mp)
     pop.convergence_information(gen,optim_param,verbose)
+    pop.check_early_conv(optim_param,gen,verbose)
 
-    # pop.selection(optim_param,verbose)
 
     time_1 = timer.time()
 
@@ -171,652 +170,6 @@ def plotConvergence(optim_param):
 
 
 
-# class Chromosome:
-#     def __init__(self,conditions_list,mech_data,ref_results_list,red_data_list,\
-#                  rand_kin=True):
-#         optim_param = red_data_list[0].optim_param
-#         if type(rand_kin) is bool:
-#             self.mech    = copy.deepcopy(mech_data)
-#         else: # if the option to import kinetic mechanism have been selected
-#             self.mech    = copy.deepcopy(rand_kin)
-#         self.r2opt   = []
-#         self.find_r2opt(red_data_list,optim_param,conditions_list)
-#
-#         if rand_kin == True:
-#             self.randomize_kin(optim_param)
-#
-#         self.fitness = 0
-#
-#
-#     def find_r2opt(self,red_data_list,optim_param,conditions_list):
-#
-#         if optim_param.optim_on_meth!='False':
-#             n_tspc     = red_data_list[0].n_tspc
-#             n_r2opt    = optim_param.nb_r2opt                    # total number of react to opt
-#             self.mech.react.modif = [False]*len(self.mech.react.modif)
-#             mp         = optim_param.main_path
-#
-#             # Get list of reactions to optimize
-#             if 'SA' in red_data_list[0].reduction_operator \
-#             or optim_param.optim_on_meth=='SA':
-#                 # keep maximal sensitivities
-#                 if len(red_data_list[0].red_op.sensi_r)!=0:
-#                     add_col = 0
-#                     for l in range(len(red_data_list)):
-#                         if red_data_list[l].red_op.sensi_Sl is not False\
-#                         and conditions_list[l].error_param.Sl_check:
-#                             if red_data_list[l].red_op.sensi_T is not False\
-#                             and conditions_list[l].error_param.T_check:
-#                                 if red_data_list[l].red_op.sensi_igt is not False\
-#                                 and conditions_list[l].error_param.ig_check:
-#                                     # sensitivity analysis on: Sl, T, igt
-#                                     add_col = 3
-#                                     idx_Sl = -3 ; idx_T = -2 ; idx_igt = -1
-#                                 else:
-#                                     # sensitivity analysis on: Sl, T
-#                                     add_col = max(add_col,2)
-#                                     idx_Sl = -2 ; idx_T = -1
-#                             elif red_data_list[l].red_op.sensi_igt is not False\
-#                             and conditions_list[l].error_param.ig_check:
-#                                 # sensitivity analysis on: Sl, igt
-#                                 add_col = max(add_col,2)
-#                                 idx_Sl = -2 ; idx_igt = -1
-#                             else:
-#                                 # sensitivity analysis on: Sl
-#                                 add_col = max(add_col,1)
-#                                 idx_Sl = -1
-#                         elif red_data_list[l].red_op.sensi_T is not False\
-#                         and conditions_list[l].error_param.T_check:
-#                             if red_data_list[l].red_op.sensi_igt is not False\
-#                             and conditions_list[l].error_param.ig_check:
-#                                 # sensitivity analysis on: T, igt
-#                                 add_col = max(add_col,2)
-#                                 idx_T = -2 ; idx_igt = -1
-#                             else:
-#                                 # sensitivity analysis on: T
-#                                 add_col = max(add_col,1)
-#                                 idx_T = -1
-#                         elif red_data_list[l].red_op.sensi_igt is not False\
-#                         and conditions_list[l].error_param.ig_check:
-#                             # sensitivity analysis on: igt
-#                             add_col = max(add_col,1)
-#                             idx_igt = -1
-#
-#                     # create max_sens_list
-#                     max_sens_list=np.zeros((len(red_data_list[0].red_op.sensi_r)+add_col,len(red_data_list[0].red_op.sensi_r[0])))
-#
-#
-#                     # fill max_sens_list   - species sensitivities
-#                     for l in range(len(red_data_list)):
-#                         for idx in range(len(red_data_list[l].red_op.sensi_r)):
-#                             for r in range(len(red_data_list[l].red_op.sensi_r[idx])):
-#                                 if abs(red_data_list[l].red_op.sensi_r[idx][r])>max_sens_list[idx][r]:
-#                                     max_sens_list[idx][r]=abs(red_data_list[l].red_op.sensi_r[idx][r])
-#
-#                     # fill max_sens_list...
-#                     for l in range(len(red_data_list)):
-#                         #   - Sl sensitivities
-#                         if red_data_list[l].red_op.sensi_Sl is not False\
-#                         and conditions_list[l].error_param.Sl_check:
-#                             if len(max_sens_list[idx_Sl])==1:
-#                                 max_sens_list[idx_Sl] = red_data_list[l].red_op.sensi_Sl
-#                             else:
-#                                 for r in range(len(red_data_list[l].red_op.sensi_Sl)):
-#                                     if abs(red_data_list[l].red_op.sensi_Sl[r])>max_sens_list[idx_Sl][r]\
-#                                     and conditions_list[l].error_param.Sl_check:
-#                                         max_sens_list[idx_Sl][r]=abs(red_data_list[l].red_op.sensi_Sl[r])
-#                         #   - T sensitivities
-#                         if red_data_list[l].red_op.sensi_T is not False\
-#                         and conditions_list[l].error_param.T_check:
-#                             if len(max_sens_list[idx_T])==1:
-#                                 max_sens_list[idx_T] = red_data_list[l].red_op.sensi_T
-#                             else:
-#                                 for r in range(len(red_data_list[l].red_op.sensi_T)):
-#                                     if abs(red_data_list[l].red_op.sensi_T[r])>max_sens_list[idx_T][r]\
-#                                     and conditions_list[l].error_param.T_check:
-#                                         max_sens_list[idx_T][r]=abs(red_data_list[l].red_op.sensi_T[r])
-#                         #   - igt sensitivities
-#                         if red_data_list[l].red_op.sensi_igt is not False\
-#                         and conditions_list[l].error_param.ig_check:
-#                             if len(max_sens_list[idx_igt])==1:
-#                                 max_sens_list[idx_igt] = red_data_list[l].red_op.sensi_igt
-#                             else:
-#                                 for r in range(len(red_data_list[l].red_op.sensi_igt)):
-#                                     if abs(red_data_list[l].red_op.sensi_igt[r])>max_sens_list[idx_igt][r]\
-#                                     and conditions_list[l].error_param.ig_check:
-#                                         max_sens_list[idx_igt][r]=abs(red_data_list[l].red_op.sensi_igt[r])
-#                     if len(max_sens_list)==1:
-#                         print_('Warning, no sensitivity data',mp)
-#
-#
-#                 n_r2opt_sp_max = round(n_r2opt/len(red_data_list[0].red_op.sensi_r))    # number of react to opt per target data (spec / Sl / ...)
-#                 react2mod = []
-#                 for idx in range(len(max_sens_list)):
-#                     react2mod.append([])
-#                     sensi_r=[]
-#                     for r in range(len(max_sens_list[idx])):
-#                         sensi_r.append((max_sens_list[idx][r],r+1))
-#                     sensi_r.sort()
-#
-#                     n_r2opt_sp=0
-#                     for r1 in range(len(sensi_r)):
-#                         x = -(r1+1)
-#                         for r2 in range(len(max_sens_list[idx])):
-#                             if max_sens_list[idx][r2]==sensi_r[x][0]:  # find most sensitive reactions
-#                                 if not self.mech.react.modif[r2]:
-#                                     # check if sub mechs can be modified:
-#                                     n_C = self.mech.react.subm_C[r2]
-#                                     sub_H = self.mech.react.subm_C[r2]==0 and not self.mech.react.subm_CO[r2]
-#                                     n_N = self.mech.react.subm_N[r2]
-#                                     n_S = self.mech.react.subm_S[r2]
-#                                     n_Si = self.mech.react.subm_Si[r2]
-#
-#                                     if    n_C>0 or sub_H: sub_C = optim_param.opt_subm_C[n_C]
-#                                     else:                 sub_C = False
-#                                     if self.mech.react.subm_CO[r2]:
-#                                         sub_CO = optim_param.opt_subm_CO
-#                                     else:
-#                                         sub_CO = False
-#                                     if    n_N>0: sub_N = optim_param.opt_subm_N[n_N]
-#                                     else:        sub_N = False
-#                                     if    n_S>0: sub_S = optim_param.opt_subm_N[n_S]
-#                                     else:        sub_S = False
-#                                     if    n_Si>0: sub_Si = optim_param.opt_subm_Si[n_Si]
-#                                     else:         sub_Si = False
-#                                     # if sub mechs can be modified:
-#                                     if sub_C or sub_CO or sub_N or sub_S or sub_Si:
-#                                         self.mech.react.modif[r2]=True ; n_r2opt_sp+=1
-#                                         react2mod[-1].append(r2)
-#                             if n_r2opt_sp==n_r2opt_sp_max: break
-#                         if n_r2opt_sp==n_r2opt_sp_max: break
-#
-#             if 'DRG' in red_data_list[0].reduction_operator \
-#             or optim_param.optim_on_meth=='DRG':
-#                 if n_tspc != 0: n_r2opt_sp_max = round(n_r2opt/n_tspc)    # number of react to opt per target data (spec / Sl / ...)
-#                 max_coeffs_list=np.zeros((n_tspc,len(red_data_list[0].red_op.r_interaction_coeffs[0])))
-#                 for l in range(len(red_data_list)):
-#                     for idx in range(n_tspc):
-#                         for r in range(len(red_data_list[l].red_op.r_interaction_coeffs[idx])):
-#                             if abs(red_data_list[l].red_op.r_interaction_coeffs[idx][r])>max_coeffs_list[idx][r]:
-#                                 max_coeffs_list[idx][r]=abs(red_data_list[l].red_op.r_interaction_coeffs[idx][r])
-#
-#                 react2mod = []
-#                 for idx in range(n_tspc):
-#                     react2mod.append([])
-#                     drg_coeffs=[]
-#                     for j in range(len(max_coeffs_list[idx])):
-#                         drg_coeffs.append((max_coeffs_list[idx][j],j+1))
-#                     drg_coeffs.sort()
-#
-#                     #DRG_sorted.sort()
-#                     n_r2opt_sp=0
-#                     for r1 in range(len(drg_coeffs)):
-#                         x = -(r1+1)
-#                         for r2 in range(len(max_coeffs_list[idx])):
-#                             if max_coeffs_list[idx][r2]==drg_coeffs[x][0]:
-#                                 if not self.mech.react.modif[r2]:
-#                                     # check if sub mechs can be modified:
-#                                     n_C = self.mech.react.subm_C[r2]
-#                                     sub_H = self.mech.react.subm_C[r2]==0 and not self.mech.react.subm_CO[r2]
-#                                     n_N = self.mech.react.subm_N[r2]
-#                                     n_S = self.mech.react.subm_S[r2]
-#                                     n_Si = self.mech.react.subm_Si[r2]
-#
-#                                     if    n_C>0 or sub_H: sub_C = optim_param.opt_subm_C[n_C]
-#                                     else:                 sub_C = False
-#                                     if self.mech.react.subm_CO[r2]:
-#                                         sub_CO = optim_param.opt_subm_CO
-#                                     else:
-#                                         sub_CO = False
-#                                     if    n_N>0: sub_N = optim_param.opt_subm_N[n_N]
-#                                     else:        sub_N = False
-#                                     if    n_S>0: sub_S = optim_param.opt_subm_N[n_S]
-#                                     else:        sub_S = False
-#                                     if    n_Si>0: sub_Si = optim_param.opt_subm_Si[n_Si]
-#                                     else:         sub_Si = False
-#                                     # if sub mechs can be modified:
-#                                     if sub_C or sub_CO or sub_N or sub_S or sub_Si:
-#                                         self.mech.react.modif[r2]=True ; n_r2opt_sp+=1
-#                                         react2mod[-1].append(r2)
-#
-#                             if n_r2opt_sp==n_r2opt_sp_max: break
-#                         if n_r2opt_sp==n_r2opt_sp_max: break
-#
-#             if optim_param.display_react2opt:
-#                 n_r_opt=0
-#                 for _r in range(len(self.mech.react.modif)):
-#                     if self.mech.react.modif[_r] == True:n_r_opt+=1
-#
-#
-#                 print_('-------------------------------- \n'+str(n_r_opt)+' reactions to optimize:',mp)
-#                 for _tn in range(len(red_data_list[0].tspc)):
-#                     print_(' * for target: '+red_data_list[0].tspc[_tn]+':',mp)
-#                     for _r in react2mod[_tn]:
-#                         if   int(self.mech.react.number[_r])<10:    spaces='    -   '
-#                         elif int(self.mech.react.number[_r])<100:   spaces='   -   '
-#                         elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
-#                         elif int(self.mech.react.number[_r])<10000: spaces=' -   '
-#                         print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
-#
-#                 # ------------ 10/07/2023
-#                 if 'idx_Sl' in locals():
-#                     print_(' * for target Flame speed'+':',mp)
-#                     for _r in react2mod[idx_Sl]:
-#                         if   int(self.mech.react.number[_r])<10:    spaces='    -   '
-#                         elif int(self.mech.react.number[_r])<100:   spaces='   -   '
-#                         elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
-#                         elif int(self.mech.react.number[_r])<10000: spaces=' -   '
-#                         print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
-#
-#                 if 'idx_T' in locals():
-#                     print_(' * for target Temperature'+':',mp)
-#                     for _r in react2mod[idx_T]:
-#                         if   int(self.mech.react.number[_r])<10:    spaces='    -   '
-#                         elif int(self.mech.react.number[_r])<100:   spaces='   -   '
-#                         elif int(self.mech.react.number[_r])<1000:  spaces='  -   '
-#                         elif int(self.mech.react.number[_r])<10000: spaces=' -   '
-#                         print_(str(self.mech.react.number[_r]) + spaces + self.mech.react.equation[_r],mp)
-#
-#                 print_('--------------------------------\n\n',mp)
-#                 optim_param.display_react2opt=False
-#
-#
-#         else:   #selection of submech in gui
-#
-#
-#             if False in optim_param.opt_subm_C \
-#             or False in optim_param.opt_subm_N \
-#             or False in optim_param.opt_subm_S \
-#             or False in optim_param.opt_subm_Si\
-#             or optim_param.opt_subm_CO == False: # opt_subm_C : selection of submech in gui
-#                 self.mech.react.modif = [True]*len(self.mech.react.modif)
-#                 # CxHyOz sub-mechanisms (H2 submech is considered as a C0 submech)
-#                 for n_C in range(len(optim_param.opt_subm_C)):
-#                     if optim_param.opt_subm_C[n_C]==False:
-#                         for r in range(len(self.mech.react.equation)):
-#                             if self.mech.react.subm_C[r] == n_C \
-#                             and not self.mech.react.subm_CO[r]  \
-#                             and self.mech.react.subm_N[r]  == 0 \
-#                             and self.mech.react.subm_S[r]  == 0 \
-#                             and self.mech.react.subm_Si[r] == 0 :
-#                                 self.mech.react.modif[r] = False
-#                 # CO sub-mechanism
-#                 if optim_param.opt_subm_CO==False:
-#                     for r in range(len(self.mech.react.equation)):
-#                         if self.mech.react.subm_CO[r] == True:
-#                             self.mech.react.modif[r] = False
-#                 # N sub-mechanisms
-#                 for n_N_ in range(len(optim_param.opt_subm_N)-1):
-#                     n_N = n_N_ + 1
-#                     if optim_param.opt_subm_N[n_N]==False:
-#                         for r in range(len(self.mech.react.equation)):
-#                             if self.mech.react.subm_N[r] == n_N:
-#                                 self.mech.react.modif[r] = False
-#                 # S sub-mechanism
-#                 if optim_param.opt_subm_S==False:
-#                     for r in range(len(self.mech.react.equation)):
-#                         if self.mech.react.subm_S[r] == True:
-#                             self.mech.react.modif[r] = False
-#                 # Si sub-mechanism
-#                 if optim_param.opt_subm_Si==False:
-#                     for r in range(len(self.mech.react.equation)):
-#                         if self.mech.react.subm_Si[r] == True:
-#                             self.mech.react.modif[r] = False
-#             else:
-#                 self.mech.react.modif = [True]*len(self.mech.react.modif)
-#
-#         if type(optim_param.reactions2opt) is not bool:
-#             if False not in self.mech.react.modif: # if no restriction is defined, prevent the modification of not specified reactions
-#                 self.mech.react.modif = [False]*len(self.mech.react.modif)
-#             # allow the modification of specified reactions
-#             for r2mod in optim_param.reactions2opt:
-#                 for r in range(len(self.mech.react.modif)):
-#                     if r2mod == r+1:
-#                         self.mech.react.modif[r] = True
-#
-#
-#     def shift_flame_data(self,conditions_list,optim_param,ref_results_list):
-#         verbose = conditions_list[0].simul_param.verbose
-#
-#         os.chdir(conditions_list[0].main_path+'/GA')
-#
-#         if '.cti' in conditions_list[0].mech:
-#             filename = 'temp.cti'
-#             self.mech.write_new_mech(filename)
-#         else:
-#             filename = 'temp.yaml'
-#             self.mech.write_yaml_mech(filename)
-#
-#
-#         # --------------------------------------------------------------------------------
-#         # interpretation of the new mech
-#         gas = cdef.get_gas_ct(filename)
-#         # --------------------------------------------------------------------------------
-#
-#         qoi_tot = [] ; qoi_tot_pond =  [] ; pond=0
-#
-#
-#         for i in range(len(conditions_list)):
-#             conditions   = conditions_list[i]
-#             if conditions.config == 'free_flame':
-#
-#                 T_check  = conditions.error_param.T_check
-#
-#                 # Simulation conditions
-#                 ref_results = ref_results_list[i]
-#
-#                 Opt_results = comp.red_computation(ref_results.conditions, \
-#                                    gas,self.mech.spec.activ_m,self.mech.react.activ_m)
-#
-#                 end_sim     = ref_results.conditions.simul_param.end_sim
-#                 shifting    = -end_sim
-#                 original_pts_scatter = np.array(ref_results.pts_scatter)
-#                 pts_scatter = np.array(ref_results.pts_scatter)
-#                 fitness     = 0
-#                 for shif_it in range(100):
-#                     shifting    += end_sim/100
-#                     ref_results.pts_scatter            = pts_scatter+shifting
-#                     conditions.simul_param.pts_scatter = pts_scatter+shifting
-#                     errors = cdef.Errors(conditions,ref_results,Opt_results,\
-#                                      optim_param)
-#                     for sp in range(optim_param.n_tspc):
-#                         qoi_tot.append(errors.qoi_s[sp])
-#                         qoi_tot_pond.append(errors.qoi_s[sp]*optim_param.coeff_s[sp])
-#                         pond+=optim_param.coeff_s[sp]
-#                     if T_check:
-#                         qoi_tot.append(errors.qoi_T)
-#                         qoi_tot_pond.append(errors.qoi_T*optim_param.coeff_T)
-#                         pond+=optim_param.coeff_T
-#                     if conditions.error_param.error_type_fit == 'mean':
-#                          fitness_i = 1/(np.sum(qoi_tot)/pond)
-#                     elif conditions.error_param.error_type_fit == 'max':
-#                          fitness_i = 1/np.max(qoi_tot)
-#                     if fitness_i>fitness:
-#                         best_shift = shifting
-#                 ref_results.pts_scatter            = original_pts_scatter+best_shift
-#                 conditions.simul_param.pts_scatter = original_pts_scatter+best_shift
-#                 ref_results.conditions.simul_param.shift = best_shift
-#
-#         return conditions_list,ref_results_list
-#
-#     def time_step_optim(self,conditions_list,ref_results_list):
-#         mp = conditions_list[0].main_path
-#         verbose = conditions_list[0].simul_param.verbose
-#
-#         print_('time step optimization',mp)
-#         os.chdir(conditions_list[0].main_path+'/GA')
-#         if '.cti' in conditions_list[0].mech:
-#             filename = 'temp.cti'
-#             self.mech.write_new_mech(filename)
-#         else:
-#             filename = 'temp.yaml'
-#             self.mech.write_yaml_mech(filename)
-#
-#         # --------------------------------------------------------------------------------
-#         # interpretation of the new mech
-#
-#         for i in range(len(conditions_list)):
-#             conditions   = conditions_list[i]
-#             conditions.composition.gas = cdef.get_gas_ct(filename)
-#             if 'reactor' in conditions.config:
-#                 opt_results, conditions = comp.ref_computation(conditions)
-#                 ref_results = comp.red_computation(conditions,
-#                             conditions.composition.gas_ref,
-#                             self.mech.spec.activ_m,self.mech.react.activ_m)
-#                 ref_results_list[i] = ref_results
-#                 conditions_list[i]  = conditions
-#         # --------------------------------------------------------------------------------
-#
-#         return conditions_list, ref_results_list
-#
-#
-#     def randomize_kin(self,optim_param):
-#
-#         for r in range(len(self.mech.react.type)):
-#             try_r = 0 ; valid = False ; damping = 0.75 ; max_try = 10
-#             while not valid and try_r < max_try:
-#                 var_range = 1-(try_r/max_try)
-#                 if self.mech.react.modif[r]:
-#                     uncert_r = [u/100 for u in self.mech.react.uncert[r]]
-#                     if self.mech.react.type[r] == "three_body_reaction"\
-#                     or self.mech.react.type[r] == "reaction":
-#                         for k in range(len(self.mech.react.kin[r])):
-#                             self.mech.react.kin[r][k]=self.mech.react.ref_kin[r][k]\
-#                             +self.mech.react.ref_kin[r][k]*random.uniform(-var_range,var_range)*uncert_r[k]*(damping**try_r)
-#
-#                     elif self.mech.react.type[r] == "falloff_reaction"\
-#                     or self.mech.react.type[r] == "pdep_arrhenius"\
-#                     or self.mech.react.type[r] == "chemically_activated_reaction"\
-#                     or self.mech.react.type[r] == "chebyshev":
-#                         for k1 in range(len(self.mech.react.kin[r])):
-#                             for k2 in range(len(self.mech.react.kin[r][k1])):
-#                                 self.mech.react.kin[r][k1][k2]=self.mech.react.ref_kin[r][k1][k2]\
-#                                 +self.mech.react.ref_kin[r][k1][k2]*random.uniform(-var_range,var_range)*uncert_r[k2]*(damping**try_r)
-#
-#                     valid = ot.check_k(self.mech.react,r)
-#                 else:
-#                     valid = True
-#
-#                 try_r +=1
-#
-#             if not valid:
-#                 self.mech.react.kin[r] = copy.deepcopy(self.mech.react.ref_kin[r])
-#
-#
-#
-#
-#
-#     def fitness_eval(self,conditions_list,optim_param,ref_results_list,n_par=0,ref_ind=False):
-#
-#         verbose = conditions_list[0].simul_param.verbose
-#         mp = conditions_list[0].main_path
-#         os.chdir(conditions_list[0].main_path+'/GA')
-#
-#         filename = 'temp_'+str(n_par)
-#         # if self.mech.keep4opt == True:
-#         #     filename = 'keep_' + filename
-#         if '.cti' in conditions_list[0].mech:
-#             filename += '.cti'
-#             self.mech.write_new_mech(filename)
-#         else:
-#             filename += '.yaml'
-#             self.mech.write_yaml_mech(filename)
-#
-#
-#         # --------------------------------------------------------------------------------
-#         # interpretation of the new mech
-#
-#         # suppress console output during the interpretation
-#         # if verbose<9:
-#         #     old_stdout = sys.stdout ; old_stderr = sys.stderr
-#         #     with open(os.devnull, "w") as devnull: sys.stdout = devnull ; sys.stderr = devnull
-#
-#         gas = cdef.get_gas_ct(filename)
-#
-#         #restore console output
-#         # if verbose<9: sys.stdout = old_stdout ; sys.stderr = old_stderr
-#         # --------------------------------------------------------------------------------
-#
-#         txt_f='\n'
-#         qoi_tot = [] ; pond=0 ; qoi_tot_mean=0
-#         for i in range(len(conditions_list)):
-#
-#             # -------------------------------
-#             # Reduction loop
-#
-#             T_check  = conditions_list[i].error_param.T_check
-#             Sl_check = conditions_list[i].error_param.Sl_check
-#             ig_check = conditions_list[i].error_param.ig_check
-#             K_check  = conditions_list[i].error_param.K_check
-#
-#
-#             # Simulation conditions
-#             conditions                      = conditions_list[i]
-#             conditions.simul_param.par_ind  = str(n_par)
-#             ref_results                     = ref_results_list[i]
-#
-#             cur_path = os.getcwd()
-#             Opt_results = comp.red_computation(conditions,gas, \
-#                                self.mech.spec.activ_m,self.mech.react.activ_m)
-#             os.chdir(cur_path)
-#
-#             # ####### DEV
-#             # if ref_ind:
-#             #     ref_results.opt_refind_T            = copy.deepcopy(Opt_results.T)
-#             #     ref_results.opt_refind_conc         = copy.deepcopy(Opt_results.conc)
-#             #     ref_results.opt_refind_X            = copy.deepcopy(Opt_results.X)
-#             #     ref_results.opt_refind_ign_time_hr  = copy.deepcopy(Opt_results.ign_time_hr)
-#             #     ref_results.opt_refind_ign_time_sp  = copy.deepcopy(Opt_results.ign_time_sp)
-#             #     ref_results.opt_refind_ign_time     = copy.deepcopy(Opt_results.ign_time)
-#             #     ref_results.opt_refind_Sl           = copy.deepcopy(Opt_results.Sl)
-#             #     ref_results.opt_refind_K_ext        = copy.deepcopy(Opt_results.K_ext)
-#
-#             errors = cdef.Errors(conditions,ref_results,Opt_results,\
-#                                  optim_param)
-#
-#             # Condition fitness weighting
-#             if optim_param.coeff_cond:  coeff_cond = optim_param.coeff_cond[i]
-#             else:                       coeff_cond = 1
-#
-#             qoi_case, pond_case = 0,0
-#             cc = conditions.config
-#             for sp in range(optim_param.n_tspc):
-#                 if errors.qoi_s[sp]:
-#                     pond_i = optim_param.coeff_s[sp]*coeff_cond
-#                     txt_f+='Fit ' + cc + '  sp - ' + optim_param.tspc[sp] + ' : ' + "%.3f" %(1-errors.qoi_s[sp]) + '  pond = ' + "%.1f" %pond_i + '\n'
-#                     qoi_tot_mean += (1-errors.qoi_s[sp])*pond_i
-#                     qoi_case     += (1-errors.qoi_s[sp])*pond_i
-#                     qoi_tot.append((1-errors.qoi_s[sp])*min(1,np.ceil(pond_i)))
-#                     pond+=pond_i ; pond_case+=pond_i
-#             if 'JSR' not in conditions.config and T_check  and errors.qoi_T:
-#                 pond_i = optim_param.coeff_T*coeff_cond
-#                 txt_f+='Fit ' + cc + ' - T: ' + "%.3f" %(1-errors.qoi_T) + '  pond = ' + "%.1f" %pond_i + '\n'
-#                 qoi_tot_mean += (1-errors.qoi_T)*pond_i
-#                 qoi_case     += (1-errors.qoi_T)*pond_i
-#                 qoi_tot.append((1-errors.qoi_T)*min(1,np.ceil(pond_i)))
-#                 pond+=pond_i ; pond_case+=pond_i
-#             if 'reactor' in conditions.config and ig_check and errors.qoi_ig:
-#                 pond_i = optim_param.coeff_ig*coeff_cond
-#                 txt_f+='Fit reactor - igt: ' + "%.3f" %(1-errors.qoi_ig) + '  pond = ' + "%.1f" %pond_i + '\n'
-#                 qoi_tot_mean += (1-errors.qoi_ig)*pond_i
-#                 qoi_case     += (1-errors.qoi_ig)*pond_i
-#                 qoi_tot.append((1-errors.qoi_ig)*min(1,np.ceil(pond_i)))
-#                 pond+=pond_i ; pond_case+=pond_i
-#             if 'free_flame' in conditions.config and Sl_check and errors.qoi_Sl:
-#                 pond_i = optim_param.coeff_Sl*coeff_cond
-#                 txt_f+='Fit free_flame - Sl: ' + "%.3f" %(1-errors.qoi_Sl) + '  pond = ' + "%.1f" %pond_i + '\n'
-#                 qoi_tot_mean += (1-errors.qoi_Sl)*pond_i
-#                 qoi_case     += (1-errors.qoi_Sl)*pond_i
-#                 qoi_tot.append((1-errors.qoi_Sl)*min(1,np.ceil(pond_i)))
-#                 pond+=pond_i ; pond_case+=pond_i
-#             if ('diff_flame' in conditions.config or 'pp_flame' in conditions.config) and K_check and errors.qoi_K:
-#                 pond_i = optim_param.coeff_K*coeff_cond
-#                 txt_f+='Fit diff_flame - K: ' + "%.3f" %(1-errors.qoi_K) + '  pond = ' + "%.1f" %pond_i + '\n'
-#                 qoi_tot_mean += (1-errors.qoi_K)*pond_i
-#                 qoi_case     += (1-errors.qoi_K)*pond_i
-#                 qoi_tot.append((1-errors.qoi_K)*min(1,np.ceil(pond_i)))
-#                 pond+=pond_i ; pond_case+=pond_i
-#
-#             # detailed informations on initial fitness (for each case)
-# #            print_detailed_fit = True
-# #            if print_detailed_fit:
-# #                fit_i =  1/(qoi_case/pond_case)
-# #                txt_fit = 'Fitness condition ' + str(i+1) + ': ' + str(fit_i) \
-# #                          + '   pond: ' + str(pond_case)
-# #                print_(txt_fit, mp)
-#         if verbose>=5:
-#              print_(txt_f,mp)
-#
-#         if 'no data' in qoi_tot:  qoi_tot.remove('no data')
-#         if conditions.error_param.error_type_fit == 'mean':
-# #             self.fitness = 1/(np.sum(qoi_tot)/pond)
-#              # fitness = 1/(qoi_tot_mean/pond)
-#              fitness = qoi_tot_mean/pond
-#              if verbose>=5:
-#                   print_('Fitness of the individual= ' + '%.3f' %fitness,mp)
-#         elif conditions.error_param.error_type_fit == 'max':
-#              fitness = 1-np.max(qoi_tot)
-#
-#         # check nan
-#         if fitness != fitness:
-#             fitness = 0
-#
-#         return max(fitness,0)
-#
-#     def export_data(self,conditions_list,optim_param,ref_results_list,filename='temp.cti'):
-#         verbose = conditions_list[0].simul_param.verbose
-#
-#         errors_list=[] ; Opt_results_list = []
-#
-#         qoi_tot = [] ; pond=0
-#
-#         os.chdir(conditions_list[0].main_path+'/GA')
-#         if '.cti' in conditions_list[0].mech:
-#             self.mech.write_new_mech(filename)
-#         else:
-#             if '.cti' in filename:
-#                 filename = filename[:-4] + '.yaml'
-#             self.mech.write_yaml_mech(filename)
-#
-#         # --------------------------------------------------------------------------------
-#         # interpretation of the new mech
-#
-#         ct.suppress_thermo_warnings()
-#         warnings.filterwarnings("ignore", category=DeprecationWarning)
-#         gas = cdef.get_gas_ct(filename)
-#
-#         # --------------------------------------------------------------------------------
-#
-#
-#         for i in range(len(conditions_list)):
-#
-#             # -------------------------------
-#             # Reduction loop
-#
-#             # Simulation condition
-#             conditions   = conditions_list[i]
-#             ref_results = ref_results_list[i]
-#             os.chdir(conditions_list[0].main_path+'/GA')
-#             if '.cti' in filename:
-#                 self.mech.write_new_mech(filename)
-#             else:
-#                 self.mech.write_yaml_mech(filename)
-#
-#             T_check  = conditions_list[i].error_param.T_check
-#             Sl_check = conditions_list[i].error_param.Sl_check
-#             ig_check = conditions_list[i].error_param.ig_check
-#             K_check  = conditions_list[i].error_param.K_check
-#
-#             Opt_results_list.append(comp.red_computation(conditions, \
-#                        gas,self.mech.spec.activ_m,self.mech.react.activ_m))
-#             os.chdir(conditions_list[0].main_path+'/GA')
-#             errors_list.append(cdef.Errors(conditions,ref_results,\
-#                                          Opt_results_list[-1],optim_param))
-#             for sp in range(optim_param.n_tspc):
-#                 if errors_list[-1].qoi_s[sp]:
-#                     qoi_tot.append(errors_list[-1].qoi_s[sp])
-#                     pond+=optim_param.coeff_s[sp]
-#             if 'JSR' not in conditions.config and T_check  and errors_list[-1].qoi_T:
-#                 qoi_tot.append(errors_list[-1].qoi_T)
-#                 pond+=optim_param.coeff_T
-#             if 'reactor' in conditions.config and ig_check and errors_list[-1].qoi_ig:
-#                 qoi_tot.append(errors_list[-1].qoi_ig)
-#                 pond+=optim_param.coeff_ig
-#             if 'free_flame' in conditions.config and Sl_check and errors_list[-1].qoi_Sl:
-#                 qoi_tot.append(errors_list[-1].qoi_Sl)
-#                 pond+=optim_param.coeff_Sl
-#             if ('diff_flame' in conditions.config or 'pp_flame' in conditions.config) and K_check and errors_list[-1].qoi_K:
-#                 qoi_tot.append(errors_list[-1].qoi_K)
-#                 pond+=optim_param.coeff_K
-#
-#         if 'no data' in qoi_tot:  qoi_tot.remove('no data')
-#         if conditions.error_param.error_type_fit == 'mean':
-#              self.fitness = 1/np.mean(qoi_tot)
-#         elif conditions.error_param.error_type_fit == 'max':
-#              self.fitness = 1/np.max(qoi_tot)
-#
-#         return Opt_results_list, errors_list, self.fitness
-
 
 class Population:
     def __init__(self,conditions_list,mech_data,red_data_list,ref_results_list,size_pop):
@@ -879,16 +232,9 @@ class Population:
                                    ref_results_list,red_data_list,'GA',rand_kin))
 
 
-#        optim_from_values = False
-#        if optim_from_values:
-#            for ind in range(size_pop):
-#                self.get_values(red_data_list[0].optim_param,ind)
-
 
     def __getitem__(self, i):
         return self.individual[i]
-
-
 
 
 
@@ -898,6 +244,8 @@ class Population:
 
         mp      = optim_param.main_path
         MaxIt   = optim_param.n_gen
+        if gen>0:
+            mean_cv_1st_gen = optim_param.mean_cv_1st_gen
 
         # calculation of the fitness stats
         fitness_list = []
@@ -907,12 +255,41 @@ class Population:
 
         fitness_list = np.array((fitness_list))
 
-        if gen < .9*MaxIt and std_fit<(.05*best_fitness):
-            print_('Early convergence detected, create new random individuals',mp)
-            self.sort_fitness()
-
-            for p_i in range(round(len(self.individual)/2)):
-                 self.individual[p_i].randomize_kin(optim_param)
+        # Calculate the mean coefficients of variation for the kinetic parameters
+        # a) construct the list of kinetic coeffs
+        kinmech = []
+        for p in range(len(self.individual)):
+            kinmech.append([])
+            # add every kin coeff in one flat list
+            for _r in range(len(self.individual[p].mech.react.kin)):
+                if self.individual[p].mech.react.modif[_r]:
+                    kin_r = self.individual[p].mech.react.kin[_r]
+                    if kin_r and isinstance(kin_r[0], list):
+                        kinmech[-1].extend([x for sublist in kin_r for x in sublist])
+                    else:
+                        kinmech[-1].extend(kin_r.copy())
+        
+        
+        # b) std/mean (if mean(kin=0) -> std/mean=0)
+        std_d_mean = np.divide(
+                np.std(kinmech, axis=0),
+                np.mean(kinmech, axis=0),
+                out=np.zeros_like(np.mean(kinmech, axis=0)),
+                where=np.mean(kinmech, axis=0) != 0
+                )
+        
+        # c) mean coefficient of variation
+        mean_cv = np.mean(std_d_mean)
+        if gen==0:
+            optim_param.mean_cv_1st_gen = mean_cv
+        
+        if gen>0:
+            if gen < .9*MaxIt and mean_cv<(0.1*mean_cv_1st_gen):#std_fit<(.05*best_fitness):
+                print_('Early convergence detected, create new random individuals',mp)
+                self.sort_fitness()
+    
+                for p_i in range(round(len(self.individual)/2)):
+                     self.individual[p_i].randomize_kin(optim_param)
 
 
 

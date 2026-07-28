@@ -24,7 +24,7 @@
 #==============================================================================
 global version
 
-version = '2.0.0'
+version = '1.9.3'
 __version__ = version
 
 #==============================================================================
@@ -239,7 +239,7 @@ def select_wd():
     try:    os.chdir(pers_config_path)
     except: os.chdir(os.path.expanduser(pers_config_path))
     
-    genf.select_wd_pg(pers_config_path)
+    WD_path = genf.select_wd_pg(pers_config_path)
     
 
 def select_wd_gui(WD_path_gui=True):

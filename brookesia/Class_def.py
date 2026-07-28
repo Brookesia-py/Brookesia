@@ -408,7 +408,10 @@ class Errors:
         n_points          = len(pts_scatter)
         QoI = []
 
-        if error_calculation =="points":
+
+        error_calculation ="Kotlarczik"
+        # print_('error_calculation: '+error_calculation,mp)
+        if error_calculation =="points" or error_calculation =="Kotlarczik":
 
             for k in range(n_tspc):
 
@@ -420,34 +423,54 @@ class Errors:
                 for i in range(n_points):
                     data1[i] = conc_ref[i][index]
                     data2[i] = conc_red[i][index]
-                    #data_ori[i] = conc_ori[i][index]
-                if sum(data1)>0:      # absence of data if experimental optimization
+                    
+                    
+                if error_calculation =="Kotlarczik":
+                    # integrated area comparison with log and min max scaling 
+                    # Kotlazczik et al. Combustion and Flame 2026
+
+                    # => log transformation
+                    data1_log = np.log10(np.abs([max([_i,1e-8]) for _i in data1]))
+                    data2_log = np.log10(np.abs([max([_i,1e-8]) for _i in data2]))
+                    
+                    # => Min-max normalization
+                    Y_min_log = np.max([np.min([np.min(data1_log), np.min(data2_log)]),-8])
+                    Y_max_log = np.max([np.max(data1_log), np.max(data2_log),-7.99])
+                    
+                    Y_ref = (data1_log-Y_min_log)/(Y_max_log-Y_min_log)
+                    Y_red = (data2_log-Y_min_log)/(Y_max_log-Y_min_log)
+                else:
+                    Y_ref = data1
+                    Y_red = data2
+                    
+                    
+                if sum(Y_ref)>0:      # absence of data if experimental optimization
                     sumDiff, sumDiff_ori = 0, 0
                     if error_type == "all":
                         sumDiff = []
                         for j in range(len(pts_scatter)):
-                            sumDiff.append(abs(data1[j] - data2[j])/np.amax(data1))
+                            sumDiff.append(abs(Y_ref[j] - Y_red[j])/np.amax(Y_ref))
                     elif error_type == "mean":
                         sumdata_ref,sumdata_red=0,0
                         for j in range(len(pts_scatter)):
                             if j==0:
-                                sumDiff     += abs(data1[j] - data2[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
-                                sumdata_ref += abs(data1[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
-                                sumdata_red += abs(data2[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
-                                # sumDiff_ori += abs(data1[j] - data_ori[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
+                                sumDiff     += abs(Y_ref[j] - Y_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
+                                sumdata_ref += abs(Y_ref[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
+                                sumdata_red += abs(Y_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
+                                # sumDiff_ori += abs(Y_ref[j] - data_ori[j])*.5*(pts_scatter[j+1]-pts_scatter[j])
                             elif j==(len(pts_scatter)-1):
-                                sumDiff     += abs(data1[j] - data2[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
-                                sumdata_ref += abs(data1[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
-                                sumdata_red += abs(data2[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
-                                # sumDiff_ori += abs(data1[j] - data_ori[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
+                                sumDiff     += abs(Y_ref[j] - Y_red[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
+                                sumdata_ref += abs(Y_ref[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
+                                sumdata_red += abs(Y_red[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
+                                # sumDiff_ori += abs(Y_ref[j] - data_ori[j])*.5*(pts_scatter[j]-pts_scatter[j-1])
                             else:
-                                sumDiff     += abs(data1[j] - data2[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
-                                sumdata_ref += abs(data1[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
-                                sumdata_red += abs(data2[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
-                                # sumDiff_ori += abs(data1[j] - data_ori[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
+                                sumDiff     += abs(Y_ref[j] - Y_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
+                                sumdata_ref += abs(Y_ref[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
+                                sumdata_red += abs(Y_red[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
+                                # sumDiff_ori += abs(Y_ref[j] - data_ori[j])*.5*(pts_scatter[j+1]-pts_scatter[j-1])
                         sumDiff=(sumDiff)/max(sumdata_ref,sumdata_red)
                     elif error_type == "max":
-                        diff = abs(np.array([data1]) - np.array([data2]))/max(max(np.array([data1])),max(np.array([data2])))
+                        diff = abs(np.array([Y_ref]) - np.array([Y_red]))/max(max(np.array([Y_ref])),max(np.array([Y_red])))
                         sumDiff = np.amax(diff)
                     QoI.append(sumDiff)
                 else:
@@ -1595,7 +1618,12 @@ class Mech_data:
             elif "elements:" in txt[l]:
                 self.gas_prop['elements'] = txt[l].split('elements: ')[1]
             elif "species:" in txt[l]:
-                self.gas_prop['species'] = txt[l].split('species: ')[1]
+                # if self.gas_prop['species'] == False:
+                self.gas_prop['species'] = []
+                self.gas_prop['species']+= [sp.strip() for sp in re.findall(r"'[^']*'|[^,\s\[\]]+", txt[l].split('species:')[1])]
+                while ']' not in txt[l]:
+                    l+=1
+                    self.gas_prop['species']+= [sp.strip() for sp in re.findall(r"'[^']*'|[^,\s\[\]]+", txt[l])]
             elif "kinetics:" in txt[l]:
                 self.gas_prop['kinetics'] = txt[l].split('kinetics: ')[1].replace('\n','')
             elif "reactions:" in txt[l]:
@@ -1782,7 +1810,10 @@ class Mech_data:
 
         while l != (len(txt)):
             if "equation:" in txt[l]:
-                self.react.number.append(int(txt[l].split('# Reaction ')[1]))
+                lp1 = l+1
+                while ':' not in txt[lp1]:
+                    lp1+=1
+                self.react.number.append(int(txt[lp1-1].split('# Reaction ')[1]))                
                 self.react.type.append('reaction')
                 self.react.opt.append({"duplicate":False, "negative-A":False, \
                                       "orders":False, "negative-orders":False})
@@ -2684,6 +2715,12 @@ class Mech_data:
         now    = datetime.datetime.now()
         date   = now.strftime("y:%Y m:%m d:%d,  %H:%M")
 
+
+# generator: ck2yaml
+# input-files: [chem.inp, therm.dat, tran.dat]
+# cantera-version: 2.6.0a4
+# date: Wed, 08 Jul 2026 16:17:43 +0200
+
         fd.write("#-------------------------------------------------------------------------------\n")
         if version is not False:
             fd.write("# Kinetic mechanism converted by Brookesia "+version+"\n")
@@ -2715,11 +2752,17 @@ class Mech_data:
         i=0 ; txt_spec = ""
         for sp in sp_list:
             if i<8 :
-                txt_spec+=self.spec.name[sp]+", "
+                if ',' in self.spec.name[sp]: 
+                    txt_spec+= "'"+self.spec.name[sp]+"', "
+                else:
+                    txt_spec+=self.spec.name[sp]+", "
                 i+=1
             else:
                 txt_spec+="\n"
-                txt_spec+="    "+self.spec.name[sp]+", "
+                if ',' in self.spec.name[sp]:
+                    txt_spec+="    '"+self.spec.name[sp]+"', "
+                else:
+                    txt_spec+="    "+self.spec.name[sp]+", "
                 i=1
 
         #transport
@@ -2742,53 +2785,6 @@ class Mech_data:
                  +       "\n    P: 101325\n\n")
 
 
-
-#         # Gas characteristics writing
-#         while "elements" not in self.gas_prop[l]:
-#             fd.write(self.gas_prop[l])
-#             l+=1
-
-#         #elements
-#         txt_elements = self.gas_prop[l].split('[')[0]+'['
-#         elements = ["C","H","O","N","AR","HE","Ar","He", "c", "h", "o", "n", "ar", "he"]
-#         for el in elements:
-#             if self.find_element(el,act_sp):
-# #                if el == "AR":
-# #                    txt_elements += "Ar" + " "
-# #                elif el == "HE":
-# #                    txt_elements += "He" + " "
-# #                else:
-#                 txt_elements += el.capitalize() + " "
-#         txt_elements += ']\n'
-#         fd.write(txt_elements)
-
-#         #species
-#         txt_spec = '  species: ['
-#         i=0
-#         for sp in sp_list:
-#             if i<10 :
-#                 txt_spec+=self.spec.name[sp]+", "
-#                 i+=1
-#             else:
-#                 fd.write(txt_spec+"\n")
-#                 txt_spec="    "+self.spec.name[sp]+", "
-#                 i=1
-#         txt_spec[:-2]+=']\n'
-#         fd.write(txt_spec)
-
-#         while "reactions" not in self.gas_prop[l]:
-#             l+=1
-
-#         while self.gas_prop[l]!="\n":
-#             fd.write(self.gas_prop[l])
-#             l+=1
-
-#         fd.write("\n")
-
-
-#-------------------------------------------------------------------------------
-# Species data
-#-------------------------------------------------------------------------------
 
 
 # =============================================================================
@@ -2851,7 +2847,7 @@ class Mech_data:
                 else:
                     l_thermo += str('%0.8e' %T) + ", "
             if self.spec.note_therm[sp] is not False:
-                l_thermo += "  note: " + self.spec.note_therm[sp]
+                l_thermo += "  note: " + self.spec.note_therm[sp] + "\n"
 
             # transport
             if self.spec.trans_model[sp] is not False:
@@ -2870,7 +2866,7 @@ class Mech_data:
                 if self.spec.trans_rot_relax[sp] is not False:
                     l_trans += "    rotational-relaxation: " + self.spec.trans_rot_relax[sp] + "\n"
                 if self.spec.note_trans[sp]      is not False:
-                    l_trans += "  note: "                    + self.spec.note_trans[sp]
+                    l_trans += "  note: "                    + self.spec.note_trans[sp]  + "\n"
             else:
                 l_trans = ""
 

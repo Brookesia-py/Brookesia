@@ -215,13 +215,13 @@ class Population:
         cognitive_accel = cognitive_accel_i + ((cognitive_accel_end - cognitive_accel_i)*n_it)/MaxIt
         social_accel    = social_accel_i    + ((social_accel_end      - social_accel_i)   *n_it)/MaxIt
 
-        if 'PSO_4' in mp:
-            phi     = cognitive_accel + social_accel
-            kappa   = 1
-            chi     = 2*kappa/np.abs(2-phi-np.sqrt(phi**2 - 4*phi))
-            inertia_max     = chi
-            cognitive_accel = chi * cognitive_accel
-            social_accel    = chi * social_accel
+        # if 'PSO_4' in mp:
+        #     phi     = cognitive_accel + social_accel
+        #     kappa   = 1
+        #     chi     = 2*kappa/np.abs(2-phi-np.sqrt(phi**2 - 4*phi))
+        #     inertia_max     = chi
+        #     cognitive_accel = chi * cognitive_accel
+        #     social_accel    = chi * social_accel
 
         #Score calculation :
         # identification of the worst and the best fitness
@@ -237,10 +237,51 @@ class Population:
                 best_fitness = self.individual[p_i].fitness
                 best_ind = copy.deepcopy(self.individual[p_i])
 
-        if n_it < .9*MaxIt and np.std(fitness_list)<(.05*best_fitness):
-            print_('Early convergence detected, inertia increased (factor +/- 5)',mp)
+        # Calculate the mean coefficients of variation for the kinetic parameters
+        # a) construct the list of kinetic coeffs
+        kinmech = []
+        for p in range(len(self.individual)):
+            kinmech.append([])
+            # add every kin coeff in one flat list
+            for _r in range(len(self.individual[p].mech.react.kin)):
+                if self.individual[p].mech.react.modif[_r]:
+                    kin_r = self.individual[p].mech.react.kin[_r]
+                    if kin_r and isinstance(kin_r[0], list):
+                        kinmech[-1].extend([x for sublist in kin_r for x in sublist])
+                    else:
+                        kinmech[-1].extend(kin_r.copy())
+        
+        # b) std/mean (if mean(kin=0) -> std/mean=0)
+        std_d_mean = np.divide(
+                np.std(kinmech, axis=0),
+                np.mean(kinmech, axis=0),
+                out=np.zeros_like(np.mean(kinmech, axis=0)),
+                where=np.mean(kinmech, axis=0) != 0
+                )            
+        
+        # c) mean coefficient of variation        
+        mean_cv = np.mean(std_d_mean)
+        if n_it==0:
+            optim_param.mean_cv_1st_gen = mean_cv
 
-        fitness_list = np.array((fitness_list))
+        
+        if n_it>0:
+            if n_it < .9*MaxIt and mean_cv<(0.1*mean_cv_1st_gen):#std_fit<(.05*best_fitness):
+                print_('Early convergence detected, inertia increased (factor +/- 5)',mp)
+            
+            
+        # if gen < .9*MaxIt and mean_cv<0.05:#std_fit<(.05*best_fitness):
+        #     print_('Early convergence detected, create new random individuals',mp)
+        #     self.sort_fitness()
+
+        #     for p_i in range(round(len(self.individual)/2)):
+        #          self.individual[p_i].randomize_kin(optim_param)
+
+
+
+
+
+        # fitness_list = np.array((fitness_list))
 
 
         for p_i in range(len(self.individual)):
@@ -253,7 +294,8 @@ class Population:
             else:
                 inertia = inertia_max
 
-            if n_it < .9*MaxIt and np.std(fitness_list)<(.05*best_fitness):
+            if n_it < .9*MaxIt and mean_cv<(0.1*mean_cv_1st_gen):#std_fit<(.05*best_fitness):
+            # if n_it < .9*MaxIt and mean_cv<0.05:
                 inertia = inertia* 10 * (-1)**(np.round(random.random()))
 
 

@@ -108,7 +108,7 @@ def check_k(_react,_r):
             At = np.float32(_react.param[_r]['A'])
             T3t = np.float32(_react.param[_r]['T3'])
             T1t = np.float32(_react.param[_r]['T1'])
-            T2t = np.float32(_react.param[_r]['T2'])
+            T2t = np.float64(_react.param[_r]['T2'])
         except:
             Troe_func = False
         # calculation of k

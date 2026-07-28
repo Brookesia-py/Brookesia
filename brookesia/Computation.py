@@ -109,8 +109,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         prune_ff = conditions.simul_param.prune_ff
 
 
-
-
         simul_success = False
         # -------- flame computation
         if conditions.simul_param.restore_flame:
@@ -864,8 +862,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
 
 
-
-
     elif 'reactor' in conditions.config or 'PFR' in conditions.config:
 
         # import the gas model and set the initial conditions
@@ -930,7 +926,6 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 z1[n1] = z1[n1 - 1] + u1[n1] * dt
                 P.append(r1.thermo.P)
                 T.append(r1.T)
-
 
                 if act_sp:
                     conc_n = []; sa_i = 0
@@ -1188,7 +1183,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             elif conditions.config == 'reactor_HP' or conditions.config == 'PFR':
                 reactor = ct.IdealGasConstPressureReactor(gas)
             sim = ct.ReactorNet([reactor])
-            time_r,temp = [0],[gas.T]
+            time_r,temp,z1_bis = [0],[gas.T],[0]
             while sim.time < timeVec[-1]:
                 sim.step()
                 time_r.append(sim.time)
@@ -1202,25 +1197,29 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                         print_("Warning: heat release calculation issues",mp)
                         print_("   Ignition delay time calculated according to the maximum fuel concentration gradient",mp)
                         hr="no_heat_release"
+                # if 'PFR' in conditions.config:
+                #     u1[n] = mass_flow_rate1 / area / reactor.thermo.density
+                #     dt = time_r[-1]-time_r[-2]
+                #     z1_bis[n].append(z1_bis[n - 1] + u1[n] * dt)
+
 
             # 1- based on heat release (default)
             if hr!= "no_heat_release":
                 ign_time_hr = time_r[heat_release.index(max(heat_release))]
             else: ign_time_hr=False
-               # 2- based on fuel gradients (if heat relase calculation issues)
+            # 2- based on fuel gradients (if heat relase calculation issues)
             for t in range(len(time_r)-3):
                 grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
             ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
-            if 'PFR' in conditions.config:
-                ign_dist_sp = z1[grad_fuel.index(max(grad_fuel))+2]
-
-
-            time2 = timer.time()
             if verbose>3:
-                if 'PFR' in conditions.config:
-                    print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
-                else:
-                    print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'us',mp)
+                print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'us',mp)
+
+            
+            # if 'PFR' in conditions.config and verbose>3:
+            #     ign_dist_sp = z1[grad_fuel.index(max(grad_fuel))+2]
+            #
+            #     if 'PFR' in conditions.config:
+            #         print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(timeVec), list(T), \
@@ -2138,7 +2137,6 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                                          K=pressureValveCoefficient)
             reactorNetwork     = ct.ReactorNet([stirredReactor])
 
-            # supress console output during the simulation
             # supress console output during the simulation
             if verbose<9: 
                 with open(path_lm, 'w') as fnull:  

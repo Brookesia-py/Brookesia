@@ -1,6 +1,12 @@
+[1.9.1.3]
+Changed
+- GA and PSO: Early convergence detection now based on the mean coefficient of variation of the kinetic parameters, relative to that of the initial population.
+- "hybrid_TSA" option: add two extra steps to the original DRG (or SA) algorithm to combine it with concentration ranking reduction (CRR)
+
+
 [1.9.1.2]
 Added:
-- Reduciton iteration now can go species-by-species when the error threshold is exceeded (default option)
+- "1 by 1 addition": Reduction iteration now can go species-by-species when the error threshold is exceeded (default option)
 
 Fixed 
 - sensitivity analysis (SA) on the reduced mechanism when mech_prev_red is used

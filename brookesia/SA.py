@@ -33,7 +33,7 @@ import time as timer
 
 
 
-def sensitivities_computation_SA(red_data, mech_data,red_results):
+def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False):
 
     conditions = red_results.conditions
     mp = conditions.main_path
@@ -53,13 +53,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
     gas_red = red_results.gas
 
     X_red = conditions.composition.X
-    gas_red.TPX = conditions.state_var.T, conditions.state_var.P,X_red
+    gas_red.TPX = conditions.state_var.T, conditions.state_var.P, X_red
 
     pts_scatter = red_results.pts_scatter
     n_points = len(pts_scatter)
     n_points_SA = int(red_data.red_op.n_points)
 
-    if int(ct.__version__[0])>2:
+    if int(ct.__version__[0]) > 2:
         nu_f = gas_ref.reactant_stoich_coeffs
         nu_r = gas_ref.product_stoich_coeffs
     else:
@@ -69,25 +69,26 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
     # Sensitivity coeff matrix
     if 'SARGEP' in red_data.reduction_operator:
-	    S_react        = np.zeros((n_sp_ref,n_r_ref))
-	    S_react_x      = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
-	    S_react_x_2w   = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
-	    norm_S_react_x = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
-	    S_AB_tsp       = np.zeros((n_sp_ref,n_sp_ref))
-	    S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
-	    S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_sp_ref,n_sp_ref))
-	    sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
-	    norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
+        S_react        = np.zeros((n_sp_ref,n_r_ref))
+        S_react_x      = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
+        S_react_x_2w   = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
+        norm_S_react_x = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
+        S_AB_tsp       = np.zeros((n_sp_ref,n_sp_ref))
+        S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
+        S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_sp_ref,n_sp_ref))
+        sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
+        norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
     else:
-	    S_react        = np.zeros((n_tsp,n_r_ref))
-	    S_react_x      = np.zeros((n_points_SA,n_tsp,n_r_ref))
-	    S_react_x_2w   = np.zeros((n_points_SA,n_tsp,n_r_ref))
-	    norm_S_react_x = np.zeros((n_points_SA,n_tsp,n_r_ref))
-	    S_AB_tsp       = np.zeros((n_tsp,n_sp_ref))
-	    S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
-	    S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_tsp,n_sp_ref))
-	    sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
-	    norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
+        S_react        = np.zeros((n_tsp,n_r_ref))
+        S_react_x      = np.zeros((n_points_SA,n_tsp,n_r_ref))
+        S_react_x_2w   = np.zeros((n_points_SA,n_tsp,n_r_ref))
+        norm_S_react_x = np.zeros((n_points_SA,n_tsp,n_r_ref))
+        S_AB_tsp       = np.zeros((n_tsp,n_sp_ref))
+        S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
+        S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_tsp,n_sp_ref))
+        sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
+        norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
+    S_AB_z = np.zeros((n_points_SA, n_tsp, n_sp_ref))
     sensi_T        = np.zeros((n_r_ref))
     sensi_igt      = np.zeros(n_r_ref)
     sensi_scatter  = []
@@ -112,39 +113,18 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                 mech_data.spec.activ_p,
                 mech_data.react.activ_p)
 
-            
-            # grid_points = red_results.f.grid
-            # f = ct.FreeFlame(gas_red)
-            # f.flame.grid = grid_points
-            # ratio_ff = conditions.simul_param.ratio_ff
-            # slope_ff = conditions.simul_param.slope_ff
-            # curve_ff = conditions.simul_param.curve_ff
-            # prune_ff = conditions.simul_param.prune_ff
-            # f.set_refine_criteria(ratio=ratio_ff, slope=slope_ff, curve=curve_ff,prune=prune_ff)
-        
-            # f.max_grid_points=3000
-            # f.solve(loglevel=0,auto=True,)
-
-
-        # else:
         f = red_results.f
         T = f.T
 
         # Sensitivity calculation
 
         if 'free' in conditions.config:
-            
-            
-            
-            
-            
             if conditions.error_param.Sl_check:
                 # if verbose >=3: print_("Sl sensitivity analysis...",mp)
                 sensi_Sl = f.get_flame_speed_reaction_sensitivities()
                 red_data.red_op.sensi_Sl = sensi_Sl
 
         if red_data.red_op.sens_method == 'adjoint':
-#            try:
             time_1 = timer.time()
 
             # if verbose >=3:
@@ -158,7 +138,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                 s_{i, spec} = \frac{k_i}{[X]} \frac{d[X]}{dk_i}
                 """
                 def g(sim):
-                    if tsp!='T':
+                    if tsp != 'T':
                         return sim.X[f.gas.species_index(tsp), grid_point]
                     else:
                         return sim.T[grid_point]
@@ -185,19 +165,19 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
                 return S_react_x_zi
 
-
-            if verbose >=2 :
+            if verbose >= 2:
                 title = 'Sensitivity computation (adjoint)  '
                 bar = cdef.ProgressBar(n_points, title)
 
-            z_i=0
+            z_i = 0
             for z in range(n_points):
-                if z%int(max(n_points/red_data.red_op.n_points,1))==0    \
-                and 0.01*(max(red_results.T)-min(red_results.T)) \
-                                    <T[z]-T[0]<           \
-                0.99*(max(red_results.T)-min(red_results.T)) :            # ~ (Ti+1%)<T_pert<(Tf-1%)
+                if z % int(max(n_points/red_data.red_op.n_points,1)) == 0    \
+                    and 0.01*(max(red_results.T)-min(red_results.T)) \
+                    < T[z]-T[0] <           \
+                    0.99*(max(red_results.T)-min(red_results.T)):            # ~ (Ti+1%)<T_pert<(Tf-1%)
                     sensi_scatter.append(z)
-                    if verbose >=2: bar.update(z)
+                    if verbose >= 2:
+                        bar.update(z)
                     sensi_T_z_adj = get_species_reaction_sensitivities(f, 'T', z)
 
                     if 'SARGEP' in red_data.reduction_operator:
@@ -206,72 +186,45 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                         n_spc = len(tsp_name)
                     S_react_x_adj = [[]]*n_spc
                     for spA in range(n_spc):
-                        if mech_data.spec.activ_m[spA] :
+                        if mech_data.spec.activ_m[spA]:
                             if 'SARGEP' in red_data.reduction_operator:
-                                S_react_x_adj[spA]=get_species_reaction_sensitivities(f, gas_ref.species_name(spA), z)
+                                S_react_x_adj[spA] = get_species_reaction_sensitivities(f, gas_ref.species_name(spA), z)
                             else:
-                                S_react_x_adj[spA]=get_species_reaction_sensitivities(f, tsp_name[spA], z)
+                                S_react_x_adj[spA] = get_species_reaction_sensitivities(f, tsp_name[spA], z)
                             r_red = 0
                             for r in range(n_r_ref):
                                 if mech_data.react.activ_m[r]:
                                     sensi_T_z[z_i][r] = sensi_T_z_adj[r_red]
                                     S_react_x[z_i][spA][r] = S_react_x_adj[spA][r_red]
-                                    r_red+=1
+                                    r_red += 1
                                 if '_sp' in red_data.reduction_operator:
                                     for r in range(n_r_ref):
                                         if mech_data.react.activ_m[r]:
                                             # Inter-species sensitivity calculation:
                                             for spB in range(n_sp_ref):
-                                                if (mech_data.spec.activ_m[spB] and nu[spB,r]!=0):
+                                                if (mech_data.spec.activ_m[spB] and nu[spB,r] != 0):
                                                     # collecting sensitivities of reactions involving both species
-                                                    S_AB_tsp_z_r[z_i][r][spA,spB]=S_react_x[z_i][spA][r]
-                    z_i+=1
+                                                    S_AB_tsp_z_r[z_i][r][spA,spB] = S_react_x[z_i][spA][r]
+                    z_i += 1
 
 
-            if verbose >=2: bar.update(n_points)
+            if verbose >= 2: bar.update(n_points)
 
             time_2 = timer.time()
-            if verbose >=4 :
+            if verbose >= 4:
                 print_("\n      time for adjoint method SA computation: "+str(round(time_2-time_1))+'s',mp)
-#            except:
-#                # if problem during the adjoint method, go for the brute-force method
-#                print_('Warning: error during the sensitivity analysis with adjoint method',mp)
-#                print_('         brute force method used instead\n',mp)
-#                red_data.red_op.sens_method = 'brute_force'
-#                # reinitialisation of the sensitivity coeff matrix
-#                if 'SARGEP' in red_data.reduction_operator:
-#            	    S_react        = np.zeros((n_sp_ref,n_r_ref))
-#            	    S_react_x      = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
-#            	    norm_S_react_x = np.zeros((n_points_SA,n_sp_ref,n_r_ref))
-#            	    S_AB_tsp       = np.zeros((n_sp_ref,n_sp_ref))
-#            	    S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
-#            	    S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_sp_ref,n_sp_ref))
-#            	    sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
-#            	    norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
-#                else:
-#            	    S_react        = np.zeros((n_tsp,n_r_ref))
-#            	    S_react_x      = np.zeros((n_points_SA,n_tsp,n_r_ref))
-#            	    norm_S_react_x = np.zeros((n_points_SA,n_tsp,n_r_ref))
-#            	    S_AB_tsp       = np.zeros((n_tsp,n_sp_ref))
-#            	    S_AB_tsp_z     = np.zeros((n_points_SA,n_sp_ref))
-#            	    S_AB_tsp_z_r   = np.zeros((n_points_SA,n_r_ref,n_tsp,n_sp_ref))
-#            	    sensi_T_z      = np.zeros((n_points_SA,n_r_ref))
-#            	    norm_sensi_T_z = np.zeros((n_points_SA,n_r_ref))
-#                sensi_T        = np.zeros((n_r_ref))
-#                sensi_scatter  = []
 
-#        red_data.red_op.sens_method = 'brute_force'
         if red_data.red_op.sens_method == 'brute_force':
 
             time_1 = timer.time()
-            r_red=-1
+            r_red = -1
             title = 'Sensitivity computation (brute force) '
-            bar = cdef.ProgressBar(n_r_ref,title)
+            bar = cdef.ProgressBar(n_r_ref, title)
             cwd = os.getcwd()
             for r in range(n_r_ref):
                 if mech_data.react.activ_m[r]:
                     f.gas.set_multiplier(1) # initialisation
-                    r_red+=1
+                    r_red += 1
                     f.gas.set_multiplier(1+dk, r_red) # set the multiplier of kf for r reaction
 
 
@@ -290,7 +243,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                     else: phi = '%.2f' %conditions.composition.phi
 
                     if conditions.state_var.P>10000:
-                        fn+=conditions.composition.fuel.replace('/','').split('(')[0]\
+                        fn += conditions.composition.fuel.replace('/','').split('(')[0]\
                         +'_'+phi\
                         +'_'+'%.0f'%conditions.state_var.T+'_'+'%.2f'%(conditions.state_var.P/1e5)\
                         +'.xml'
@@ -316,11 +269,11 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 #                        sys.stdout = old_stdout ; sys.stderr = old_stderr
                     #=================================================
 
-                    z_i=0
+                    z_i = 0
                     for z in range(n_points):
-                        if z%int(max(n_points/red_data.red_op.n_points,1))==0    \
+                        if z % int(max(n_points/red_data.red_op.n_points,1)) == 0    \
                         and 0.01*(max(red_results.T)-min(red_results.T)) \
-                                                <T[z]-T[0]<           \
+                            < T[z]-T[0] <           \
                             0.99*(max(red_results.T)-min(red_results.T)) :            # ~ (Ti+1%)<T_pert<(Tf-1%)
 #                            if sensi_scatter==[]:
                             if z not in sensi_scatter:
@@ -329,9 +282,9 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 #                                sensi_scatter.append(z)
                             f.set_gas_state(z)
                             conc_red = red_results.conc[z]
-                            kf_ref  = red_results.kf[z][r]
+                            kf_ref = red_results.kf[z][r]
                             kf_pert = f.gas.forward_rate_constants[r_red]
-                            if kf_pert!=kf_ref:
+                            if kf_pert != kf_ref:
                                 conc_pert = f.gas.concentrations
                                 # Temperature sensitivity to reactions
 #                                sensi_T_z[z_i][r] = (kf_ref/red_results.T[z])\
@@ -340,20 +293,17 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
                                 # Species sensitivity to reactions
                                 for spA in range(n_sp_ref):
-                                    if mech_data.spec.activ_m[spA] :
+                                    if mech_data.spec.activ_m[spA]:
                                         if 'SARGEP' in red_data.reduction_operator:
-            		                            ired = f.gas.species_index(gas_ref.species_name(spA))
-            		                            if conc_pert[ired]>conditions.simul_param.tol_ss[1]: # tol_ss_flame[1] : atol for steady-state problem
-#            		                                S_react_x[z_i][spA][r]=kf_ref/conc_red[spA]\
-#            		                                  *((np.max([conc_pert[ired],0])-conc_red[spA])\
-#            		                                     /(kf_pert-kf_ref))
-            		                                S_react_x[z_i][spA][r]=(np.max([conc_pert[ired],0])-conc_red[spA])/(conc_red[spA]*dk)
+                                            ired = f.gas.species_index(gas_ref.species_name(spA))
+                                            if conc_pert[ired]>conditions.simul_param.tol_ss[1]: # tol_ss_flame[1] : atol for steady-state problem
+                                                S_react_x[z_i][spA][r]=(np.max([conc_pert[ired],0])-conc_red[spA])/(conc_red[spA]*dk)
 
-            		                                # Inter-species sensitivity calculation:
-            		                                for spB in range(n_sp_ref):
-            		                                    if (mech_data.spec.activ_m[spB] and nu[spB,r]!=0):
-            		                                        # collecting sensitivities of reactions involving both species
-            		                                        S_AB_tsp_z_r[z_i][r][spA,spB]=S_react_x[z_i][spA][r]
+                                                # Inter-species sensitivity calculation:
+                                                for spB in range(n_sp_ref):
+                                                    if (mech_data.spec.activ_m[spB] and nu[spB,r]!=0):
+                                                        # collecting sensitivities of reactions involving both species
+                                                        S_AB_tsp_z_r[z_i][r][spA,spB]=S_react_x[z_i][spA][r]
                                         else:
                                             if spA in tsp_idx:
                                                 tsp = tsp_idx.index(spA)
@@ -366,11 +316,11 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                                                         if (mech_data.spec.activ_m[spB] and nu[spB,r]!=0):
                                                             # collecting sensitivities of reactions involving both species
                                                             S_AB_tsp_z_r[z_i][r][tsp,spB]=S_react_x[z_i][tsp][r]
-                            z_i+=1
+                            z_i += 1
                 bar.update(r)
 
             time_2 = timer.time()
-            if verbose >=4 :
+            if verbose >= 4:
                 print_("\n      time for brute-force SA computation: "+str(round(time_2-time_1))+'s',mp)
             os.chdir(cwd)
 
@@ -382,16 +332,15 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 #       Sensitivity analysis
         title = '2- Analysis of the sensitivity coeff   '
 
-
         if 'SARGEP' in red_data.reduction_operator:
             n_spc = n_sp_ref
-            if verbose>=2:
+            if verbose >= 2:
                 bar = cdef.ProgressBar(mech_data.spec.activ_m.count(True),title)
-        else :
+        else:
             n_spc = n_tsp
-            if verbose>=2:
+            if verbose >= 2:
                 bar = cdef.ProgressBar(n_tsp*n_sp_ref,title)
-        sensi_T_done = False ; sp_c = 0
+        sensi_T_done = False; sp_c = 0
         for spA in range(n_spc):
             if mech_data.spec.activ_m[spA]:
                 sensi_tsp_done = False ; sp_c+=1
@@ -423,6 +372,8 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                                         # keep the max sens coeffs of all z points
                                         if abs(norm_S_react_x[z_i][spA][r])>abs(S_react[spA][r]):
                                             S_react[spA][r] = norm_S_react_x[z_i][spA][r]
+                                if LOI_calc:
+                                    S_AB_z[z_i][spA][spB] = S_AB_tsp_z[z_i][spB]
                                 z_i += 1
 
                         sensi_T_done   = True
@@ -450,6 +401,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
         if verbose>=2 and 'SARGEP' not in red_data.reduction_operator:
             bar.update(n_tsp*n_sp_ref,title)
         red_data.red_op.sensi_T   = sensi_T
+        
         del norm_S_react_x ; del norm_sensi_T_z ; del S_AB_tsp_z
 
 
@@ -489,12 +441,11 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
 
         # fuel1 index
-        ind_fuel  = gas_red.species_index(conditions.composition.fuel.split('/')[0].split('(')[0])
+        ind_fuel = gas_red.species_index(conditions.composition.fuel.split('/')[0].split('(')[0])
         fuel_conc = [gas_red.concentrations[ind_fuel]]
 
         bar = cdef.ProgressBar(n_points-int(n_points/red_data.red_op.n_points-1))
         t_i = -1
-
 
         # T and species sensitivity analysis
         for t in range(n_points-int(n_points/red_data.red_op.n_points+1)):
@@ -529,16 +480,16 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                         if 'SARGEP' not in red_data.reduction_operator:
                             sp_red = gas_red.species_index(tsp_name[spA])
                         else:
-                            sp_red+=1
-                        r_red=-1
+                            sp_red += 1
+                        r_red = -1
                         for r in range(n_r_ref):
                             if mech_data.react.activ_m[r]:
-                                r_red+=1
+                                r_red += 1
                                 # Reaction sensitivity calculation:
                                 if conditions.config == "reactor_UV":
-                                    S_react_x[t_i][spA][r]=sensi_r_t[sp_red+3,r_red]
+                                    S_react_x[t_i][spA][r] = sensi_r_t[sp_red+3,r_red]
                                 elif conditions.config == "reactor_HP":
-                                    S_react_x[t_i][spA][r]=sensi_r_t[sp_red+2,r_red]
+                                    S_react_x[t_i][spA][r] = sensi_r_t[sp_red+2,r_red]
                                 for spB in range(n_sp_ref):
                                     if mech_data.spec.activ_m[spB] and nu[spB, r] != 0:
                                         # Inter-species sensitivity calculation:
@@ -548,15 +499,19 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                                         elif conditions.config == "reactor_HP":
                                             S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+2, r_red])
 
+                        if LOI_calc:
+                            for spB in range(n_sp_ref):
+                                S_AB_z[t_i][spA][spB] = S_AB_tsp_t[t_i][spA, spB]
+
                         # S_react_x sensitivity normalisation on t
                         S_react_x_2w[t_i][spA] = copy.deepcopy(S_react_x[t_i][spA])
                         max_S_react_x = max(abs(S_react_x[t_i][spA]))
-                        if max_S_react_x>0:
+                        if max_S_react_x > 0:
                             for r in range(n_r_ref):
                                 S_react_x[t_i][spA][r]=S_react_x[t_i][spA][r]/max_S_react_x
                         # S_AB_t sensitivity normalisation on t
                         max_S_AB_tsp_t = max(abs(S_AB_tsp_t[t_i][spA]))
-                        if max_S_AB_tsp_t>0:
+                        if max_S_AB_tsp_t > 0:
                             for spB in range(n_sp_ref):
                                 if mech_data.spec.activ_m[spB] and nu[spB, r] != 0:
                                     S_AB_tsp_t[t_i][spA,spB]=S_AB_tsp_t[t_i][spA,spB]/max_S_AB_tsp_t
@@ -566,21 +521,21 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
 
                 if conditions.error_param.T_check:
                     # temperature sensitivity
-                    r_red=-1
+                    r_red = -1
                     for r in range(n_r_ref):
                         if mech_data.react.activ_m[r]:
-                            r_red+=1
+                            r_red += 1
                             # Reaction sensitivity calculation:
                             if conditions.config == "reactor_UV":
-                                sensi_T_z[t_i][r]=sensi_r_t[2,r_red]
+                                sensi_T_z[t_i][r] = sensi_r_t[2,r_red]
                             elif conditions.config == "reactor_HP":
-                                sensi_T_z[t_i][r]=sensi_r_t[1,r_red]
+                                sensi_T_z[t_i][r] = sensi_r_t[1,r_red]
 
                     # S_react_x sensitivity normalisation on t
                     max_sensi_T = max(abs(sensi_T_z[t_i]))
-                    if max_sensi_T>0:
+                    if max_sensi_T > 0:
                         for r in range(n_r_ref):
-                            sensi_T_z[t_i][r]=sensi_T_z[t_i][r]/max_sensi_T
+                            sensi_T_z[t_i][r] = sensi_T_z[t_i][r]/max_sensi_T
 #            except:
 #                print_('Warning: error during in sensitivities calculation at t = '+'%.3f'%(pts_scatter[t]*1000)+' ms',mp)
             bar.update(t)
@@ -591,13 +546,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
             if red_results.ign_time_hr!=False:  ign0 = red_results.ign_time_hr
             else:                               ign0 = red_results.ign_time_sp
 
-            r_red=-1
+            r_red = -1
             title = 'Ignition delay sensitivity analysis (brute force) '
-            bar = cdef.ProgressBar(n_r_ref,title)
+            bar   = cdef.ProgressBar(n_r_ref,title)
             for r in range(n_r_ref):
                 if mech_data.react.activ_m[r]:
                     gas_red.set_multiplier(1) # initialisation
-                    r_red+=1
+                    r_red += 1
                     gas_red.set_multiplier(1+dk, r_red) # set the multiplier of kf for r reaction
 
                     # Simulation with the modified reaction rate
@@ -655,14 +610,10 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
         red_data.red_op.sensi_T   = sensi_T
         red_data.red_op.sensi_igt = np.array(sensi_igt)/np.max(sensi_igt)
 
+        # if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
 
     elif 'JSR' in conditions.config:
 
-#        # Sensitivity coeff matrix
-#        S_react    = np.zeros((n_tsp,n_r_ref))
-#        S_AB_tsp   = np.zeros((n_tsp,n_sp_ref))
-#        S_react_x  = np.zeros((n_points_SA,n_tsp,n_r_ref))
-#        S_AB_tsp_t = np.zeros((n_points,n_tsp,n_sp_ref))
 
         # Sensitivity coeff matrix
         if 'SARGEP' in red_data.reduction_operator:
@@ -699,13 +650,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
         # Instrument parameters
         pressureValveCoefficient = .05
         # Simulation termination criterion
-        maxSimulationTime = 50 # seconds
+        maxSimulationTime = 1 # seconds
         bar = cdef.ProgressBar(len(T_list))
 
         # =============================================================================
         # Reactor model
         # =============================================================================
-        #Initialize the stirred reactor and connect all peripherals
+        # Initialize the stirred reactor and connect all peripherals
         fuelAirMixtureTank = ct.Reservoir(gas_red)
         exhaust = ct.Reservoir(gas_red)
         stirredReactor = ct.IdealGasReactor(gas_red, energy='off', volume=reactorVolume)
@@ -763,28 +714,26 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                 reactorNetwork.rtol_sensitivity = conditions.simul_param.rtol_ts
                 reactorNetwork.atol_sensitivity = conditions.simul_param.atol_ts
 
-            for r in range(gas_red.n_reactions):
-                stirredReactor.add_sensitivity_reaction(r)
-
-            # Re-run the isothermal simulations
-            time_s = 0
-#            bar = cdef.ProgressBar(np.log10(maxSimulationTime),'SA_PSR: ')
-#            t_step = maxSimulationTime/10000
-#            while time_s <maxSimulationTime:
-#                reactorNetwork.advance(time_s)
-#                bar.update(time_s, str(time_s))
-#                time_s+=t_step
 
 
-            while time_s < maxSimulationTime:
-                time_s = reactorNetwork.step()
-#                bar.update(np.log10(time_s),'%.3e' %time_s)
-#            bar.update(np.log10(maxSimulationTime))
 
-
-            concentrations = stirredReactor.thermo.X
 
             if t!=0 and t%int(max(n_points/red_data.red_op.n_points,1))==0 :
+                
+                for r in range(gas_red.n_reactions):
+                    stirredReactor.add_sensitivity_reaction(r)
+                
+                # Re-run the isothermal simulations
+                time_s = 0
+                
+                while time_s < residenceTime*5: #maxSimulationTime
+                    time_s = reactorNetwork.step()
+                    # print(time_s)
+    
+                # record concentrations to speed up convergence of the next iteration 
+                concentrations = stirredReactor.thermo.X
+                
+                
 #            if t%int(max(n_points/red_data.red_op.n_points,1))==0 :
                 t_i+=1
                 sensi_scatter.append(t)
@@ -829,6 +778,10 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                                         # (sum of the sensitivities of reactions involving both species)
                                         S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+3, r_red])
 
+                        if LOI_calc:
+                            for spB in range(n_sp_ref):
+                                S_AB_z[t_i][spA][spB] = S_AB_tsp_t[t_i][spA,spB]
+
                         # S_react_x sensitivity normalisation on T
                         S_react_x_2w[t_i][spA] = copy.deepcopy(S_react_x[t_i][spA])
                         max_S_react_x = max(abs(S_react_x[t_i][spA]))
@@ -872,13 +825,14 @@ def sensitivities_computation_SA(red_data, mech_data,red_results):
                         except:
                             a=2
 
+    if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
+
 
     time_end = timer.time()
-    if conditions.simul_param.verbose >=4 :
+    if conditions.simul_param.verbose >= 4:
         print_("\n      time for SA computation+analysis: "+str(round(time_end-time_start))+'s',mp)
 
     print_("\n",mp)
-
 
 
     red_data.red_op.sensi_sp = S_AB_tsp
@@ -1075,8 +1029,11 @@ def reactionWithdrawal(conditions, mech_data,active_species,red_data,red_method,
             sensi_sorted = list(sensi_r[tsp])
             sensi_sorted.sort()
             while 0 in sensi_sorted: sensi_sorted.remove(0)
-            lim_val = sensi_sorted[int((len(sensi_sorted)-1)
+            if len(sensi_sorted)>0:
+                lim_val = sensi_sorted[int((len(sensi_sorted)-1)
                                            *min(abs(eps_r[tsp]),1))]
+            else:
+                lim_val = 0
             for r in range(nr):
                 if not mech_data.react.activ_m[r]:
                     active_reactions[r] = False
