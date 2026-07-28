@@ -22,8 +22,8 @@
 import os
 import numpy as np
 import time as timer
-import brookesia.Class_def as cdef
-from  brookesia.Class_def import print_
+import brookesia_dev.Class_def as cdef
+from  brookesia_dev.Class_def import print_
 import multiprocessing
 import cantera as ct
 # multiprocessing.set_start_method('spawn')

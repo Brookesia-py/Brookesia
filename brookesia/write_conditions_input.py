@@ -561,7 +561,7 @@ mut_intensity       = 20
     # ================================================================
     # ================================================================
     try:
-        import brookesia.CSP as csp
+        import brookesia_dev.CSP as csp
         CSP_method = True
         try:
             os.chdir('_conditions_input')
