@@ -150,17 +150,14 @@ class Composition :
                     self.diluent + ':' + str(X_diluent)
 
             else:    # i.e. if diffusion flame
-                if self.diluent_ratio>1:                    # normalized by 100
-                    X_fuel = 100-self.diluent_ratio
-                else:                                       # normalized by 1
-                    X_fuel = 1-self.diluent_ratio
-            
-            
-                X_diluent = self.diluent_ratio
+                # X_diluent calculation
+                if type(self.diluent_ratio) is float :
+                    X_diluent = self.diluent_ratio /(1-self.diluent_ratio)
+                else:
+                    X_diluent = X_oxidant * self.diluent_ratio[1]
 
-                X = self.fuel    + ':' + str(X_fuel)          + ',' + \
+                X = self.fuel    + ':' + str(1)          + ',' + \
                     self.diluent + ':' + str(X_diluent)
-
 
         else:
             if type(self.phi2) is float:    # i.e. if not diffusion flame
@@ -176,7 +173,7 @@ class Composition :
                         X_oxidant = 0
 
 
-                if self.diluent_ratio2 is float:
+                if type(self.diluent_ratio2) is float :
                     X_diluent = self.diluent_ratio2 * (X_oxidant + self.phi2) \
                                  / (1-self.diluent_ratio2)
                 else:
@@ -188,17 +185,23 @@ class Composition :
 
             else:    # i.e. if diffusion flame
                 try:
-                    if self.diluent_ratio2>1:                   # normalized by 100
-                        X_oxidant = 100-self.diluent_ratio2
-                    else:                                       # normalized by 1
-                        X_oxidant = 1-self.diluent_ratio2
-                except: # no oxygen in the mechanism
-                    X_oxidant = 0
+                    X_oxidant = gas.n_atoms(self.fuel2, 'C')            \
+                                + 1/4 * gas.n_atoms(self.fuel2, 'H')    \
+                                - 1/2 * gas.n_atoms(self.fuel2,'O')
+                except:  # non carbonated fuel
+                    try:
+                        X_oxidant = 1/4 * gas.n_atoms(self.fuel2, 'H')      \
+                                    - 1/2 * gas.n_atoms(self.fuel2,'O')
+                    except: # no oxygen in the mechanism
+                        X_oxidant = 0
 
 
-                X_diluent = self.diluent_ratio2
+                if type(self.diluent_ratio2) is float :
+                    X_diluent = (X_oxidant*self.diluent_ratio2/100)/(1-self.diluent_ratio2/100)
+                else:
+                    X_diluent = X_oxidant * self.diluent_ratio2[1]/100
 
-                X = self.oxidant2 + ':' + str(X_oxidant)  + ',' + \
+                X = self.oxidant2    + ':' + str(X_oxidant)  + ',' + \
                     self.diluent2 + ':' + str(X_diluent)
 
         return X
@@ -394,8 +397,6 @@ class Errors:
         verbose           = conditions.simul_param.verbose
 
         pts_scatter       = ref_results.pts_scatter
-        pts_scatter_red   = red_results.pts_scatter
-        
         if conditions.conc_unit == 'volumic_concentration':
             conc_ref          = ref_results.conc
             conc_red          = red_results.conc
@@ -417,9 +418,8 @@ class Errors:
                 index = conditions.composition.sp2idx[tspc[k]]
 
                 data1 = np.zeros(n_points)
-                data2_raw = np.zeros(n_points)
-                
-                
+                data2 = np.zeros(n_points)
+                #data_ori = np.zeros(n_points)
                 for i in range(n_points):
                     data1[i] = conc_ref[i][index]
                     data2[i] = conc_red[i][index]
@@ -485,12 +485,7 @@ class Errors:
                 data2 = []
                 for i in range(n_points-1):
                     data1.append(conc_ref[i][index])
-                    data2_raw.append(conc_red[i][index])
-                    
-                # Creating the interpolation function from the 2nd series
-                interp_func = interp1d(pts_scatter_red, data2_raw, kind='linear', fill_value="extrapolate")
-                # Interpolating the values of the 2nd series at the timesteps of the 1st series
-                data2 = interp_func(pts_scatter)
+                    data2.append(conc_red[i][index])
 
                 if sum(data1)>0:     # absence of data if experimental optimization
 
@@ -562,15 +557,9 @@ class Errors:
 
 
         pts_scatter       = ref_results.pts_scatter
-        pts_scatter_red   = red_results.pts_scatter        
         T_ref             = ref_results.T
-        T_red_raw         = red_results.T
-
-        # Creating the interpolation function from the 2nd series
-        interp_func = interp1d(pts_scatter_red, T_red_raw, kind='linear', fill_value="extrapolate")
-        # Interpolating the values of the 2nd series at the timesteps of the 1st series
-        T_red = interp_func(pts_scatter)
-
+        T_red             = red_results.T
+        # T_ori             = ref_results.opt_refind_T
 
         n_points = len(pts_scatter)
 
@@ -2762,10 +2751,6 @@ class Mech_data:
         #species
         i=0 ; txt_spec = ""
         for sp in sp_list:
-            if ',' in self.spec.name[sp]: 
-                sp_name = "'" + self.spec.name[sp] + "'"
-            else:
-                sp_name = self.spec.name[sp] 
             if i<8 :
                 if ',' in self.spec.name[sp]: 
                     txt_spec+= "'"+self.spec.name[sp]+"', "
@@ -3662,7 +3647,7 @@ class Mech_data:
 
 class Optim_param :
     def __init__(self, tsp, n_tspc, n_gen=20,n_ind=50, \
-         selection_operator='Roulette',      selection_options=[0.2],   \
+         selection_operator='Geometric_norm',      selection_options=[0.2],   \
          Xover_operator=['simple_Xover', 'multiple_Xover', 'arith_Xover', 'heuristic_Xover'], \
          Xover_pct = [10,10,20,20],   \
          mut_operator=['uniform_mutation', 'non_uniform_mutation', 'boundary_mutation'], \
@@ -3855,10 +3840,10 @@ class Simul_param :
 
         self.pts_scatter      = pts_scatter      # time stepping  or  grid
         self.end_sim          = end_sim          # tmax           or  xmax
-        self.rtol_ts          = 1e-8
-        self.atol_ts          = 1e-13
+        self.rtol_ts           = 1e-8
+        self.atol_ts           = 1e-13
         self.tol_ss           = tol_ss
-        self.tol_ts_f         = [1.0e-4, 1.0e-8]
+        self.tol_ts_f           = [1.0e-4, 1.0e-8]
         self.tign_nPoints     = tign_nPoints
         self.tign_dt          = tign_dt
         self.n_pts            = n_pts

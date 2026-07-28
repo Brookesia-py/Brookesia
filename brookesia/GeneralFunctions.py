@@ -52,7 +52,7 @@ import datetime
 import traceback
 import multiprocessing
 
-from  brookesia_devLOI.Class_def   import print_
+from  brookesia.Class_def   import print_
 from scipy.interpolate       import interp1d
 from shutil import copyfile
 
@@ -222,7 +222,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
     path_lm = '/dev/null' ; path_w = 'nul'
 
     # maximum number of reduction iteration
-    n_it_max = 200
+    n_it_max = 100
 
     if conditions_list[0].import_data:
         ref_results_list_ext_data = copy_ref_results(ref_results_list)
@@ -363,6 +363,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                     # LOI coefficients calculation
                     red_data = loi.LOI_computation(red_data,mech_data,\
                                                             red_results)
+                                            
                 elif 'CSP' in red_method:
                     if 'flame' in conditions.config:
                         print_('Warning: no CSP analysis for flame configurations',mp)
@@ -691,16 +692,7 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                             if conditions.simul_param.show_plots:
                                 plotData(tspc[0:red_data.n_tspc],ref_results,red_results_loop)
 
-                    # elif active_r_pm.count(True) != 0:
-                    #     errors = cdef.Errors(conditions,ref_results,\
-                    #                 ref_results,red_data,red_data.red_op)
-                    #     errors.under_tol_T  = False  ; errors.qoi_T  = 1
-                    #     errors.under_tol_Sl = False  ; errors.qoi_Sl = 1
-                    #     errors.under_tol_K  = False  ; errors.qoi_K  = 1
-                    #     errors.under_tol_ig = False  ; errors.qoi_ig = 1
-                    #     errors.under_tol    = False
-                    #     for idx in range(red_data.n_tspc):
-                    #         errors.under_tol_s[idx]=False ; errors.qoi_s[idx]=1
+
 
                     elif  (np.array(active_sp_pm) == np.array(mech_data.spec.activ_p)).all()       \
                       and (np.array(active_r_pm)  == np.array(mech_data.react.activ_p)).all()      \
@@ -1317,8 +1309,8 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 mech_data.write_new_mech(new_filename)
             else:
                 mech_data.write_yaml_mech(new_filename)
-#            if conditions_list[0].simul_param.write_ck:
-#                mech_data.write_chemkin_mech(new_filename,conditions_list[0].version)
+            if conditions_list[0].simul_param.write_ck:
+                mech_data.write_chemkin_mech(new_filename,conditions_list[0].version)
             os.chdir(conditions_list[0].main_path)
 
 
