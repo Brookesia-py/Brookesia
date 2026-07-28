@@ -22,15 +22,16 @@
 
 import numpy as np
 
-import brookesia.Computation as comp
-import brookesia.Class_def as cdef
-from  brookesia.Class_def import print_
+import brookesia_dev.Computation as comp
+import brookesia_dev.Class_def as cdef
+from  brookesia_dev.Class_def import print_
 import os
 import sys
 import multiprocessing
 from multiprocessing import Pool
 from pebble import ProcessPool
-from concurrent.futures import TimeoutError
+import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, TimeoutError
 
 
 from shutil import copyfile
@@ -105,7 +106,7 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
     if verbose >= 1 : print_('Initial population:',mp)
     pop.convergence_information(gen,optim_param,verbose)
 
-    pop.selection(optim_param,verbose)
+    new_best_ind = pop.selection(optim_param,best_ind,verbose)
 
     time_1 = timer.time()
 
@@ -114,15 +115,15 @@ def geneticAlgorithm(conditions_list,mech_data,ref_results_list,red_data_list):
         pop.Xover(optim_param,conditions_list,ref_results_list,verbose)
         pop.mutation(optim_param,conditions_list,ref_results_list,gen,verbose)
         pop.fitness_eval_newchilds(optim_param,conditions_list,ref_results_list)
-        pop.selection(optim_param,verbose)
-        pop.check_early_conv(optim_param,gen,verbose)
-        best_ind,new_best_ind = pop.compare_best_ind(best_ind,optim_param,verbose)
+        new_best_ind = pop.selection(optim_param,best_ind,verbose)
         if new_best_ind and optim_param.exp_data:                              # optimization of the time iteration for reactor models
             best_ind.fitness = best_ind.fitness_eval(conditions_list,optim_param,ref_results_list)
         if gen<optim_param.keep_until_gen:
             pop.insert_pop2keep(optim_param, pop2keep)
+        pop.convergence_information(gen,optim_param,verbose) 
+        pop.check_early_conv(optim_param,gen,verbose)
+
         if verbose > 5: pop.display(optim_param)
-        pop.convergence_information(gen,optim_param,verbose)
 
     time_2 = timer.time()
     if verbose >= 5 :
@@ -1099,8 +1100,8 @@ class Population:
                     react_f['k0_fit'].append(False)
                     react_f['k0_fit_lp'].append(False)
                     react_f['k0_fit_hp'].append(False)
-                    if 'h + ho2 => h2 + o2' in row[3]:
-                        print('toto')
+                    # if 'h + ho2 => h2 + o2' in row[3]:
+                    #     print('toto')
                     
                 # --- atmospheric pressure
                 if 'f max:' in row:
@@ -1173,8 +1174,8 @@ class Population:
 
             # 2b - comparer les réactifs du méca avec ceux du fichier
             for _r1,r1_equation in enumerate(mech_data.react.equation):
-                if _r1==15:
-                    print('toto')
+                # if _r1==15:
+                #     print('toto')
                 if '<=>' in r1_equation:
                     reactants_m = r1_equation.split('<=>')[0].upper()
                     products_m  = r1_equation.split('<=>')[1].upper()
@@ -1258,7 +1259,6 @@ class Population:
         return mech_data
 
 
-
     def check_early_conv(self,optim_param,gen,verbose):
 
         mp      = optim_param.main_path
@@ -1266,18 +1266,20 @@ class Population:
 
         # calculation of the fitness stats
         fitness_list = []
-        for p in range(len(self.population)):
+        for p in range(optim_param.n_ind):
             fitness_list.append(self.population[p].fitness)
-        best_fitness = np.max(fitness_list) ; std_fit = np.std(fitness_list)
+        best_fitness = np.max(fitness_list) ; std_fit = np.std(fitness_list) 
+        diff_val_frac = len(set(fitness_list))/len(fitness_list)
+        diff_val = len(fitness_list)-len(set(fitness_list))
+        
 
-        fitness_list = np.array((fitness_list))
+        if gen < .9*MaxIt and (std_fit < (0.01+0.01*((MaxIt-gen)/MaxIt)*best_fitness) or diff_val_frac<0.6):
+            print_('Standard deviation = ' + '%5.3f' %std_fit +'   |   '\
+                'Proportion of unique fitness = ' + str(int(len(set(fitness_list)))) + '/' + str(int(len(fitness_list))),mp)
+            print_('   => Early convergence detected, create new random individuals',mp)
 
-        if gen < .9*MaxIt and std_fit<(.1*best_fitness):
-            print_('Early convergence detected, create new random individuals',mp)
-            self.sort_fitness()
-
-            for p_i in range(round(len(self.population)/2)):
-                 self.population[p_i].randomize_kin(optim_param)
+            for p_i in range(round(len(self.population)*(1-(min(0.5,diff_val_frac))))):
+                 self.population[p_i+1].randomize_kin(optim_param)
 
 
 
@@ -1320,9 +1322,10 @@ class Population:
             new_best_ind = True
         best_idx = self.find_best(n_ind)
 
-        if self.population[best_idx].fitness < best_ind.fitness:
-            worst_idx=self.find_worst(best_idx,n_ind)
-            self.population[worst_idx]=copy.deepcopy(best_ind)
+        self.population[0]=copy.deepcopy(best_ind)
+        # if self.population[best_idx].fitness < best_ind.fitness:
+        #     worst_idx=self.find_worst(best_idx,n_ind)
+        #     self.population[worst_idx]=copy.deepcopy(best_ind)
 
         return best_ind, new_best_ind
 
@@ -1352,7 +1355,7 @@ class Population:
             order[_index] = i
 
         for _p2k, mech_2keep in enumerate(pop2keep):
-            self.population[order[_p2k]]=copy.deepcopy(mech_2keep)
+            self.population[order[_p2k+1]]=copy.deepcopy(mech_2keep)
 
 
     def find_best(self,n_ind=False):
@@ -1433,7 +1436,9 @@ class Population:
             del ref_results_list[res].f
             simul_time_limit += ref_results_list[res].simul_time
 #        simul_time_limit = simul_time_limit*(6+np.random.uniform()*16)#*(child_nb/num_cores)
-        simul_time_limit = simul_time_limit*2*(child_nb/num_cores) + 30
+        # simul_time_limit = simul_time_limit*3*(child_nb/num_cores) + 30
+        simul_time_limit = simul_time_limit*3 + 30
+
 #        simul_time_limit = simul_time_limit*5 + 30
 
 
@@ -1494,47 +1499,83 @@ class Population:
 
             # Parallelisation 4   (with simulation time check) --------------------
             #  https://pythonhosted.org/Pebble/#pools
-            fit_list = []
-            with ProcessPool() as pool:
-                sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
-                try:
-                    for fit in sim_results.result():
-                        fit_list.append(fit)
-                except TimeoutError:
-                    print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 1.5 x ref simulation time)',mp)
-                    print_("TimeoutError: aborting remaining computations",mp)
-                    fit_list.sort(reverse=False, key=lambda col: col[1])
-                    fitness_incomplete = copy.deepcopy(fit_list)
-                    list_ind_eval = []
-                    for ind_fit_inc in fitness_incomplete:
-                        list_ind_eval.append(ind_fit_inc[1])
-                    n_sim=len(fitness_incomplete)
-                    for _i in range(child_nb):
-                        try:
-                            if _i+optim_param.n_ind not in list_ind_eval:
-                                fit_list.insert(_i,(0,_i))
-                        except:
-                            fit_list.append((0,_i))
-                    print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
-                    sim_results.cancel()
-                except:
-                    print_('\n\nWarning : error in simulation',mp)
-                    print_("aborting remaining computations",mp)
-                    fit_list.sort(reverse=False, key=lambda col: col[1])
-                    fitness_incomplete = copy.deepcopy(fit_list)
-                    list_ind_eval = []
-                    for ind_fit_inc in fitness_incomplete:
-                        list_ind_eval.append(ind_fit_inc[1])
-                    n_sim=len(fitness_incomplete)
-                    for _i in range(child_nb):
-                        try:
-                            if _i+optim_param.n_ind not in list_ind_eval:
-                                fit_list.insert(_i,(0,_i))
-                        except:
-                            fit_list.append((0,_i))
-                    print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
-                    sim_results.cancel()
+            # fit_list = []
+            # with ProcessPool() as pool:
+            #     sim_results = pool.map(self.fitness_eval_par, fit_eval_inp, timeout=simul_time_limit)
+            #     try:
+            #         for fit in sim_results.result():
+            #             fit_list.append(fit)
+            #     except TimeoutError:
+            #         print_('\n\nWarning : simulation time > ' + '%.0f' %simul_time_limit + 's (> 1.5 x ref simulation time)',mp)
+            #         print_("TimeoutError: aborting remaining computations",mp)
+            #         fit_list.sort(reverse=False, key=lambda col: col[1])
+            #         fitness_incomplete = copy.deepcopy(fit_list)
+            #         list_ind_eval = []
+            #         for ind_fit_inc in fitness_incomplete:
+            #             list_ind_eval.append(ind_fit_inc[1])
+            #         n_sim=len(fitness_incomplete)
+            #         for _i in range(child_nb):
+            #             try:
+            #                 if _i+optim_param.n_ind not in list_ind_eval:
+            #                     fit_list.insert(_i,(0,_i))
+            #             except:
+            #                 fit_list.append((0,_i))
+            #         print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+            #         sim_results.cancel()
+            #     except:
+            #         print_('\n\nWarning : error in simulation',mp)
+            #         print_("aborting remaining computations",mp)
+            #         fit_list.sort(reverse=False, key=lambda col: col[1])
+            #         fitness_incomplete = copy.deepcopy(fit_list)
+            #         list_ind_eval = []
+            #         for ind_fit_inc in fitness_incomplete:
+            #             list_ind_eval.append(ind_fit_inc[1])
+            #         n_sim=len(fitness_incomplete)
+            #         for _i in range(child_nb):
+            #             try:
+            #                 if _i+optim_param.n_ind not in list_ind_eval:
+            #                     fit_list.insert(_i,(0,_i))
+            #             except:
+            #                 fit_list.append((0,_i))
+            #         print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+            #         sim_results.cancel()
 
+
+
+            # Parallelisation 5   (with individual simulation time check) --------------------
+            fit_list = [] ; errors = False
+            with ProcessPoolExecutor() as pool:
+                future_to_case = {pool.submit(self.fitness_eval_par, case): case for case in fit_eval_inp}
+
+                for future in concurrent.futures.as_completed(future_to_case):
+                    indiv = future_to_case[future]
+                    try:
+                        fit = future.result(timeout=simul_time_limit)  # Timeout individuel
+                        fit_list.append(fit)
+                    except TimeoutError:
+                        print(f"\n\nWarning : simulation time > {simul_time_limit}s for indiv {indiv} (skipping)")
+                        errors = True
+                    except Exception as e:
+                        print(f"\n\nError: simulation failed for indiv {indiv} -> {e}")
+                        errors = True
+
+            if errors:
+                # fit_list.sort(reverse=False, key=lambda col: col[1])
+                fitness_incomplete = copy.deepcopy(fit_list)
+                # list_ind_eval = []
+                # for ind_fit_inc in fitness_incomplete:
+                #     list_ind_eval.append(ind_fit_inc[1])
+                list_ind_eval = [ind_fit_inc[1] for ind_fit_inc in fitness_incomplete]                
+                n_sim=len(fitness_incomplete)
+                for _i in range(child_nb):
+                    try:
+                        if _i+optim_param.n_ind not in list_ind_eval:
+                            fit_list.append((0, _i))
+                    except:
+                        fit_list.append((0,_i))
+                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                # sim_results.cancel()
+            fit_list.sort(reverse=False, key=lambda col: col[1])
 
 
 #        for _i in range(len(fit_list)):
@@ -1600,11 +1641,10 @@ class Population:
     def fitness_eval_newpop(self,optim_param,conditions_list,ref_results_list):
 
         mp          = optim_param.main_path
+        num_cores   = multiprocessing.cpu_count()
+        child_nb    = optim_param.total_Xover + optim_param.total_mut
 
         n_ind = optim_param.n_ind
-#        print('total_Xover: '+str(optim_param.total_Xover))
-#        print('total_mut: '+str(optim_param.total_mut))
-#        print('total_child: '+str(child_nb))
 
         gas     = conditions_list[0].composition.gas
         gas_ref = conditions_list[0].composition.gas_ref
@@ -1620,7 +1660,9 @@ class Population:
             del ref_results_list[res].gas
             del ref_results_list[res].f
             simul_time_limit += ref_results_list[res].simul_time
-        simul_time_limit = simul_time_limit*3
+        # simul_time_limit = simul_time_limit*3*(child_nb/num_cores) + 30
+        simul_time_limit = simul_time_limit*3 + 30
+
 
         bar = cdef.ProgressBar(n_ind, '')
         title="New pop evaluation  "
@@ -1642,7 +1684,7 @@ class Population:
 
         if is_debug_mode:
             # bypass parallelisation for debugging
-            fit_i = []
+            fit_list = []
             mech = conditions_list[0].mech
 
             gas = cdef.get_gas_ct(mech)
@@ -1650,21 +1692,73 @@ class Population:
                 conditions_list[_c].composition.gas     = gas
                 conditions_list[_c].composition.gas_ref = gas
             for ind in range(n_ind):
-                fit_i.append([self.population[ind].fitness_eval(conditions_list,optim_param,ref_results_list,ind),ind])
+                fit_list.append([self.population[ind].fitness_eval(conditions_list,optim_param,ref_results_list,ind),ind])
 
         else:
-            # Parallelized Fitness calculation
-            num_cores   = multiprocessing.cpu_count()
-            if os.name == 'nt': multiprocessing.get_context('spawn')
-            with multiprocessing.Pool(num_cores) as p:
-                fit_i = p.map(self.fitness_eval_par, fit_eval_inp)
-    #
-            fit_i.sort(reverse=False, key=lambda col: col[1])
+    #         # Parallelized Fitness calculation
+    #         num_cores   = multiprocessing.cpu_count()
+    #         if os.name == 'nt': multiprocessing.get_context('spawn')
+    #         with multiprocessing.Pool(num_cores) as p:
+    #             fit_list = p.map(self.fitness_eval_par, fit_eval_inp)
+    # #
+    #         fit_list.sort(reverse=False, key=lambda col: col[1])
 
-            for _i in range(len(fit_i)):
-                self.population[_i].fitness = fit_i[_i][0]
+            # Parallelisation 5   (with individual simulation time check) --------------------
+            fit_list = [] ; errors = False
+            with ProcessPoolExecutor() as pool:
+                future_to_case = {pool.submit(self.fitness_eval_par, case): case for case in fit_eval_inp}
+
+                for future in concurrent.futures.as_completed(future_to_case):
+                    indiv = future_to_case[future]
+                    try:
+                        fit = future.result(timeout=simul_time_limit)  # Timeout individuel
+                        fit_list.append(fit)
+                    except TimeoutError:
+                        print(f"\n\nWarning : simulation time > {simul_time_limit}s for indiv {indiv} (skipping)")
+                        errors = True
+                    except Exception as e:
+                        print(f"\n\nError: simulation failed for indiv {indiv} -> {e}")
+                        errors = True
+
+            # if errors:
+            #     fit_list.sort(reverse=False, key=lambda col: col[1])
+            #     fitness_incomplete = copy.deepcopy(fit_list)
+            #     list_ind_eval = []
+            #     for ind_fit_inc in fitness_incomplete:
+            #         list_ind_eval.append(ind_fit_inc[1])
+            #     n_sim=len(fitness_incomplete)
+            #     for _i in range(n_ind):
+            #         try:
+            #             if _i not in list_ind_eval:
+            #                 fit_list.insert(_i,(0,_i))
+            #         except:
+            #             fit_list.append((0,_i))
+            #     print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+            #     # sim_results.cancel()
 
 
+            if errors:
+                # fit_list.sort(reverse=False, key=lambda col: col[1])
+                fitness_incomplete = copy.deepcopy(fit_list)
+                # list_ind_eval = []
+                # for ind_fit_inc in fitness_incomplete:
+                #     list_ind_eval.append(ind_fit_inc[1])
+                list_ind_eval = [ind_fit_inc[1] for ind_fit_inc in fitness_incomplete]                
+                n_sim=len(fitness_incomplete)
+                for _i in range(child_nb):
+                    try:
+                        if _i+optim_param.n_ind not in list_ind_eval:
+                            fit_list.append((0, _i))
+                    except:
+                        fit_list.append((0,_i))
+                print_('Number of individuals evaluated: ' + str(n_sim) +'\n\n',mp)
+                # sim_results.cancel()
+            fit_list.sort(reverse=False, key=lambda col: col[1])
+
+
+
+        for _i in range(len(fit_list)):
+            self.population[_i].fitness = fit_list[_i][0]
 
         bar.update(n_ind,title)
         print('\n')
@@ -1709,7 +1803,7 @@ class Population:
 
 #%% Selection
 
-    def selection(self,optim_param,verbose):
+    def selection(self,optim_param,best_ind,verbose):
         mp = optim_param.main_path
 
         if   optim_param.selection_operator == 'Elitism':     # elitism
@@ -1724,7 +1818,8 @@ class Population:
         elif optim_param.selection_operator == 'Geometric_norm':    # geometric
             self.select_4_geomNorm(optim_param)
             if verbose >= 6: print_("Geometric norm selection",mp)
-
+        best_ind,new_best_ind = self.compare_best_ind(best_ind,optim_param,verbose)
+        return new_best_ind
 
     def select_1_elit(self):
         self.sort_fitness_rev()
@@ -1755,10 +1850,10 @@ class Population:
         rand_sel_vect.sort()
 
 
-        new_ind = 0 ; i_prob =0 ; proba[-1]=1
+        new_ind = 1 ; i_prob =0 ; proba[-1]=1
 
         while new_ind<size_pop:
-            if rand_sel_vect[new_ind]<=proba[i_prob]:
+            if rand_sel_vect[new_ind-1]<=proba[i_prob]:
                 self.population[new_ind]=copy.deepcopy(pop_copy.population[i_prob])
                 new_ind += 1 #; i_prob = 0
             else:
@@ -1796,33 +1891,56 @@ class Population:
 
     def select_4_geomNorm(self,optim_param):
 
-
         q = optim_param.selection_options[0]
         pop_copy = copy.deepcopy(self)
         pop_copy.sort_fitness
+
+        # ----------  print(fit_vec)
+        fitvec = []
+        mp = optim_param.main_path
+        for r in range(len(pop_copy.population)):    
+            fitvec.append('%2.3f' %pop_copy[r].fitness)
+        print_('Fitness pop totale : ',mp)
+        print_(str(fitvec),mp)
 
         random.seed() ; proba = [] ; rand_sel_vect=[]
 
         # calculate selection probability vector
         for r in range(len(pop_copy.population)):
             p = (q/(1-(1-q)**len(pop_copy.population)) )*(1-q)**r
+            if pop_copy[r].fitness == 0: p=0
             proba.append(p)
         proba = np.cumsum(proba)/np.sum(proba)
         proba.sort()
+        print_('proba : ',mp)
+        print_(str(proba),mp)
+
 
         # build the random vector for the selection
         for i in range(len(pop_copy.population)):
             rand_sel_vect.append(random.random())
         rand_sel_vect.sort()
+        print_('rand_sel_vect : ',mp)
+        print_(str(rand_sel_vect),mp)
 
-        new_ind = 0 ; i_prob =0 ; proba[-1]=1
+
+        new_ind = 1 ; i_prob =0 ; proba[-1]=1
         size_pop = optim_param.n_ind
         while new_ind<size_pop:
-            if rand_sel_vect[new_ind]<=proba[i_prob]:
+            if rand_sel_vect[new_ind-1]<=proba[i_prob]:
                 self.population[new_ind]=copy.deepcopy(pop_copy.population[i_prob])
                 new_ind +=1 #; i_prob = 0
             else:
                 i_prob += 1
+
+
+        # ----------  print(fit_vec)
+        fitvec = []
+        for r in range(size_pop):    
+            fitvec.append('%2.3f' %self.population[r].fitness)
+        print_('Fitness nouveaux parents : ',mp)
+        print_(str(fitvec),mp)
+
         #self.sort_fitness_rev()
 
 
@@ -1954,7 +2072,10 @@ class Population:
                                         min_val = min(a,b)
                                         max_val = max(a,b)
                                     else:
-                                        f_min = self.population[0].mech.react.f_min[r]
+                                        try:
+                                            f_min = self.population[0].mech.react.f_min[r]
+                                        except:
+                                            f_min=0.7
                                         T_min = self.population[0].mech.react.f_Tit[0]
                                         T_max = self.population[0].mech.react.f_Tit[1]            
                                         R = 8.314/4.1868 #(cal/mol)                                    
@@ -2018,7 +2139,10 @@ class Population:
                                             min_val = min(a,b)
                                             max_val = max(a,b)
                                         else:
-                                            f_min = self.population[0].mech.react.f_min[r]
+                                            try:
+                                                f_min = self.population[0].mech.react.f_min[r]
+                                            except:
+                                                f_min=0.7
                                             T_min = self.population[0].mech.react.f_Tit[0]
                                             T_max = self.population[0].mech.react.f_Tit[1]            
                                             R = 8.314/4.1868 #(cal/mol)                                    
@@ -2125,7 +2249,10 @@ class Population:
                                         min_val = min(a,b)
                                         max_val = max(a,b)
                                     else:
-                                        f_min = self.population[0].mech.react.f_min[r]
+                                        try:
+                                            f_min = self.population[0].mech.react.f_min[r]
+                                        except:
+                                            f_min=0.7
                                         T_min = self.population[0].mech.react.f_Tit[0]
                                         T_max = self.population[0].mech.react.f_Tit[1]            
                                         R = 8.314/4.1868 #(cal/mol)                                    
@@ -2183,7 +2310,10 @@ class Population:
                                             min_val = min(a,b)
                                             max_val = max(a,b)
                                         else:
-                                            f_min = self.population[0].mech.react.f_min[r]
+                                            try:
+                                                f_min = self.population[0].mech.react.f_min[r]
+                                            except:
+                                                f_min=0.7
                                             T_min = self.population[0].mech.react.f_Tit[0]
                                             T_max = self.population[0].mech.react.f_Tit[1]            
                                             R = 8.314/4.1868 #(cal/mol)                                    
@@ -2304,7 +2434,10 @@ class Population:
                                                             ,ref*(1+incert_r[k]*(damping**try_r))))
                                 
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except :
+                                        f_min=0.7
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)                                    
@@ -2349,7 +2482,10 @@ class Population:
                                     if ref!=0:  mod_factor.append(val/ref)
                                     else:       mod_factor.append(0)
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except:
+                                        f_min=0.7
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)                                    
@@ -2440,7 +2576,10 @@ class Population:
                                         max_val = ref*(1-incert_r[k]*(damping**try_r))
                                         min_val = ref*(1+incert_r[k]*(damping**try_r))
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except:
+                                        f_min=0.7
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)   
@@ -2494,7 +2633,10 @@ class Population:
                                         max_val = ref*(1-incert_r[k]*(damping**try_r))
                                         min_val = ref*(1+incert_r[k]*(damping**try_r))
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except:
+                                        f_min=0.7    
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)
@@ -2598,7 +2740,10 @@ class Population:
                                     min_val = ref*(1-incert_r[k]*(damping**try_r))
                                     max_val = ref*(1-incert_r[k]*(damping**try_r))
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except:
+                                        f_min=0.7
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)
@@ -2644,7 +2789,10 @@ class Population:
                                     min_val = ref*(1-incert_r[k]*(damping**try_r))
                                     max_val = ref*(1-incert_r[k]*(damping**try_r))
                                 else:
-                                    f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    try:
+                                        f_min = self.population[0].mech.react.f_min[r]*(damping**try_r)
+                                    except:
+                                        f_min=0.7
                                     T_min = self.population[0].mech.react.f_Tit[0]
                                     T_max = self.population[0].mech.react.f_Tit[1]            
                                     R = 8.314/4.1868 #(cal/mol)    
@@ -2983,6 +3131,7 @@ def compute_kref_and_klim(mech_data,p_min,p_max):
             f_T   = cTf(T_list)
         else:
             f_T   = np.array([cT]*len(T_list))
+        f_T = np.array([min(x, 0.7) for x in f_T])
         mech_data.react.f_min.append(min(f_T))
 
 
@@ -2992,6 +3141,7 @@ def compute_kref_and_klim(mech_data,p_min,p_max):
         ck0 = np.poly1d(mech_data.react.k0_fit_lp[_r])
         f_T_lp   = cT(T_list)
         k0_lp    = 10**ck0(T_list)
+        f_T_lp = np.array([min(x, 0.7) for x in f_T])
         mech_data.react.f_lp_min.append(min(f_T_lp))
 
         # high pressure
@@ -2999,6 +3149,7 @@ def compute_kref_and_klim(mech_data,p_min,p_max):
         cT  = np.poly1d(mech_data.react.f_T_fit_hp[_r])
         ck0 = np.poly1d(mech_data.react.k0_fit_hp[_r])
         f_T_hp   = cT(T_list)
+        f_T_hp = np.array([min(x, 0.7) for x in f_T])
         k0_hp    = 10**ck0(T_list)
         mech_data.react.f_hp_min.append(min(f_T_hp))
 
@@ -4011,3 +4162,4 @@ def plot_bar(y_label,var,fig_n,x_label,label=False):
 #
 #    * si pas de f(T) alors f = 0.7
 #
+

@@ -2,10 +2,17 @@
 import cantera as ct
 #import pyjacob
 import numpy as np
+<<<<<<< HEAD
 import brookesia.Class_def   as cdef
 import brookesia.Computation as comp
 import brookesia.SA          as sa
 from  brookesia.Class_def import print_
+=======
+import brookesia_devLOI.Class_def   as cdef
+import brookesia_devLOI.Computation as comp
+import brookesia_devLOI.SA as sa
+from  brookesia_devLOI.Class_def import print_
+>>>>>>> origin/LOI
 import pandas as pd
 import copy
 import sys
@@ -18,7 +25,6 @@ import time as timer
 
 
 def LOI_computation(red_data, mech_data, red_results): 
-
     """
     Level of importance computation
     """
@@ -80,13 +86,6 @@ def LOI_computation(red_data, mech_data, red_results):
             sim.advance(pts_scatter[t])
             if t != 0 and t % int(max(n_points/red_data.red_op.n_points, 1)) == 0:
                 t_i += 1
-                # sensi_scatter.append(t)
-    
-    
-            # for i in range(n_sp):
-
-            #     # conc_ref = gas_red.concentrations.copy()
-            #     # omega_ref = gas_red.net_production_rates.copy()
 
     
             #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
@@ -133,8 +132,7 @@ def LOI_computation(red_data, mech_data, red_results):
                     
                 except ValueError: #if spec not in red mech
                     pass
-                
-                        
+                                        
                     
                 timescales_all[t_i] = timescales.copy()
             
@@ -362,7 +360,6 @@ def LOI_computation(red_data, mech_data, red_results):
     
        
     
-    
     # =============================================================================
     # 3- LOI computation
     # =============================================================================
@@ -425,18 +422,7 @@ def LOI_computation(red_data, mech_data, red_results):
             LOI_max[_t][_sp] = LOI_max[_t][_sp]/loi_max_targ
 
     red_data.red_op.LOI_max = LOI_max 
-    
-    
-    
-    
-    
-    
-    
-    
-    # LOI = S[:len(timescales_all), :, :] * timescales_all[:, np.newaxis, :] # attention pas meme taille SA: matrice timescales: vecteur
-    # on prends les premieres valeurs de S et on s'arrete a la meme dimension que t ici (donc on enleves les dernieres valeurs de S)
-    # on a joute une dimension t ( np.newaxis) pour qu'elle puisse correspondre a S
-    
+        
     red_data.red_op.LOI = LOI
     
     return red_data
@@ -507,7 +493,6 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, eps):
 
 
     red_data.red_op.sp_rank = sp_rank
-
 
 
     return active_species, red_data
