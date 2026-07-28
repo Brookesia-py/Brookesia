@@ -23,7 +23,7 @@
 #  default options
 # =============================================================================
 
-version = '1.6.0'
+version = '1.9.3'
 
 d_verbose               = 4
 d_show_plots            = False
