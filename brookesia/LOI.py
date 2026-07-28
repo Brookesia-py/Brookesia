@@ -64,6 +64,9 @@ def LOI_computation(red_data, mech_data, red_results):
     timescales_all = np.ones((n_points_LOI, n_sp))
        
     
+    
+>>>>>>> origin/LOI
+    
     if "reactor" in conditions.config:
         
         # parametres de tolerance
@@ -496,6 +499,10 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, eps):
 
 
     return active_species, red_data
+
+
+    return active_species
+>>>>>>> origin/LOI
 
 
 def reactionWithdrawal(conditions, mech_data, active_species, red_data, red_method, eps_r):

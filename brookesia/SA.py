@@ -176,7 +176,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                 if z % int(max(n_points/red_data.red_op.n_points,1)) == 0    \
                     and 0.01*(max(red_results.T)-min(red_results.T)) \
                     < T[z]-T[0] <           \
-                    0.99*(max(red_results.T)-min(red_results.T)):            # ~ (Ti+1%)<T_pert<(Tf-1%)
+                        0.99*(max(red_results.T)-min(red_results.T)):            # ~ (Ti+1%)<T_pert<(Tf-1%)
                     sensi_scatter.append(z)
                     if verbose >= 2:
                         bar.update(z)
