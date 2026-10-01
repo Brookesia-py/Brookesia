@@ -91,6 +91,12 @@ def speciesWithdrawal(conditions, red_data, red_method, mech_data, conc_max, ste
             red_coeff    = red_data.red_op.sensi_sp # [target, sp]
             # get, for each sp, the max of interaction across all targets
             red_coeff_sp = red_coeff.max(axis=(0)) 
+        if 'LOI' in red_method:
+            red_coeff    = red_data.red_op.LOI_max # [target, sp]
+            # get, for each sp, the max of interaction across all targets
+            red_coeff_sp = red_coeff.max(axis=(0))
+        else:
+            red_coeff_sp = np.ones(ns)
     else:
         red_coeff_sp = np.ones(ns)
 

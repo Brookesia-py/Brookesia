@@ -1,3 +1,14 @@
+[1.9.1.5]
+Fixed 
+- Correction of the identification of removed species/reactions when importing a previous kinetic mechanism
+
+[1.9.1.4]
+Added:
+- Integration of the PFR configuration for LOI calculations.
+
+Changed
+- Improved handling of convergence issues for SA calculations: tolerances are defined relative to those of the original calculation; in case of convergence failure, rtol is set to 1e-4 and atol to 1e-6.
+
 [1.9.1.3]
 Changed
 - GA and PSO: Early convergence detection now based on the mean coefficient of variation of the kinetic parameters, relative to that of the initial population.

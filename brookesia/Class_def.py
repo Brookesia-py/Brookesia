@@ -278,7 +278,6 @@ class conditions :
         self.exp_data    = False
         self.import_data = False
         self.conc_unit   = "volumic_concentration" # molar_fraction
-        self.mech_prev_red = False
         self.fit_coeff     = 1
         self.write_conc  = True
 
@@ -317,7 +316,6 @@ class Red_operator :
         self.gas                = 'no_gas_yet'
         self.inter_sp_inter     = inter_sp_inter
         self.write_results      = False
-
 
         # drg
         self.graph_search       = 'Dijkstra'  # Dijkstra DFS
@@ -1669,78 +1667,79 @@ class Mech_data:
                 and "reactions:\n" not in txt[l+1].replace(" ",""):
                     l+=1
 
-                    if "composition:" in txt[l]:
-                        self.spec.atoms[-1] = txt[l].split("{")[1].split("}")[0]
-
-                    if "thermo" in txt[l]: read_data = "thermo"
-                    if "transport" in txt[l]: read_data = "transport"
-
-                    if "model" in txt[l]:
-                        if read_data == "thermo":
-                            self.spec.thermo_model[-1]= txt[l].split("model:")[1].replace(' ','').replace('\n','')
-                        elif read_data == "transport":
-                            self.spec.trans_model[-1]= txt[l].split("model:")[1].replace(' ','').replace('\n','')
-
-                    if "temperature-ranges" in txt[l]:
-                        T_range = txt[l].split("[")[1].split("]")[0].split(",")
-                        T_range = [float(T) for T in T_range]
-                        self.spec.thermo_temp[-1]= T_range
-
-                    if "data" in txt[l]:
-                        # low T coeff
-                        l+=1
-                        while "]" not in txt[l]:
-                            txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
-                            if "[" in txt_l:
+                    if 'note:' not in txt[l]: 
+                        if "composition:" in txt[l]:
+                            self.spec.atoms[-1] = txt[l].split("{")[1].split("}")[0]
+    
+                        if "thermo" in txt[l]: read_data = "thermo"
+                        if "transport" in txt[l]: read_data = "transport"
+    
+                        if "model" in txt[l]:
+                            if read_data == "thermo":
+                                self.spec.thermo_model[-1]= txt[l].split("model:")[1].replace(' ','').replace('\n','')
+                            elif read_data == "transport":
+                                self.spec.trans_model[-1]= txt[l].split("model:")[1].replace(' ','').replace('\n','')
+    
+                        if "temperature-ranges" in txt[l]:
+                            T_range = txt[l].split("[")[1].split("]")[0].split(",")
+                            T_range = [float(T) for T in T_range]
+                            self.spec.thermo_temp[-1]= T_range
+    
+                        if "data:" in txt[l] :
+                            # low T coeff
+                            l+=1
+                            while "]" not in txt[l]:
+                                txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
+                                if "[" in txt_l:
+                                    lT_coeffs = txt_l.split("[")[1].split(",")
+                                    while '' in lT_coeffs: lT_coeffs.remove('')
+                                    lT_coeffs = [float(c) for c in lT_coeffs]
+                                    self.spec.thermo_coeff_lT[-1] = lT_coeffs
+                                else:
+                                    lT_coeffs = txt_l.replace("\n","").split(",")
+                                    while '' in lT_coeffs: lT_coeffs.remove('')
+                                    lT_coeffs = [float(c) for c in lT_coeffs]
+                                    self.spec.thermo_coeff_lT[-1] += lT_coeffs
+                                l+=1
+                            if "[" in txt[l]:
+                                txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
                                 lT_coeffs = txt_l.split("[")[1].split(",")
                                 while '' in lT_coeffs: lT_coeffs.remove('')
                                 lT_coeffs = [float(c) for c in lT_coeffs]
                                 self.spec.thermo_coeff_lT[-1] = lT_coeffs
                             else:
-                                lT_coeffs = txt_l.replace("\n","").split(",")
+                                lT_coeffs = txt[l].replace("\n","").replace(']','').split(",")
                                 while '' in lT_coeffs: lT_coeffs.remove('')
                                 lT_coeffs = [float(c) for c in lT_coeffs]
                                 self.spec.thermo_coeff_lT[-1] += lT_coeffs
                             l+=1
-                        if "[" in txt[l]:
-                            txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
-                            lT_coeffs = txt_l.split("[")[1].split(",")
-                            while '' in lT_coeffs: lT_coeffs.remove('')
-                            lT_coeffs = [float(c) for c in lT_coeffs]
-                            self.spec.thermo_coeff_lT[-1] = lT_coeffs
-                        else:
-                            lT_coeffs = txt[l].replace("\n","").replace(']','').split(",")
-                            while '' in lT_coeffs: lT_coeffs.remove('')
-                            lT_coeffs = [float(c) for c in lT_coeffs]
-                            self.spec.thermo_coeff_lT[-1] += lT_coeffs
-                        l+=1
-                        # high T coeff
-                        while "]" not in txt[l]:
-                            txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
-                            if "[" in txt_l:
+                            # high T coeff
+                            while "]" not in txt[l]:
+                                txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
+                                if "[" in txt_l:
+                                    hT_coeffs = txt_l.split("[")[1].split(",")
+                                    while '' in hT_coeffs: hT_coeffs.remove('')
+                                    hT_coeffs = [float(c) for c in hT_coeffs]
+                                    self.spec.thermo_coeff_hT[-1] = hT_coeffs
+                                else:
+                                    hT_coeffs = txt_l.replace("\n","").replace(']','').split(",")
+                                    while '' in hT_coeffs: hT_coeffs.remove('')
+                                    hT_coeffs = [float(c) for c in hT_coeffs]
+                                    self.spec.thermo_coeff_hT[-1] += hT_coeffs
+                                l+=1
+                            if "[" in txt[l]:
+                                txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
                                 hT_coeffs = txt_l.split("[")[1].split(",")
                                 while '' in hT_coeffs: hT_coeffs.remove('')
                                 hT_coeffs = [float(c) for c in hT_coeffs]
                                 self.spec.thermo_coeff_hT[-1] = hT_coeffs
                             else:
-                                hT_coeffs = txt_l.replace("\n","").replace(']','').split(",")
+                                hT_coeffs = txt[l].replace("\n","").replace(']','').split(",")
                                 while '' in hT_coeffs: hT_coeffs.remove('')
                                 hT_coeffs = [float(c) for c in hT_coeffs]
                                 self.spec.thermo_coeff_hT[-1] += hT_coeffs
-                            l+=1
-                        if "[" in txt[l]:
-                            txt_l = txt[l].replace("\n","").replace(" ","").replace(']','')
-                            hT_coeffs = txt_l.split("[")[1].split(",")
-                            while '' in hT_coeffs: hT_coeffs.remove('')
-                            hT_coeffs = [float(c) for c in hT_coeffs]
-                            self.spec.thermo_coeff_hT[-1] = hT_coeffs
-                        else:
-                            hT_coeffs = txt[l].replace("\n","").replace(']','').split(",")
-                            while '' in hT_coeffs: hT_coeffs.remove('')
-                            hT_coeffs = [float(c) for c in hT_coeffs]
-                            self.spec.thermo_coeff_hT[-1] += hT_coeffs
 
-                    if "note" in txt[l]:
+                    else:
                         note = txt[l].split("note: ")[1]
                         while 'transport' not in txt[l]\
                         and '- name:' not in txt[l]\
@@ -2011,21 +2010,24 @@ class Mech_data:
         self.react.subm_CO = [False]*len(self.react.equation)
         for r in range(len(self.react.equation)):
             for sp in range(len(self.spec.name)):
-                if (nu_f[sp][r]!=0 or nu_r[sp][r]!=0) and nu_f[sp][r]!=nu_r[sp][r]:
-                    n_at = self.spec.atoms[sp].split(',')
-                    for at in n_at:
-                        if 'C' in at or 'c' in at:
-                            n_C = int(at.split(':')[-1])
-                            self.react.subm_C[r] = max(self.react.subm_C[r],n_C)
-                        if 'N' in at or 'n' in at:
-                            n_N = int(at.split(':')[-1])
-                            self.react.subm_N[r] = max(self.react.subm_N[r],n_N)
-                        if 'S' in at or 's' in at:
-                            n_S = int(at.split(':')[-1])
-                            self.react.subm_S[r] = max(self.react.subm_S[r],n_S)
-                        if 'Si' in at or 'si' in at:
-                            n_Si = int(at.split(':')[-1])
-                            self.react.subm_Si[r] = max(self.react.subm_Si[r],n_Si)
+                try:
+                    if (nu_f[sp][r]!=0 or nu_r[sp][r]!=0) and nu_f[sp][r]!=nu_r[sp][r]:
+                        n_at = self.spec.atoms[sp].split(',')
+                        for at in n_at:
+                            if 'C' in at or 'c' in at:
+                                n_C = int(at.split(':')[-1])
+                                self.react.subm_C[r] = max(self.react.subm_C[r],n_C)
+                            if 'N' in at or 'n' in at:
+                                n_N = int(at.split(':')[-1])
+                                self.react.subm_N[r] = max(self.react.subm_N[r],n_N)
+                            if 'S' in at or 's' in at:
+                                n_S = int(at.split(':')[-1])
+                                self.react.subm_S[r] = max(self.react.subm_S[r],n_S)
+                            if 'Si' in at or 'si' in at:
+                                n_Si = int(at.split(':')[-1])
+                                self.react.subm_Si[r] = max(self.react.subm_Si[r],n_Si)
+                except:
+                    print('toto')
             if self.react.subm_C[r]==1:
                 self.react.subm_CO[r] = True
                 for sp in range(len(self.spec.name)):
@@ -4306,6 +4308,91 @@ def print_(text,main_path,file_n='red_info.txt'):
     fichier_data.write(str(text)+'\n')
     os.chdir(cur_path)
 
+def stop_reduction(param_list):
+    stop_reduction    = False
+    output_stop       = [0]*8
+
+    oneby1_sp         = param_list[0]
+    hyb_step_2        = param_list[1]
+    hyb_step_3        = param_list[2]
+    max_eps_config    = param_list[3]
+    eps               = param_list[4]
+    eps_continue_bis  = param_list[5]
+    errors_above_tol  = param_list[6]
+    eps               = param_list[7]
+    eps_init          = param_list[8]
+    n_it_max          = param_list[9]
+    sp_try            = param_list[10]
+    T_try             = param_list[11]
+    ig_try            = param_list[12]
+    Sl_try            = param_list[13]
+    K_try             = param_list[14]
+    global_max_error  = param_list[15]
+    errors_under_tol  = param_list[16]
+    hybrid_CRR        = param_list[17]
+    mp                = param_list[18]
+    verbose           = param_list[19]
+    act_sp_prev       = param_list[20]
+    act_r_prev        = param_list[21]
+    active_sp_pm      = param_list[22]
+    active_r_pm       = param_list[23]
+    sp_prev           = param_list[24]
+    r_prev            = param_list[25]
+    
+    if not oneby1_sp and not hyb_step_2 and not hyb_step_3 \
+    and (max_eps_config == eps         \
+    or not eps_continue_bis            \
+    or errors_above_tol                \
+    or max(eps)<=min(eps_init)/n_it_max\
+    or max(sp_try)>=n_it_max or T_try>=n_it_max or ig_try>=n_it_max or Sl_try>=n_it_max or K_try>=n_it_max\
+    or global_max_error==0):
+        stop_reduction = True
+        if verbose > 4:
+            if   max_eps_config == eps:                 txt = 'maximum value of eps reached'
+            elif not eps_continue_bis:                  txt = 'eps_continue_bis'
+            elif errors_above_tol:                      txt = 'errors above tolerance'
+            elif max(eps)<=min(eps_init)/n_it_max:      txt = 'max(eps)'
+            elif max(sp_try)>=n_it_max:                 txt = 'max(sp_try)'
+            elif T_try>=n_it_max:                       txt = 'T_try'
+            elif ig_try>=n_it_max:                      txt = 'ig_try'
+            elif Sl_try>=n_it_max:                      txt = 'Sl_try'
+            elif K_try>=n_it_max:                       txt = 'K_try'
+            elif global_max_error==0:                   txt = 'global_max_error'
+    
+    elif oneby1_sp and errors_under_tol:
+        if hybrid_CRR:
+            oneby1_sp, hyb_step_2  = False, True
+        else:
+            stop_reduction=True
+            if verbose > 4:
+                txt = 'errors under tolerance'
+
+    elif (hyb_step_2 or hyb_step_3) and not errors_under_tol:
+        if hyb_step_3 is True:    
+            stop_reduction = True
+            if verbose > 4:
+                txt = 'errors under tolerance'
+        else:                      
+            hyb_step_2, hyb_step_3 = False, True
+            active_sp_pm = copy.deepcopy(act_sp_prev)
+            active_r_pm  = copy.deepcopy(act_r_prev)
+            sp_prev = copy.deepcopy(act_sp_prev)
+            r_prev  = copy.deepcopy(act_r_prev)
+
+    
+    if stop_reduction and verbose>4:
+        print_('Stop reduction: '+txt, mp)
+
+    output_stop[0] = stop_reduction
+    output_stop[1] = oneby1_sp
+    output_stop[2] = hyb_step_2
+    output_stop[3] = hyb_step_3
+    output_stop[4] = active_sp_pm
+    output_stop[5] = active_r_pm
+    output_stop[6] = sp_prev
+    output_stop[7] = r_prev
+
+    return output_stop
 
 class ProgressBar:
     """
@@ -4367,7 +4454,7 @@ def get_screen_size():
 def get_gas_with_fallback(mech):
     """Try to retrieve the gas file using several possible paths.."""
     paths_to_try = [
-        f'_kinetic_mech/{mech}',
+        f'_kinetic_mech/{mech}',        
         mech,
         f'_kinetic_mech/{mech[:-4]}.yaml',
         f'_kinetic_mech/{mech[:-5]}.cti',
@@ -4376,23 +4463,31 @@ def get_gas_with_fallback(mech):
     ]
 
     for path in paths_to_try:
-        try:
+        if os.path.isfile(path):
             gas = get_gas_ct(path)
             return gas
-        except Exception as e:
-            continue
 
     print(f"\n\n\n ! ! ! ! !\n\nFile '{mech}' not found.\n\n\n\n\n")
     return None
 
 
-def get_gas_ct(mech):
+def get_gas_ct(mech,r_path=''):
 
     ct.suppress_thermo_warnings()
     warnings.filterwarnings("ignore", category=DeprecationWarning)
 
     error           = True
     reaction_error  = False
+    
+    # if os.path.isfile(mech):
+    #     # open(mech).close()
+    #     mech_path = mech
+    # else:
+    #     if os.name != 'nt': # for Linux or Mac
+    #         mech_path = r_path+'/_kinetic_mech/'+mech
+    #     else: 
+    #         mech_path = r_path+'\\_kinetic_mech\\'+mech
+            
     while error:
         try:
             if float(ct.__version__[0:3])>2.4:

@@ -94,7 +94,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
     sensi_scatter  = []
 
     dk = 0.05 # perturbation for brute force analysis
-
+    normalize_SAB = False
 
     time_start = timer.time()
 
@@ -133,14 +133,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
             def get_species_reaction_sensitivities(f, tsp, grid_point):
                 r"""
                 Compute the normalized sensitivities of the species production
-                :math:`s_{i, spec}` with respect to the reaction rate constants :math:`k_i`:
-                .. math::
+                s_{i, spec} with respect to the reaction rate constants k_i:
                 s_{i, spec} = \frac{k_i}{[X]} \frac{d[X]}{dk_i}
                 """
                 def g(sim):
                     if tsp != 'T':
-                        return sim.X[f.gas.species_index(tsp), grid_point]
-                    else:
+                        return sim.concentrations[f.gas.species_index(tsp), grid_point]
+                    else: 
                         return sim.T[grid_point]
 
                 Nvars = sum(D.n_components * D.n_points for D in f.domains)
@@ -157,7 +156,9 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                 spec_0 = g(f)
 
                 def perturb(sim, i, dp):
+                    # note that dx = 1+dp = (k0+k0.dp)/k0 = k0' / 
                     sim.gas.set_multiplier(1+dp, i)
+                    
 
 #                    S_react_x_zi = f.solve_adjoint(perturb, f.gas.n_reactions, dgdx,g,1e-5) * (kf/spec_0)
                 S_react_x_zi = f.solve_adjoint(perturb, f.gas.n_reactions, dgdx,g,5e-2) / spec_0
@@ -372,6 +373,13 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                                         # keep the max sens coeffs of all z points
                                         if abs(norm_S_react_x[z_i][spA][r])>abs(S_react[spA][r]):
                                             S_react[spA][r] = norm_S_react_x[z_i][spA][r]
+                                if normalize_SAB:
+                                    # Normalize S_AB(z) by C_spB (eq. 4 in [1]) rather than by C_spA as provided by previous calculation
+                                    # [1] T. Lovas C&F 156 (2009) 1348–1358
+                                    
+                                    C_spA = gas_red.concentrations[gas_red.species_index(tsp_name[spA])]
+                                    C_spB = gas_red.concentrations[gas_red.species_index(tsp_name[spB])]
+                                    S_AB_tsp_z[z_i][spB] *= (C_spA/C_spB)
                                 if LOI_calc:
                                     S_AB_z[z_i][spA][spB] = S_AB_tsp_z[z_i][spB]
                                 z_i += 1
@@ -405,14 +413,14 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         del norm_S_react_x ; del norm_sensi_T_z ; del S_AB_tsp_z
 
 
-    elif 'reactor' in conditions.config:
+    elif 'reactor' in conditions.config or conditions.config == "PFR":
 
         # -------   Adjoint method   --------
 
         # 1- reactor definition
         if conditions.config == "reactor_UV":
             reactor = ct.IdealGasReactor(gas_red)
-        elif conditions.config == "reactor_HP":
+        elif conditions.config == "reactor_HP" or conditions.config == "PFR":
             reactor = ct.IdealGasConstPressureReactor(gas_red)
         sim = ct.ReactorNet([reactor])
 
@@ -420,8 +428,8 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         sim.rtol = conditions.simul_param.rtol_ts
         sim.atol = conditions.simul_param.atol_ts
         if red_data.red_op.rtol_ts:
-            sim.rtol_sensitivity = red_data.red_op.rtol_ts
-            sim.atol_sensitivity = red_data.red_op.rtol_ts
+            sim.rtol_sensitivity = 1e-4#red_data.red_op.rtol_ts
+            sim.atol_sensitivity = 1e-6#red_data.red_op.rtol_ts
         else:
             sim.rtol_sensitivity = conditions.simul_param.rtol_ts
             sim.atol_sensitivity = conditions.simul_param.atol_ts
@@ -444,18 +452,29 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         ind_fuel = gas_red.species_index(conditions.composition.fuel.split('/')[0].split('(')[0])
         fuel_conc = [gas_red.concentrations[ind_fuel]]
 
+        
+        # =============================================================================
+        #         # T and species sensitivity analysis
+        # =============================================================================
         bar = cdef.ProgressBar(n_points-int(n_points/red_data.red_op.n_points-1))
         t_i = -1
 
-        # T and species sensitivity analysis
         for t in range(n_points-int(n_points/red_data.red_op.n_points+1)):
-#            try:
-            sim.advance(pts_scatter[t])
+            try:
+                sim.advance(pts_scatter[t])
+            except Exception as e:
+                print(f"Warning: Error in sensitivity calculation at t = {pts_scatter[t]*1000:.3f} ms. Falling back to rtol=1e-4 and atol=1e-6.")
+                # Reconfiguration avec les tolérances de secours
+                sim.rtol_sensitivity = 1e-4
+                sim.atol_sensitivity = 1e-6
+                sim.advance(pts_scatter[t])
+
             #normalized sensitivity for reactions
             if t!=0 and t%int(max(n_points/red_data.red_op.n_points,1))==0 :
                 t_i+=1
                 sensi_scatter.append(t)
                 fuel_conc.append(gas_red.concentrations[ind_fuel])
+                # Nondimensional reaction sensitivity coefficients https://www.cantera.org/dev/python/zerodim.html
                 sensi_r_t  = sim.sensitivities()
     #             IdealGasReactor
     #                    0 - mass
@@ -475,7 +494,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                     n_spc = n_sp_ref
                 else:
                     n_spc = n_tsp
-                for spA in range(n_spc):
+                for spA in range(n_spc):                    
                     if 'SARGEP' not in red_data.reduction_operator or mech_data.spec.activ_m[spA]:
                         if 'SARGEP' not in red_data.reduction_operator:
                             sp_red = gas_red.species_index(tsp_name[spA])
@@ -488,28 +507,42 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                                 # Reaction sensitivity calculation:
                                 if conditions.config == "reactor_UV":
                                     S_react_x[t_i][spA][r] = sensi_r_t[sp_red+3,r_red]
-                                elif conditions.config == "reactor_HP":
+                                elif conditions.config == "reactor_HP" or conditions.config == "PFR":
                                     S_react_x[t_i][spA][r] = sensi_r_t[sp_red+2,r_red]
                                 for spB in range(n_sp_ref):
                                     if mech_data.spec.activ_m[spB] and nu[spB, r] != 0:
                                         # Inter-species sensitivity calculation:
                                         # (sum of the sensitivities of reactions involving both species)
                                         if conditions.config == "reactor_UV":
-                                            S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+3, r_red])
-                                        elif conditions.config == "reactor_HP":
-                                            S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+2, r_red])
-
+                                            S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+3, r_red]*nu[spB, r])
+                                        elif conditions.config == "reactor_HP" or conditions.config == "PFR":
+                                            S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+2, r_red]*nu[spB, r])
+                        
+                        if normalize_SAB:
+                            # Normalize S_AB(t) by C_spB (eq. 4 in [1]) rather than by C_spA as provided by Cantera [2]
+                            # [1] T. Lovas C&F 156 (2009) 1348–1358
+                            # [2] https://www.cantera.org/dev/python/zerodim.html
+                            C_spA = gas_red.concentrations[gas_red.species_index(tsp_name[spA])]
+                            for spB in range(n_sp_ref):
+                                try:
+                                    C_spB = gas_red.concentrations[gas_red.species_index(gas_ref.species_name(spB))]
+                                except ValueError:
+                                    # if spB not in red mech (then S_AB_tsp_t=0 ...)
+                                    C_spB = 1
+                                if C_spB!=0:
+                                    S_AB_tsp_t[t_i][spA, spB] *= (C_spA/C_spB)
+                        
                         if LOI_calc:
                             for spB in range(n_sp_ref):
                                 S_AB_z[t_i][spA][spB] = S_AB_tsp_t[t_i][spA, spB]
 
-                        # S_react_x sensitivity normalisation on t
+                        # reaction sensitivity (S_react_x) normalisation on t
                         S_react_x_2w[t_i][spA] = copy.deepcopy(S_react_x[t_i][spA])
                         max_S_react_x = max(abs(S_react_x[t_i][spA]))
                         if max_S_react_x > 0:
                             for r in range(n_r_ref):
                                 S_react_x[t_i][spA][r]=S_react_x[t_i][spA][r]/max_S_react_x
-                        # S_AB_t sensitivity normalisation on t
+                        # inter-species sensitivity (S_AB_t) normalisation on t
                         max_S_AB_tsp_t = max(abs(S_AB_tsp_t[t_i][spA]))
                         if max_S_AB_tsp_t > 0:
                             for spB in range(n_sp_ref):
@@ -528,7 +561,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                             # Reaction sensitivity calculation:
                             if conditions.config == "reactor_UV":
                                 sensi_T_z[t_i][r] = sensi_r_t[2,r_red]
-                            elif conditions.config == "reactor_HP":
+                            elif conditions.config == "reactor_HP" or conditions.config == "PFR":
                                 sensi_T_z[t_i][r] = sensi_r_t[1,r_red]
 
                     # S_react_x sensitivity normalisation on t
@@ -539,6 +572,7 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
 #            except:
 #                print_('Warning: error during in sensitivities calculation at t = '+'%.3f'%(pts_scatter[t]*1000)+' ms',mp)
             bar.update(t)
+                
         sensi_T_z_2w = copy.deepcopy(sensi_T_z)
 
         # -------   brute force ignition delay sensitivity analysis   --------
@@ -613,7 +647,6 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
         # if LOI_calc: red_data.red_op.S_AB_z = S_AB_z
 
     elif 'JSR' in conditions.config:
-
 
         # Sensitivity coeff matrix
         if 'SARGEP' in red_data.reduction_operator:
@@ -777,6 +810,22 @@ def sensitivities_computation_SA(red_data, mech_data,red_results, LOI_calc=False
                                         # Inter-species sensitivity calculation:
                                         # (sum of the sensitivities of reactions involving both species)
                                         S_AB_tsp_t[t_i][spA,spB]+=abs(sensi_r_t[sp_red+3, r_red])
+
+                        if normalize_SAB:
+                            # Normalize S_AB(t) by C_spB (eq. 4 in [1]) rather than by C_spA as provided by Cantera [2]
+                            # [1] T. Lovas C&F 156 (2009) 1348–1358
+                            # [2] https://www.cantera.org/dev/python/zerodim.html
+                            C_spA = gas_red.concentrations[gas_red.species_index(tsp_name[spA])]
+                            for spB in range(n_sp_ref):
+                                try:
+                                    C_spB = gas_red.concentrations[gas_red.species_index(gas_ref.species_name(spB))]
+                                except ValueError:
+                                    # if spB not in red mech (then S_AB_tsp_t=0 ...)
+                                    C_spB = 1
+                                if C_spB!=0:
+                                    S_AB_tsp_t[t_i][spA, spB] *= (C_spA/C_spB)
+
+
 
                         if LOI_calc:
                             for spB in range(n_sp_ref):

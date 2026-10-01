@@ -98,6 +98,48 @@ def dic_par(dic_par_arg_i):
 
 
 
+def dic_FK(dic_par_arg_i):
+    dic_par_arg  = dic_par_arg_i[0]
+    reactionRate = dic_par_arg_i[4]
+    i            = dic_par_arg_i[5]
+    ns          = dic_par_arg[0]
+    nr          = dic_par_arg[1]
+    react_activ = np.asarray(dic_par_arg[2], dtype=bool)
+    spec_activ  = np.asarray(dic_par_arg[3], dtype=bool)
+    nu          = dic_par_arg[4]
+    kronecker   = dic_par_arg[7]
+
+    # --- num[spA, spB] = sum_r nu[spA,r]*reactionRate[r]*kronecker[spB,r], r actif ---
+    rr = reactionRate * react_activ            # (nr,) : 0 pour réactions inactives
+    num = (nu * rr[None, :]) @ kronecker.T      # (ns, ns), remplace la triple boucle
+
+    # --- PA, CA (identique au code original : PAS filtré par react_activ) ---
+    nur = nu * reactionRate[None, :]            # (ns, nr)
+    PA = np.maximum(0, nur).sum(axis=1)
+    CA = np.maximum(0, -nur).sum(axis=1)
+
+    den = np.zeros(ns)
+    den[spec_activ] = np.maximum(PA[spec_activ], CA[spec_activ])
+
+    # --- dic[spA, spB] = |num[spA,spB]| / den[spA]  si den != 0, sinon 0 ---
+    dic = np.zeros((ns, ns))
+    valid = den != 0
+    dic[valid, :] = np.abs(num[valid, :]) / den[valid, None]
+
+# =============================================================================
+# extraction csv
+# =============================================================================
+    from datetime import datetime
+    import pandas as pd
+    
+    nom_fichier = datetime.now().strftime("%H_%M_%S.csv")
+    df = pd.DataFrame(dic)    
+    df.to_csv(nom_fichier, index=False, header=False)
+# =============================================================================
+
+    return (dic, i)
+
+
 
 def dic(red_data,mech_data,results):
     """r_AB =sum(nu_iA rate_i delta_Bi) /max(prod A, conso A) """
@@ -141,9 +183,13 @@ def dic(red_data,mech_data,results):
     n_points = len(results.r_rate)
 
     ib = []; dic_par_arg_i=[]
-    dic_par_arg = [ns, nr,
-                   mech_data.react.activ_m, mech_data.spec.activ_m,
-                   nu,nu_f,nu_r,
+    dic_par_arg = [ns,
+                   nr,
+                   mech_data.react.activ_m, 
+                   mech_data.spec.activ_m,
+                   nu,
+                   nu_f,
+                   nu_r,
                    kronecker]#,
 
     for i in range(len(results.r_rate)):
@@ -153,15 +199,17 @@ def dic(red_data,mech_data,results):
             dic_par_arg_i.append([dic_par_arg,results.kf[i],results.kr[i],\
                                   results.conc[i],results.r_rate[i],i])
 
-
-    num_cores = multiprocessing.cpu_count()
-
-    dic=[]
-    if os.name == 'nt': multiprocessing.get_context('spawn')
-    # print('\n\n\n\n\n\============================================\n' + __name__ + '\n\n\n\n')
-    # if __name__ == "__main__":
-    with multiprocessing.Pool(num_cores) as p:
-        dic=p.map(dic_par, dic_par_arg_i)
+    parallelization = False
+    if parallelization:
+        num_cores = multiprocessing.cpu_count()
+        if os.name == 'nt': multiprocessing.get_context('spawn')
+        with multiprocessing.Pool(num_cores) as p:
+            dic=p.map(dic_par, dic_par_arg_i)    
+    else:
+        dic = []
+        for _i in range(len(dic_par_arg_i)):
+            dic_i = dic_FK(dic_par_arg_i[_i])
+            dic.append(dic_i)
 
     dic.sort(reverse=False, key=lambda col: col[1])
 
@@ -190,99 +238,18 @@ def dic(red_data,mech_data,results):
     if red_data.red_op.write_results:
         write_sensitivities(red_data,results,drg_i)
 
-    return red_data
+# =============================================================================
+# extraction csv
+# =============================================================================
+    from datetime import datetime
+    import pandas as pd
+    
+    nom_fichier = datetime.now().strftime("%H_%M_%S.csv")
+    df = pd.DataFrame(dic)    
+    df.to_csv(nom_fichier, index=False, header=False)
+# =============================================================================
 
 
-
-def ric(red_data, mech_data, red_results):
-    """
-    Reaction Interaction Coefficient
-    """
-
-    mp = red_results.conditions.main_path
-
-    # main variables
-    gas_ref  = red_data.gas_ref
-    verbose=red_data.verbose
-    n_points = len(red_results.r_rate)
-
-#    n_sp_ref  = gas_ref.n_species
-    n_r_ref   = gas_ref.n_reactions
-    tspc   = red_data.red_op.new_targets_4_DRG_r
-    tsp_idx=[]
-    while '' in tsp_idx: tspc.remove('')
-    for i in range(len(tspc)):
-        	tsp_idx.append(gas_ref.species_index(tspc[i]))
-
-
-    n_tsp     = len(tsp_idx)
-
-    if int(ct.__version__[0])>2:
-        nu_f = gas_ref.reactant_stoich_coeffs
-        nu_r = gas_ref.product_stoich_coeffs
-    else:
-        nu_f = gas_ref.reactant_stoich_coeffs()
-        nu_r = gas_ref.product_stoich_coeffs()
-    nu = nu_f - nu_r
-
-    r_interCoeff =  np.zeros((n_tsp,n_r_ref))
-
-    div_DRG_points = round(n_points/(red_data.red_op.n_points-1))
-
-    if verbose >=8 :
-        print_("   reactions direct interaction coefficients computation ...",mp)
-
-    bar = cdef.ProgressBar(n_points)
-    bar.update(0)
-    for i in range(n_points):
-        if i%max(div_DRG_points,1)==0:
-            reactionRate = red_results.r_rate[i]
-
-#            k_f = red_results.kf[i]
-#            k_r = red_results.kr[i]
-            # reaction rates computation
-#            reactionRate = np.zeros(n_r_ref)
-#            fRate = np.ones(n_r_ref)
-#            rRate = np.ones(n_r_ref)
-#            # Reaction rate calculation
-#            r_red=-1
-#            for r in range(n_r_ref):
-#                if mech_data.react.activ_p[r]\
-#                or True not in mech_data.react.activ_p: # (1st reduction)
-#                    r_red+=1
-#                    for spA in range(n_sp_ref):
-#                        if mech_data.spec.activ_p[spA] \
-#                        or True not in mech_data.spec.activ_p:
-#                            if nu_f[spA, r]!=0 or nu_r[spA, r]!=0:
-#                                fRate[r]*=(1e3*red_results.conc[i][spA])**nu_f[spA, r]
-#                                rRate[r]*=(1e3*red_results.conc[i][spA])**nu_r[spA, r]
-#                    fRate[r] *= k_f[r]
-#                    rRate[r] *= k_r[r]
-#                    reactionRate[r] = fRate[r] - rRate[r]
-#
-            # Computation of Direct Interaction Coefficients at time n
-            for t_sp in range(n_tsp):
-                PA = 0
-                CA = 0
-                for r in range(n_r_ref):
-                    if mech_data.react.activ_p[r]\
-                    or True not in mech_data.react.activ_p: # (1st reduction)
-                        PA += max(0, nu[tsp_idx[t_sp], r]*reactionRate[r])
-                        CA += max(0, -nu[tsp_idx[t_sp], r]*reactionRate[r])
-                den = max(PA, CA)
-                for r in range(n_r_ref):
-                    if mech_data.react.activ_p[r]\
-                    or True not in mech_data.react.activ_p: # (1st reduction)
-                        num = abs(nu[tsp_idx[t_sp], r]*reactionRate[r])
-                        if den > 0:
-                            r_interCoeff[t_sp,r]=max(num/den,r_interCoeff[t_sp,r])
-        bar.update(i)
-
-    bar.update(n_points);print_("\n",mp)
-
-
-    red_data.red_op.r_interaction_coeffs = list(r_interCoeff)
-    del r_interCoeff
     return red_data
 
 
@@ -308,6 +275,7 @@ def optimised_dic(red_data, mech_data,results):
 
     gas_ref = red_data.gas_ref
     gas_red = red_data.gas_red
+
 
     verbose = red_data.verbose
 
@@ -422,7 +390,114 @@ def optimised_dic(red_data, mech_data,results):
     if red_data.red_op.write_results:
         write_sensitivities(red_data, results, drg_i)
 
+# # =============================================================================
+# # extraction csv
+# # =============================================================================
+#     from datetime import datetime
+#     import pandas as pd
+    
+#     nom_fichier = datetime.now().strftime("%H_%M_%S.csv")
+#     df = pd.DataFrame(dic)    
+#     df.to_csv(nom_fichier, index=False, header=False)
+# # =============================================================================
+
+
     return red_data
+
+
+
+def ric(red_data, mech_data, red_results):
+    """
+    Reaction Interaction Coefficient
+    """
+
+    mp = red_results.conditions.main_path
+
+    # main variables
+    gas_ref  = red_data.gas_ref
+    verbose=red_data.verbose
+    n_points = len(red_results.r_rate)
+
+#    n_sp_ref  = gas_ref.n_species
+    n_r_ref   = gas_ref.n_reactions
+    tspc   = red_data.red_op.new_targets_4_DRG_r
+    tsp_idx=[]
+    while '' in tsp_idx: tspc.remove('')
+    for i in range(len(tspc)):
+        	tsp_idx.append(gas_ref.species_index(tspc[i]))
+
+
+    n_tsp     = len(tsp_idx)
+
+    if int(ct.__version__[0])>2:
+        nu_f = gas_ref.reactant_stoich_coeffs
+        nu_r = gas_ref.product_stoich_coeffs
+    else:
+        nu_f = gas_ref.reactant_stoich_coeffs()
+        nu_r = gas_ref.product_stoich_coeffs()
+    nu = nu_f - nu_r
+
+    r_interCoeff =  np.zeros((n_tsp,n_r_ref))
+
+    div_DRG_points = round(n_points/(red_data.red_op.n_points-1))
+
+    if verbose >=8 :
+        print_("   reactions direct interaction coefficients computation ...",mp)
+
+    bar = cdef.ProgressBar(n_points)
+    bar.update(0)
+    for i in range(n_points):
+        if i%max(div_DRG_points,1)==0:
+            reactionRate = red_results.r_rate[i]
+
+#            k_f = red_results.kf[i]
+#            k_r = red_results.kr[i]
+            # reaction rates computation
+#            reactionRate = np.zeros(n_r_ref)
+#            fRate = np.ones(n_r_ref)
+#            rRate = np.ones(n_r_ref)
+#            # Reaction rate calculation
+#            r_red=-1
+#            for r in range(n_r_ref):
+#                if mech_data.react.activ_p[r]\
+#                or True not in mech_data.react.activ_p: # (1st reduction)
+#                    r_red+=1
+#                    for spA in range(n_sp_ref):
+#                        if mech_data.spec.activ_p[spA] \
+#                        or True not in mech_data.spec.activ_p:
+#                            if nu_f[spA, r]!=0 or nu_r[spA, r]!=0:
+#                                fRate[r]*=(1e3*red_results.conc[i][spA])**nu_f[spA, r]
+#                                rRate[r]*=(1e3*red_results.conc[i][spA])**nu_r[spA, r]
+#                    fRate[r] *= k_f[r]
+#                    rRate[r] *= k_r[r]
+#                    reactionRate[r] = fRate[r] - rRate[r]
+#
+            # Computation of Direct Interaction Coefficients at time n
+            for t_sp in range(n_tsp):
+                PA = 0
+                CA = 0
+                for r in range(n_r_ref):
+                    if mech_data.react.activ_p[r]\
+                    or True not in mech_data.react.activ_p: # (1st reduction)
+                        PA += max(0, nu[tsp_idx[t_sp], r]*reactionRate[r])
+                        CA += max(0, -nu[tsp_idx[t_sp], r]*reactionRate[r])
+                den = max(PA, CA)
+                for r in range(n_r_ref):
+                    if mech_data.react.activ_p[r]\
+                    or True not in mech_data.react.activ_p: # (1st reduction)
+                        num = abs(nu[tsp_idx[t_sp], r]*reactionRate[r])
+                        if den > 0:
+                            r_interCoeff[t_sp,r]=max(num/den,r_interCoeff[t_sp,r])
+        bar.update(i)
+
+    bar.update(n_points);print_("\n",mp)
+
+
+    red_data.red_op.r_interaction_coeffs = list(r_interCoeff)
+    del r_interCoeff
+    return red_data
+
+
 
 
 def graphSearch(conditions,red_data,mech_data,eps):

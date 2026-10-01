@@ -2050,17 +2050,19 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
            # 2- based on fuel gradients (if heat relase calculation issues)
         for t in range(len(time_r)-3):
             grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
-        ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
-
+        if len(time_r)>8:
+            ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
+        else:
+            ign_time_sp = time_r[0]
 
         results = cdef.Sim_Results(conditions, gas_red, list(timeVec), list(T),\
                              list(P), list(conc), list(kf), list(kr))
 
         if 'PFR' in conditions.config:
             results.z1 = list(z1)
-        else:
-            results.ign_time_hr = ign_time_hr
-            results.ign_time_sp = ign_time_sp
+
+        results.ign_time_hr = ign_time_hr
+        results.ign_time_sp = ign_time_sp
 
         results.r_rate      = list(r_rate)
 

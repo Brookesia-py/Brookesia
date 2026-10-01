@@ -58,7 +58,7 @@ def LOI_computation(red_data, mech_data, red_results):
     timescales_all = np.ones((n_points_LOI, n_sp))
        
     
-    if "reactor" in conditions.config:
+    if "reactor" in conditions.config or conditions.config == "PFR":
         
         # parametres de tolerance
         abs_tol = conditions.simul_param.atol_ts
@@ -67,7 +67,7 @@ def LOI_computation(red_data, mech_data, red_results):
         
         if conditions.config == "reactor_UV":
             reactor = ct.IdealGasReactor(gas_red)
-        elif conditions.config == "reactor_HP":
+        elif conditions.config == "reactor_HP"  or conditions.config == "PFR":
             reactor = ct.IdealGasConstPressureReactor(gas_red)
         sim = ct.ReactorNet([reactor])
 
@@ -343,7 +343,8 @@ def LOI_computation(red_data, mech_data, red_results):
    
     
     timescales_all = np.array(timescales_all)   # taille (n_points_LOI, n_sp)
-    
+    # print('\n\n\ntimescales: ')
+    # print(timescales_all)
     
     fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
             +'_'+'%.2f' %conditions.composition.phi\
@@ -359,7 +360,8 @@ def LOI_computation(red_data, mech_data, red_results):
     
     red_data = sa.sensitivities_computation_SA(red_data, mech_data,red_results,LOI_calc=True)
     S = red_data.red_op.S_AB_z
-    
+    # print('\n\n\nS: ')
+    # print(S)
        
     
     
@@ -381,7 +383,7 @@ def LOI_computation(red_data, mech_data, red_results):
     
     for tsp in range(n_tsp):
         
-       for i in range(n_sp):
+       for spB in range(n_sp):
            
            t_i = -1
            for t in range(n_points-int(n_points/red_data.red_op.n_points+1)):
@@ -392,52 +394,43 @@ def LOI_computation(red_data, mech_data, red_results):
                    # ---------- Calculation of LOI : method 1
                    # definition of Lovas (2007)
                    # print_('LOI: method 1',mp)
-                   LOI[t_i, tsp, i] = S[ t_i, tsp, i] * timescales_all[t_i, i]
+                   LOI[t_i, tsp, spB] = S[ t_i, tsp, spB] * timescales_all[t_i, spB]
                    
                    
                    # ---------- Calculation of LOI : method 2
                    # calculation with log-average between S(AB) and timescale : 
                    # print_('LOI: method 2',mp)
                    # # log-space normalization of timescale
-                   # tsc_log_norm = (np.log(np.max([timescales_all[t_i, i],min_tsc])) - np.log(min_tsc)) /  \
+                   # tsc_log_norm = (np.log(np.max([timescales_all[t_i, spB],min_tsc])) - np.log(min_tsc)) /  \
                    #                (np.log(max_tsc) - np.log(min_tsc))
                    # # log-space normalization of S
-                   # S_log_norm   = (np.log(np.max([S[ t_i, tsp, i],min_S])) - np.log(min_S)) / \
+                   # S_log_norm   = (np.log(np.max([S[ t_i, tsp, spB],min_S])) - np.log(min_S)) / \
                    #                (np.log(max_S) - np.log(min_S))
                    # # LOI = log-average
-                   # LOI[t_i, tsp, i] = 0.5*(tsc_log_norm + S_log_norm)
+                   # LOI[t_i, tsp, spB] = 0.5*(tsc_log_norm + S_log_norm)
 
                    # ---------- Calculation of LOI : method 3
                    #  S(AB) x log normalized timescale : 
                    # print_('LOI: method 3',mp)
                    # log-space normalization of timescale
-                   # tsc_log_norm = (np.log(np.max([timescales_all[t_i, i],min_tsc])) - np.log(min_tsc)) /  \
+                   # tsc_log_norm = (np.log(np.max([timescales_all[t_i, spB],min_tsc])) - np.log(min_tsc)) /  \
                    #                (np.log(max_tsc) - np.log(min_tsc))
                    # # LOI = log-average
-                   # LOI[t_i, tsp, i] =  S[ t_i, tsp, i] * tsc_log_norm
+                   # LOI[t_i, tsp, i] =  S[ t_i, tsp, spB] * tsc_log_norm
 
 
-    # Calcul du maximum de LOI pour chaque (tsp, i)
+    # Calcul du maximum de LOI pour chaque (tsp, spB)
     LOI_max = np.max(np.abs(LOI), axis=0)   # taille = (n_tsp, n_sp)
+    # print('\n\n\nLOI_max: ')
+    # print(LOI_max)
+    
     for _t in range(len(LOI_max)):
         loi_max_targ = max(LOI_max[_t])
         for _sp in range(len(LOI_max[_t])):
             LOI_max[_t][_sp] = LOI_max[_t][_sp]/loi_max_targ
 
-    red_data.red_op.LOI_max = LOI_max 
+    red_data.red_op.LOI_max = LOI_max
     
-    
-    
-    
-    
-    
-    
-    
-    # LOI = S[:len(timescales_all), :, :] * timescales_all[:, np.newaxis, :] # attention pas meme taille SA: matrice timescales: vecteur
-    # on prends les premieres valeurs de S et on s'arrete a la meme dimension que t ici (donc on enleves les dernieres valeurs de S)
-    # on a joute une dimension t ( np.newaxis) pour qu'elle puisse correspondre a S
-    
-    red_data.red_op.LOI = LOI
     
     return red_data
     
