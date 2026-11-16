@@ -1,3 +1,7 @@
+[1.9.1.6]
+Changed
+- igt now calculated only when the ig_check option is set to True (prevents calculation issues under pyrolysis conditions).
+
 [1.9.1.5]
 Fixed 
 - Correction of the identification of removed species/reactions when importing a previous kinetic mechanism
