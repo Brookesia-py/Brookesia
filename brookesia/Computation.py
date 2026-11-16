@@ -222,39 +222,79 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         npoints = f.flame.n_points
         conc = [] ; kf = [] ; kr = [] ; r_rate = []
 
+        # # Calculation of x_star (Peters Summer school)
+        # # Ercoftac Summer School, 1992, Aachen, Germany
+        # try:
+        #     sL      = f.u[0]          # for cantera version <= 2.4
+        # except:
+        #     sL      = f.velocity[0]
+        # rho_u   = f.density[0]
+
+        # cp      = np.zeros(npoints)
+        # _lambda = np.zeros(npoints)
+
+ 
+
         for n in range(npoints):
             f.set_gas_state(n)
-            if act_sp:
-                conc_n = []; sa_i = 0
-                for s_i in range(len(act_sp)):
-                    if act_sp[s_i]:
-                        conc_n.append(gas.concentrations[sa_i])
-                        sa_i += 1
-                    else:
-                        conc_n.append(0)
-                conc.append(conc_n)
+            # saving spec concentrations
+            if type(act_sp) is list:
+                conc_x = np.zeros(len(act_sp))
+                conc_x[act_sp] = gas.concentrations
+                conc.append(conc_x)
             else:
                 conc.append(gas.concentrations)
-
-            if act_r:
-                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                for r_i in range(len(act_r)):
-                    if act_r[r_i]:
-                        kf_r.append(gas.forward_rate_constants[ra_i])
-                        kr_r.append(gas.reverse_rate_constants[ra_i])
-                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                        ra_i += 1
-                    else:
-                        kf_r.append(0)
-                        kr_r.append(0)
-                        r_rate_r.append(0)
-                kf.append(kf_r)
-                kr.append(kr_r)
-                r_rate.append(r_rate_r)
+            
+            # saving kf and kr values             
+            if type(act_r) is list:
+                # kr / kf or 0, if non activ_species
+                kf_x = np.zeros(len(act_r))
+                kr_x = np.zeros(len(act_r))
+                r_rate_x = np.zeros(len(act_r)) 
+                
+                kf_x[act_r] = gas.forward_rate_constants
+                kr_x[act_r] = gas.reverse_rate_constants
+                r_rate_x[act_r] = gas.net_rates_of_progress
+                kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
             else:
                 kf.append(gas.forward_rate_constants)
                 kr.append(gas.reverse_rate_constants)
                 r_rate.append(gas.net_rates_of_progress)
+
+            
+            
+            
+            # if act_sp:
+            #     conc_n = []; sa_i = 0
+            #     for s_i in range(len(act_sp)):
+            #         if act_sp[s_i]:
+            #             conc_n.append(gas.concentrations[sa_i])
+            #             sa_i += 1
+            #         else:
+            #             conc_n.append(0)
+            #     conc.append(conc_n)
+            # else:
+            #     conc.append(gas.concentrations)
+            # 
+            # if act_r:
+            #     kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+            #     for r_i in range(len(act_r)):
+            #         if act_r[r_i]:
+            #             kf_r.append(gas.forward_rate_constants[ra_i])
+            #             kr_r.append(gas.reverse_rate_constants[ra_i])
+            #             r_rate_r.append(gas.net_rates_of_progress[ra_i])
+            #             ra_i += 1
+            #         else:
+            #             kf_r.append(0)
+            #             kr_r.append(0)
+            #             r_rate_r.append(0)
+            #     kf.append(kf_r)
+            #     kr.append(kr_r)
+            #     r_rate.append(r_rate_r)
+            # else:
+            #     kf.append(gas.forward_rate_constants)
+            #     kr.append(gas.reverse_rate_constants)
+            #     r_rate.append(gas.net_rates_of_progress)
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
@@ -474,37 +514,61 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
         for n in range(npoints):
             f.set_gas_state(n)
 
-            if act_sp:
-                conc_n = []; sa_i = 0
-                for s_i in range(len(act_sp)):
-                    if act_sp[s_i]:
-                        conc_n.append(gas.concentrations[sa_i])
-                        sa_i += 1
-                    else:
-                        conc_n.append(0)
-                conc.append(conc_n)
+            # saving spec concentrations
+            if type(act_sp) is list:
+                conc_x = np.zeros(len(act_sp))
+                conc_x[act_sp] = gas.concentrations
+                conc.append(conc_x)
             else:
                 conc.append(gas.concentrations)
-
-            if act_r:
-                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                for r_i in range(len(act_r)):
-                    if act_r[r_i]:
-                        kf_r.append(gas.forward_rate_constants[ra_i])
-                        kr_r.append(gas.reverse_rate_constants[ra_i])
-                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                        ra_i += 1
-                    else:
-                        kf_r.append(0)
-                        kr_r.append(0)
-                        r_rate_r.append(0)
-                kf.append(kf_r)
-                kr.append(kr_r)
-                r_rate.append(r_rate_r)
+            
+            # saving kf and kr values             
+            if type(act_r) is list:
+                # kr / kf or 0, if non activ_species
+                kf_x = np.zeros(len(act_r))
+                kr_x = np.zeros(len(act_r))
+                r_rate_x = np.zeros(len(act_r)) 
+                
+                kf_x[act_r] = gas.forward_rate_constants
+                kr_x[act_r] = gas.reverse_rate_constants
+                r_rate_x[act_r] = gas.net_rates_of_progress
+                kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
             else:
                 kf.append(gas.forward_rate_constants)
                 kr.append(gas.reverse_rate_constants)
                 r_rate.append(gas.net_rates_of_progress)
+
+            # if act_sp:
+            #     conc_n = []; sa_i = 0
+            #     for s_i in range(len(act_sp)):
+            #         if act_sp[s_i]:
+            #             conc_n.append(gas.concentrations[sa_i])
+            #             sa_i += 1
+            #         else:
+            #             conc_n.append(0)
+            #     conc.append(conc_n)
+            # else:
+            #     conc.append(gas.concentrations)
+
+            # if act_r:
+            #     kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+            #     for r_i in range(len(act_r)):
+            #         if act_r[r_i]:
+            #             kf_r.append(gas.forward_rate_constants[ra_i])
+            #             kr_r.append(gas.reverse_rate_constants[ra_i])
+            #             r_rate_r.append(gas.net_rates_of_progress[ra_i])
+            #             ra_i += 1
+            #         else:
+            #             kf_r.append(0)
+            #             kr_r.append(0)
+            #             r_rate_r.append(0)
+            #     kf.append(kf_r)
+            #     kr.append(kr_r)
+            #     r_rate.append(r_rate_r)
+            # else:
+            #     kf.append(gas.forward_rate_constants)
+            #     kr.append(gas.reverse_rate_constants)
+            #     r_rate.append(gas.net_rates_of_progress)
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
@@ -800,37 +864,62 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
 
             f.set_gas_state(n)
 
-            if act_sp:
-                conc_n = []; sa_i = 0
-                for s_i in range(len(act_sp)):
-                    if act_sp[s_i]:
-                        conc_n.append(gas.concentrations[sa_i])
-                        sa_i += 1
-                    else:
-                        conc_n.append(0)
-                conc.append(conc_n)
+            # saving spec concentrations
+            if type(act_sp) is list:
+                conc_x = np.zeros(len(act_sp))
+                conc_x[act_sp] = gas.concentrations
+                conc.append(conc_x)
             else:
                 conc.append(gas.concentrations)
-
-            if act_r:
-                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                for r_i in range(len(act_r)):
-                    if act_r[r_i]:
-                        kf_r.append(gas.forward_rate_constants[ra_i])
-                        kr_r.append(gas.reverse_rate_constants[ra_i])
-                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                        ra_i += 1
-                    else:
-                        kf_r.append(0)
-                        kr_r.append(0)
-                        r_rate_r.append(0)
-                kf.append(kf_r)
-                kr.append(kr_r)
-                r_rate.append(r_rate_r)
+            
+            # saving kf and kr values             
+            if type(act_r) is list:
+                # kr / kf or 0, if non activ_species
+                kf_x = np.zeros(len(act_r))
+                kr_x = np.zeros(len(act_r))
+                r_rate_x = np.zeros(len(act_r)) 
+                
+                kf_x[act_r] = gas.forward_rate_constants
+                kr_x[act_r] = gas.reverse_rate_constants
+                r_rate_x[act_r] = gas.net_rates_of_progress
+                kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
             else:
                 kf.append(gas.forward_rate_constants)
                 kr.append(gas.reverse_rate_constants)
                 r_rate.append(gas.net_rates_of_progress)
+
+
+            # if act_sp:
+            #     conc_n = []; sa_i = 0
+            #     for s_i in range(len(act_sp)):
+            #         if act_sp[s_i]:
+            #             conc_n.append(gas.concentrations[sa_i])
+            #             sa_i += 1
+            #         else:
+            #             conc_n.append(0)
+            #     conc.append(conc_n)
+            # else:
+            #     conc.append(gas.concentrations)
+
+            # if act_r:
+            #     kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+            #     for r_i in range(len(act_r)):
+            #         if act_r[r_i]:
+            #             kf_r.append(gas.forward_rate_constants[ra_i])
+            #             kr_r.append(gas.reverse_rate_constants[ra_i])
+            #             r_rate_r.append(gas.net_rates_of_progress[ra_i])
+            #             ra_i += 1
+            #         else:
+            #             kf_r.append(0)
+            #             kr_r.append(0)
+            #             r_rate_r.append(0)
+            #     kf.append(kf_r)
+            #     kr.append(kr_r)
+            #     r_rate.append(r_rate_r)
+            # else:
+            #     kf.append(gas.forward_rate_constants)
+            #     kr.append(gas.reverse_rate_constants)
+            #     r_rate.append(gas.net_rates_of_progress)
 
 
         results = cdef.Sim_Results(conditions, gas, np.array(f.flame.grid), \
@@ -927,32 +1016,25 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 P.append(r1.thermo.P)
                 T.append(r1.T)
 
-                if act_sp:
-                    conc_n = []; sa_i = 0
-                    for s_i in range(len(act_sp)):
-                        if act_sp[s_i]:
-                            conc_n.append(r1.thermo.concentrations.tolist()[sa_i])
-                            sa_i += 1
-                        else:
-                            conc_n.append(0)
-                    conc.append(conc_n)
+                # saving spec concentrations
+                if type(act_sp) is list:
+                    conc_x = np.zeros(len(act_sp))
+                    conc_x[act_sp] = gas.concentrations
+                    conc.append(conc_x)
                 else:
-                    conc.append(r1.thermo.concentrations.tolist())
-                if act_r:
-                    kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                    for r_i in range(len(act_r)):
-                        if act_r[r_i]:
-                            kf_r.append(gas.forward_rate_constants[ra_i])
-                            kr_r.append(gas.reverse_rate_constants[ra_i])
-                            r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                            ra_i += 1
-                        else:
-                            kf_r.append(0)
-                            kr_r.append(0)
-                            r_rate_r.append(0)
-                    kf.append(kf_r)
-                    kr.append(kr_r)
-                    r_rate.append(r_rate_r)
+                    conc.append(gas.concentrations)
+                
+                # saving kf and kr values             
+                if type(act_r) is list:
+                    # kr / kf or 0, if non activ_species
+                    kf_x = np.zeros(len(act_r))
+                    kr_x = np.zeros(len(act_r))
+                    r_rate_x = np.zeros(len(act_r)) 
+                    
+                    kf_x[act_r] = gas.forward_rate_constants
+                    kr_x[act_r] = gas.reverse_rate_constants
+                    r_rate_x[act_r] = gas.net_rates_of_progress
+                    kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
                 else:
                     kf.append(gas.forward_rate_constants)
                     kr.append(gas.reverse_rate_constants)
@@ -1090,36 +1172,65 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             heat_release = [0]
             T.append(reactor.T)
             P.append(reactor.thermo.P)
-            if act_sp:
-                conc_n = []; sa_i = 0
-                for s_i in range(len(act_sp)):
-                    if act_sp[s_i]:
-                        conc_n.append(reactor.thermo.concentrations.tolist()[sa_i])
-                        sa_i += 1
-                    else:
-                        conc_n.append(0)
-                conc.append(conc_n)
+            
+            
+            # saving spec concentrations
+            if type(act_sp) is list:
+                conc_x = np.zeros(len(act_sp))
+                conc_x[act_sp] = gas.concentrations
+                conc.append(conc_x)
             else:
-                conc.append(reactor.thermo.concentrations.tolist())
-            if act_r:
-                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                for r_i in range(len(act_r)):
-                    if act_r[r_i]:
-                        kf_r.append(gas.forward_rate_constants[ra_i])
-                        kr_r.append(gas.reverse_rate_constants[ra_i])
-                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                        ra_i += 1
-                    else:
-                        kf_r.append(0)
-                        kr_r.append(0)
-                        r_rate_r.append(0)
-                kf.append(kf_r)
-                kr.append(kr_r)
-                r_rate.append(r_rate_r)
+                conc.append(gas.concentrations)
+            
+            # saving kf and kr values             
+            if type(act_r) is list:
+                # kr / kf or 0, if non activ_species
+                kf_x = np.zeros(len(act_r))
+                kr_x = np.zeros(len(act_r))
+                r_rate_x = np.zeros(len(act_r)) 
+                
+                kf_x[act_r] = gas.forward_rate_constants
+                kr_x[act_r] = gas.reverse_rate_constants
+                r_rate_x[act_r] = gas.net_rates_of_progress
+                kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
             else:
                 kf.append(gas.forward_rate_constants)
                 kr.append(gas.reverse_rate_constants)
                 r_rate.append(gas.net_rates_of_progress)
+
+            
+            
+            
+            # if act_sp:
+            #     conc_n = []; sa_i = 0
+            #     for s_i in range(len(act_sp)):
+            #         if act_sp[s_i]:
+            #             conc_n.append(reactor.thermo.concentrations.tolist()[sa_i])
+            #             sa_i += 1
+            #         else:
+            #             conc_n.append(0)
+            #     conc.append(conc_n)
+            # else:
+            #     conc.append(reactor.thermo.concentrations.tolist())
+            # if act_r:
+            #     kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+            #     for r_i in range(len(act_r)):
+            #         if act_r[r_i]:
+            #             kf_r.append(gas.forward_rate_constants[ra_i])
+            #             kr_r.append(gas.reverse_rate_constants[ra_i])
+            #             r_rate_r.append(gas.net_rates_of_progress[ra_i])
+            #             ra_i += 1
+            #         else:
+            #             kf_r.append(0)
+            #             kr_r.append(0)
+            #             r_rate_r.append(0)
+            #     kf.append(kf_r)
+            #     kr.append(kr_r)
+            #     r_rate.append(r_rate_r)
+            # else:
+            #     kf.append(gas.forward_rate_constants)
+            #     kr.append(gas.reverse_rate_constants)
+            #     r_rate.append(gas.net_rates_of_progress)
 
 #            conc.append(reactor.thermo.concentrations.tolist())
 #            kf.append(gas.forward_rate_constants)
@@ -1132,43 +1243,36 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             z1 = np.zeros_like(timeVec)
             u1 = np.zeros_like(timeVec)
 
-            hr="ok"
+            # hr="ok"
+            hr = conditions.error_param.ig_check
             for n in range(1,len(timeVec)):
                 sim.advance(timeVec[n])
                 T.append(reactor.T)
                 P.append(reactor.thermo.P)
 
-                if act_sp:
-                    conc_n = []; sa_i = 0
-                    for s_i in range(len(act_sp)):
-                        if act_sp[s_i]:
-                            conc_n.append(reactor.thermo.concentrations.tolist()[sa_i])
-                            sa_i += 1
-                        else:
-                            conc_n.append(0)
-                    conc.append(conc_n)
+                # saving spec concentrations
+                if type(act_sp) is list:
+                    conc_t = np.zeros(len(act_sp))
+                    conc_t[act_sp] = gas.concentrations
+                    conc.append(conc_t)
                 else:
-                    conc.append(reactor.thermo.concentrations.tolist())
-                if act_r:
-                    kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                    for r_i in range(len(act_r)):
-                        if act_r[r_i]:
-                            kf_r.append(gas.forward_rate_constants[ra_i])
-                            kr_r.append(gas.reverse_rate_constants[ra_i])
-                            r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                            ra_i += 1
-                        else:
-                            kf_r.append(0)
-                            kr_r.append(0)
-                            r_rate_r.append(0)
-                    kf.append(kf_r)
-                    kr.append(kr_r)
-                    r_rate.append(r_rate_r)
+                    conc.append(gas.concentrations)
+                
+                # saving kf and kr values             
+                if type(act_r) is list:
+                    # kr / kf or 0, if non activ_species
+                    kf_t = np.zeros(len(act_r))
+                    kr_t = np.zeros(len(act_r))
+                    r_rate_t = np.zeros(len(act_r)) 
+                    
+                    kf_t[act_r] = gas.forward_rate_constants
+                    kr_t[act_r] = gas.reverse_rate_constants
+                    r_rate_t[act_r] = gas.net_rates_of_progress
+                    kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
                 else:
                     kf.append(gas.forward_rate_constants)
                     kr.append(gas.reverse_rate_constants)
                     r_rate.append(gas.net_rates_of_progress)
-
 
                 if 'PFR' in conditions.config:
                     u1[n] = mass_flow_rate1 / area / reactor.thermo.density
@@ -1193,7 +1297,7 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                     heat_release.append(-np.dot(gas.net_rates_of_progress,\
                                                gas.delta_enthalpy))
                 except:
-                    if hr=="ok":
+                    if hr:
                         print_("Warning: heat release calculation issues",mp)
                         print_("   Ignition delay time calculated according to the maximum fuel concentration gradient",mp)
                         hr="no_heat_release"
@@ -1203,24 +1307,20 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
                 #     z1_bis[n].append(z1_bis[n - 1] + u1[n] * dt)
 
 
-            # 1- based on heat release (default)
-            if hr!= "no_heat_release":
-                ign_time_hr = time_r[heat_release.index(max(heat_release))]
-            else: ign_time_hr=False
-            # 2- based on fuel gradients (if heat relase calculation issues)
-            for t in range(len(time_r)-3):
-                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
-            ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
-            if verbose>3:
-                print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'us',mp)
-
-            
-            # if 'PFR' in conditions.config and verbose>3:
-            #     ign_dist_sp = z1[grad_fuel.index(max(grad_fuel))+2]
-            #
-            #     if 'PFR' in conditions.config:
-            #         print_("    - ignition distance :  "+"%5.3f" %(ign_dist_sp*1e3)+'mm',mp)
-
+            ign_time_hr, ign_time_sp = False, False
+            if conditions.error_param.ig_check and 'reactor' in conditions.config:
+                # 1- based on heat release (default)
+                if hr!= "no_heat_release" :
+                    try:                    
+                        ign_time_hr = time_r[heat_release.index(max(heat_release))]
+                    except:
+                        ign_time_hr = False
+                # 2- based on fuel gradients (if heat relase calculation issues)
+                for t in range(len(time_r)-3):
+                    grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
+                ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
+                if verbose>3:
+                    print_("    - ignition time :  "+"%5.3f" %(ign_time_sp*1e6)+'us',mp)
 
         results = cdef.Sim_Results(conditions, gas, np.array(timeVec), list(T), \
                              list(P), list(conc), list(kf), list(kr))
@@ -1336,36 +1436,62 @@ def ref_computation(conditions, verbose=0,act_sp=False,act_r=False):
             # results
             T.append(stirredReactor.T)
             P.append(stirredReactor.thermo.P)
-            if act_sp:
-                conc_n = []; sa_i = 0
-                for s_i in range(len(act_sp)):
-                    if act_sp[s_i]:
-                        conc_n.append(stirredReactor.thermo.concentrations.tolist()[sa_i])
-                        sa_i += 1
-                    else:
-                        conc_n.append(0)
-                conc.append(conc_n)
+            
+            
+            # saving spec concentrations
+            if type(act_sp) is list:
+                conc_T = np.zeros(len(act_sp))
+                conc_T[act_sp] = gas.concentrations
+                conc.append(conc_T)
             else:
-                conc.append(stirredReactor.thermo.concentrations.tolist())
-            if act_r:
-                kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
-                for r_i in range(len(act_r)):
-                    if act_r[r_i]:
-                        kf_r.append(gas.forward_rate_constants[ra_i])
-                        kr_r.append(gas.reverse_rate_constants[ra_i])
-                        r_rate_r.append(gas.net_rates_of_progress[ra_i])
-                        ra_i += 1
-                    else:
-                        kf_r.append(0)
-                        kr_r.append(0)
-                        r_rate_r.append(0)
-                kf.append(kf_r)
-                kr.append(kr_r)
-                r_rate.append(r_rate_r)
+                conc.append(gas.concentrations)
+            
+            # saving kf and kr values             
+            if type(act_r) is list:
+                # kr / kf or 0, if non activ_species
+                kf_T = np.zeros(len(act_r))
+                kr_T = np.zeros(len(act_r))
+                r_rate_T = np.zeros(len(act_r)) 
+                
+                kf_x[act_r] = gas.forward_rate_constants
+                kr_x[act_r] = gas.reverse_rate_constants
+                r_rate_x[act_r] = gas.net_rates_of_progress
+                kf.append(kf_T); kr.append(kr_T) ; r_rate.append(r_rate_T)
             else:
                 kf.append(gas.forward_rate_constants)
                 kr.append(gas.reverse_rate_constants)
                 r_rate.append(gas.net_rates_of_progress)
+            
+            # if act_sp:
+            #     conc_n = []; sa_i = 0
+            #     for s_i in range(len(act_sp)):
+            #         if act_sp[s_i]:
+            #             conc_n.append(stirredReactor.thermo.concentrations.tolist()[sa_i])
+            #             sa_i += 1
+            #         else:
+            #             conc_n.append(0)
+            #     conc.append(conc_n)
+            # else:
+            #     conc.append(stirredReactor.thermo.concentrations.tolist())
+            # if act_r:
+            #     kf_r = []; kr_r = []; r_rate_r = []; ra_i = 0
+            #     for r_i in range(len(act_r)):
+            #         if act_r[r_i]:
+            #             kf_r.append(gas.forward_rate_constants[ra_i])
+            #             kr_r.append(gas.reverse_rate_constants[ra_i])
+            #             r_rate_r.append(gas.net_rates_of_progress[ra_i])
+            #             ra_i += 1
+            #         else:
+            #             kf_r.append(0)
+            #             kr_r.append(0)
+            #             r_rate_r.append(0)
+            #     kf.append(kf_r)
+            #     kr.append(kr_r)
+            #     r_rate.append(r_rate_r)
+            # else:
+            #     kf.append(gas.forward_rate_constants)
+            #     kr.append(gas.reverse_rate_constants)
+            #     r_rate.append(gas.net_rates_of_progress)
 
 #            conc.append(stirredReactor.thermo.concentrations.tolist())
 #            kf.append(gas.forward_rate_constants)
@@ -1399,7 +1525,10 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
     # simulation time start
     tic_sim = timer.time()
-
+    
+    # Convert the list to numpy boolean array
+    act_r  = np.asarray(act_r, dtype=bool)
+    act_sp = np.asarray(act_sp, dtype=bool)
 
     if 'free_flame' in conditions.config or 'burner_flame' in conditions.config:
 
@@ -1490,24 +1619,21 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         for n in range(npoints):
             f.set_gas_state(n)
             # saving spec concentrations
-            conc_x = []
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
-                    conc_x.append(gas_red.concentrations[sp_ind])
-                else:
-                    conc_x.append(0)
+            conc_x = np.zeros(len(act_sp))
+            conc_x[act_sp] = gas_red.concentrations
             conc.append(conc_x)
-            # saving kf and kr values
-            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_x.append(gas_red.forward_rate_constants[r_red])
-                        kr_x.append(gas_red.reverse_rate_constants[r_red])
-                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
-                        r_red+=1
-                else:
-                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+            
+
+            # saving kf and kr values 
+            # kr / kf or 0, if non activ_species
+            kf_x = np.zeros(len(act_r))
+            kr_x = np.zeros(len(act_r))
+            r_rate_x = np.zeros(len(act_r)) 
+            
+            kf_x[act_r] = gas_red.forward_rate_constants
+            kr_x[act_r] = gas_red.reverse_rate_constants
+            r_rate_x[act_r] = gas_red.net_rates_of_progress
+ 
             kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
@@ -1581,26 +1707,22 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         conc=[] ; kf=[] ; kr=[] ; r_rate=[] ; npoints = f.flame.n_points
         for n in range(npoints):
             f.set_gas_state(n)
+            
             # saving spec concentrations
-            conc_x = []
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind = gas_red.species_index(conditions.composition.idx2sp[sp])
-                    # sp_ind=gas_red.species_index(gas_ref.species_name(sp))
-                    conc_x.append(gas_red.concentrations[sp_ind])
-                else:
-                    conc_x.append(0)
+            conc_x = np.zeros(len(act_sp))
+            conc_x[act_sp] = gas_red.concentrations
             conc.append(conc_x)
-            # saving kf and kr values
-            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_x.append(gas_red.forward_rate_constants[r_red])
-                        kr_x.append(gas_red.reverse_rate_constants[r_red])
-                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
-                        r_red+=1
-                else:
-                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+
+            # saving kf and kr values 
+            # kr / kf or 0, if non activ_species
+            kf_x = np.zeros(len(act_r))
+            kr_x = np.zeros(len(act_r))
+            r_rate_x = np.zeros(len(act_r)) 
+            
+            kf_x[act_r] = gas_red.forward_rate_constants
+            kr_x[act_r] = gas_red.reverse_rate_constants
+            r_rate_x[act_r] = gas_red.net_rates_of_progress
+ 
             kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
@@ -1713,26 +1835,22 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         for n in range(npoints):
             f.set_gas_state(n)
             # saving spec concentrations
-            conc_x = []
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
-                    conc_x.append(gas_red.concentrations[sp_ind])
-                else:
-                    conc_x.append(0)
+            conc_x = np.zeros(len(act_sp))
+            conc_x[act_sp] = gas_red.concentrations
             conc.append(conc_x)
 
-            # saving kf and kr values
-            kf_x=[];kr_x=[];r_rate_x=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_x.append(gas_red.forward_rate_constants[r_red])
-                        kr_x.append(gas_red.reverse_rate_constants[r_red])
-                        r_rate_x.append(gas_red.net_rates_of_progress[r_red])
-                        r_red+=1
-                else:
-                    kf_x.append(0); kr_x.append(0); r_rate_x.append(0)
+            # saving kf and kr values 
+            # kr / kf or 0, if non activ_species
+            kf_x = np.zeros(len(act_r))
+            kr_x = np.zeros(len(act_r))
+            r_rate_x = np.zeros(len(act_r)) 
+            
+            kf_x[act_r] = gas_red.forward_rate_constants
+            kr_x[act_r] = gas_red.reverse_rate_constants
+            r_rate_x[act_r] = gas_red.net_rates_of_progress
+
             kf.append(kf_x); kr.append(kr_x) ; r_rate.append(r_rate_x)
+
 
         results = cdef.Sim_Results(conditions, gas_red, list(f.flame.grid), \
                           list(f.T), f.P, list(conc), list(kf), list(kr))
@@ -1842,7 +1960,7 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
                             if verbose>5: print('\nFlame extinguished')
                             strain_factor=1-it_strain/(it_strain+1)
                             restart_sim=True
-                            # if extinction at first iteration
+                            # if extinction at first iteratioreactor.thermon
                             if first_it:
                                 it_strain *= 4
                                 strain_rate_prev2 = 1 ; strain_rate_prev=0.1
@@ -1901,26 +2019,23 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
         P.append(reactor.thermo.P)
 
         # saving spec concentrations at t=0
-        conc_t=[]
-        for sp in range(len(act_sp)):
-            if act_sp[sp]:
-                sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
-                conc_t.append(reactor.thermo.concentrations[sp_ind])
-            else:
-                conc_t.append(0)
+        conc_t = np.zeros(len(act_sp))
+        conc_t[act_sp] = gas_red.concentrations
         conc.append(conc_t)
-
+        
         # saving kf and kr values at t=0
-        kf_t=[];kr_t=[];r_rate_t=[];r_red=0
-        for r in range(len(act_r)):
-            if act_r[r]:
-                    kf_t.append(gas_red.forward_rate_constants[r_red])
-                    kr_t.append(gas_red.reverse_rate_constants[r_red])
-                    r_rate_t.append(gas_red.net_rates_of_progress[r_red])
-                    r_red+=1
-            else:
-                kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+        # kr / kf or 0, if non activ_species        
+        kf_t = np.zeros(len(act_r))
+        kr_t = np.zeros(len(act_r))
+        r_rate_t = np.zeros(len(act_r)) 
+        
+        kf_t[act_r] = gas_red.forward_rate_constants
+        kr_t[act_r] = gas_red.reverse_rate_constants
+        r_rate_t[act_r] = gas_red.net_rates_of_progress
+        
         kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+    
+
 
         # definition of fuel for ignition delay detection
         fuel = X_red.split(':')[0]
@@ -1962,38 +2077,35 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
             T.append(reactor.T)
             P.append(reactor.thermo.P)
+            
             # saving spec concentrations
-            conc_t=[]
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
-                    conc_t.append(reactor.thermo.concentrations[sp_ind])
-                else:
-                    conc_t.append(0)
+            conc_t = np.zeros(len(act_sp))
+            conc_t[act_sp] = gas_red.concentrations
             conc.append(conc_t)
-
+            
             # saving kf and kr values
-            kf_t=[];kr_t=[];r_rate_t=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_t.append(gas_red.forward_rate_constants[r_red])
-                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-                        r_rate_t.append(gas_red.net_rates_of_progress[r_red])
-                        r_red+=1
-                else:
-                    kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+            kf_t = np.zeros(len(act_r))
+            kr_t = np.zeros(len(act_r))
+            r_rate_t = np.zeros(len(act_r)) 
+            
+            kf_t[act_r] = gas_red.forward_rate_constants
+            kr_t[act_r] = gas_red.reverse_rate_constants
+            r_rate_t[act_r] = gas_red.net_rates_of_progress
+            
             kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+            
+            # kf_t=[];kr_t=[];r_rate_t=[];r_red=0
+            # for r in range(len(act_r)):
+            #     if act_r[r]:
+            #             kf_t.append(gas_red.forward_rate_constants[r_red])
+            #             kr_t.append(gas_red.reverse_rate_constants[r_red])
+            #             r_rate_t.append(gas_red.net_rates_of_progress[r_red])
+            #             r_red+=1
+            #     else:
+            #         kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
+            # kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
 
-#            # saving kf and kr values
-#            kf_t=[];kr_t=[];r_red=0
-#            for r in range(len(act_r)):
-#                if act_r[r]:
-#                        kf_t.append(gas_red.forward_rate_constants[r_red])
-#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-#                        r_red+=1
-#                else:
-#                    kf_t.append(0); kr_t.append(0)
-#            kf.append(kf_t); kr.append(kr_t)
+
 
 #            target_ign_.append(gas_red.X[target_ign_idx])
 
@@ -2030,30 +2142,33 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
             time_r.append(sim.time)
             temp.append(reactor.T)
             target_ign_.append(gas_red.X[target_ign_idx])
-            hr="ok"
+            # hr="ok"
+            hr = conditions.error_param.ig_check
             try:
                 heat_release.append(-np.dot(gas_red.net_rates_of_progress,\
                                            gas_red.delta_enthalpy))
             except:
-                if hr=="ok":
+                if hr:
                     print_("Warning: heat release calculation issues",mp)
                     print_("   Ignition delay time calculated according to the maximum fuel concentration gradient",mp)
                     hr="no_heat_release"
 
-        # 1- based on heat release (default)
-        if hr!= "no_heat_release":
-            try:
-                ign_time_hr = time_r[heat_release.index(max(heat_release))]
-            except:
-                ign_time_hr = False
-        else: ign_time_hr=False
-           # 2- based on fuel gradients (if heat relase calculation issues)
-        for t in range(len(time_r)-3):
-            grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
-        if len(time_r)>8:
-            ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
-        else:
-            ign_time_sp = time_r[0]
+
+        ign_time_hr, ign_time_sp = False, False
+        if conditions.error_param.ig_check and 'reactor' in conditions.config:
+            # 1- based on heat release (default)
+            if hr!= "no_heat_release" :
+                try:
+                    ign_time_hr = time_r[heat_release.index(max(heat_release))]
+                except:
+                    ign_time_hr = False
+            # 2- based on fuel gradients (if heat relase calculation issues)
+            for t in range(len(time_r)-3):
+                grad_fuel.append((target_ign_[t+2]-target_ign_[t])/(time_r[t+2]-time_r[t]))
+            if len(time_r)>8:
+                ign_time_sp = time_r[grad_fuel.index(max(grad_fuel))+2]
+            else:
+                ign_time_sp = time_r[0]
 
         results = cdef.Sim_Results(conditions, gas_red, list(timeVec), list(T),\
                              list(P), list(conc), list(kf), list(kr))
@@ -2187,38 +2302,23 @@ def red_computation(conditions, gas_red, act_sp,act_r,return_list=False):
 
             # results
             T.append(stirredReactor.T)
-            P.append(stirredReactor.thermo.P)
+            P.append(stirredReactor.thermo.P)            
             # saving spec concentrations
-            for sp in range(len(act_sp)):
-                if act_sp[sp] and simul_success:
-                    sp_ind=gas_red.species_index(conditions.composition.idx2sp[sp])
-                    conc_T.append(stirredReactor.thermo.concentrations[sp_ind])
-                else:
-                    conc_T.append(0)
+            conc_T = np.zeros(len(act_sp))
+            conc_T[act_sp] = gas_red.concentrations
             conc.append(conc_T)
 
             # saving kf and kr values
-            kf_t=[];kr_t=[];r_rate_t=[];r_red=0
-            for r in range(len(act_r)):
-                if act_r[r]:
-                        kf_t.append(gas_red.forward_rate_constants[r_red])
-                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-                        r_rate_t.append(gas_red.net_rates_of_progress[r_red])
-                        r_red+=1
-                else:
-                    kf_t.append(0); kr_t.append(0); r_rate_t.append(0)
-            kf.append(kf_t); kr.append(kr_t) ; r_rate.append(r_rate_t)
+            kf_T     = np.zeros(len(act_r))
+            kr_T     = np.zeros(len(act_r))
+            r_rate_T = np.zeros(len(act_r)) 
+            
+            kf_T[act_r]     = gas_red.forward_rate_constants
+            kr_T[act_r]     = gas_red.reverse_rate_constants
+            r_rate_T[act_r] = gas_red.net_rates_of_progress
+            
+            kf.append(kf_T); kr.append(kr_T) ; r_rate.append(r_rate_T)
 
-#            # saving kf and kr values
-#            kf_t=[];kr_t=[];r_red=0
-#            for r in range(len(act_r)):
-#                if act_r[r]:
-#                        kf_t.append(gas_red.forward_rate_constants[r_red])
-#                        kr_t.append(gas_red.reverse_rate_constants[r_red])
-#                        r_red+=1
-#                else:
-#                    kf_t.append(0); kr_t.append(0)
-#            kf.append(kf_t); kr.append(kr_t)
 
         results = cdef.Sim_Results(conditions, gas_red, list(T_list), list(T), \
                              list(P), list(conc), list(kf), list(kr))

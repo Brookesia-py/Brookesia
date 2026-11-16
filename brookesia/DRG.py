@@ -276,7 +276,6 @@ def optimised_dic(red_data, mech_data,results):
     gas_ref = red_data.gas_ref
     gas_red = red_data.gas_red
 
-
     verbose = red_data.verbose
 
 
@@ -842,7 +841,7 @@ def reactionWithdrawal(mech_data,red_data,red_method,eps_r,conditions,active_spe
 
     # define new activated species / reactions based on species sensitivities
     if '_sp' in red_method:
-        active_reactions = [True]*len(mech_data.react.activ_p)
+        active_reactions = [True]*n_r_ref
         for r in range(n_r_ref):
             if not mech_data.react.activ_m[r]:
                 active_reactions[r] = False

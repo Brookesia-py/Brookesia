@@ -212,8 +212,16 @@ def computation_reference(conditions, verbose=1, act_sp=False, act_r=False):
         print_('Mixture: ' + composition,mp)
         print_('============================ \n\n',mp)
 
-        results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
-        results.conditions = conditions
+        if act_sp is False:
+            results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
+            results.conditions = conditions
+        else:
+            if act_sp.count(True) == len(act_sp) and act_r.count(True) == len(act_r):
+                results,conditions = comp.ref_computation(conditions,verbose,act_sp,act_r)
+                results.conditions = conditions
+            else:
+                gas_red = conditions.composition.gas_red
+                results = comp.red_computation(conditions,gas_red,act_sp,act_r)
 
         return results,conditions
 
@@ -237,10 +245,10 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
     else:
         red_results_list = copy_ref_results(ref_results_list)
 
-    if conditions_list[0].mech_prev_red:
-        gas_prev_mech = ct.Solution(conditions_list[0].mech_prev_red)
-        for i in range(len(red_results_list)):
-            red_results_list[i].gas = gas_prev_mech
+    # if conditions_list[0].mech_prev_red:
+    #     gas_prev_mech = ct.Solution(conditions_list[0].mech_prev_red)
+    #     for i in range(len(red_results_list)):
+    #         red_results_list[i].gas = gas_prev_mech
 
 
     red_errors_list = []
@@ -383,9 +391,6 @@ def reduction(conditions_list,ref_results_list,red_data_list,mech_data):
                 delta_eps       = copy.deepcopy(red_data.red_op.delta_eps_init)                
                 if 'LOI' in red_method:
                     _LOI = red_data.red_op.LOI_max
-                    print('_LOI : ')
-
-                    print(_LOI)
                     # Filter values > 0 
                     LOI_pos = _LOI[_LOI > 0]
                     # 33% quantile
@@ -1451,9 +1456,9 @@ def input_results_treatment(conditions_list,ref_results_list,mech_data):
 
     mech_results_list = []
     if conditions_list[-1].mech_prev_red:
-        gas = ct.Solution(conditions_list[-1].mech_prev_red)
+        gas_red = ct.Solution(conditions_list[-1].mech_prev_red)
         for i in range(len(conditions_list)):
-            conditions_list[i].composition.gas = gas
+            conditions_list[i].composition.gas_red = gas_red
     for i in range(len(conditions_list)):
         results,conditions = computation_reference(conditions_list[i],conditions_list[i].simul_param.verbose,\
                                 mech_data.spec.activ_m,mech_data.react.activ_m)
@@ -2247,6 +2252,7 @@ def get_reduction_parameters(filename):
                         if 'mech_prev_red' in locals():
                             if mech_prev_red != 'False':
                                 conditions_list[-1].mech_prev_red = mech_prev_red
+                                conditions_list[-1].import_data   = True
                             else: conditions_list[-1].mech_prev_red = False
                         # options for reactor or PFR
                         if 'n_pts' in locals():
@@ -2658,6 +2664,7 @@ def get_reduction_parameters(filename):
 
         if conditions_list[0].mech_prev_red is not False:
             gas_red = cdef.get_gas_with_fallback(conditions_list[0].mech_prev_red)
+            
         # store data
         if save_op:
             red_data_list.append([])
@@ -2910,6 +2917,7 @@ def copy_ref_results(ref_results_list):
     # 1- save unpickable variables:
     gas     = ref_results_list[0].conditions.composition.gas
     gas_ref = ref_results_list[0].conditions.composition.gas_ref
+    gas_red = getattr(ref_results_list[0].conditions.composition, 'gas_red', None)
     f_save = []
     for ref_results in ref_results_list:
         f_save.append(ref_results.f)
@@ -2919,6 +2927,8 @@ def copy_ref_results(ref_results_list):
         del ref_results.gas
         del ref_results.conditions.composition.gas
         del ref_results.conditions.composition.gas_ref
+        try:                    del ref_results.conditions.composition.gas_red
+        except AttributeError:  pass  
         del ref_results.f
 
     # 3- create red_results_list as a copy ref_results_list:
@@ -2929,10 +2939,12 @@ def copy_ref_results(ref_results_list):
         ref_results_copy[i].gas                             = gas_ref
         ref_results_copy[i].conditions.composition.gas      = gas
         ref_results_copy[i].conditions.composition.gas_ref  = gas_ref
+        ref_results_copy[i].conditions.composition.gas_red  = gas_red
         ref_results_copy[i].f                               = f_save[i]
         ref_results_list[i].gas                             = gas_ref
         ref_results_list[i].conditions.composition.gas      = gas
         ref_results_list[i].conditions.composition.gas_ref  = gas_ref
+        ref_results_list[i].conditions.composition.gas_red  = gas_red
         ref_results_list[i].f                               = f_save[i]
 
 

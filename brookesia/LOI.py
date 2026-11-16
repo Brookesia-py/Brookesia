@@ -11,6 +11,7 @@ import copy
 import sys
 import os
 import time as timer
+import matplotlib.pyplot as plt    
 
 #from brookesia_devLOI.SA import sensitivities_computation_SA
 
@@ -31,8 +32,7 @@ def LOI_computation(red_data, mech_data, red_results):
     mp = conditions.main_path
     gas_ref = conditions.composition.gas_ref
     
-    # gas_red = gas_ref ; print_('gas_red = gas_ref',mp)
-    gas_red = red_results.gas #; print_('gas_red_ok',mp)
+    gas_red = red_results.gas 
     
     
     # gas = red_data.gas_ref
@@ -47,9 +47,8 @@ def LOI_computation(red_data, mech_data, red_results):
     
     pts_scatter = red_results.pts_scatter
     n_points = len(pts_scatter)
-    n_points_LOI = int(red_data.red_op.n_points)
-    
-    
+    n_points_LOI = int(n_points/int(max(n_points/red_data.red_op.n_points, 1)))
+        
     
     # =============================================================================
     # 1- timescales computation
@@ -75,68 +74,55 @@ def LOI_computation(red_data, mech_data, red_results):
         sim.rtol = rel_tol
         sim.atol = abs_tol
 
-        t_i = -1
+        t_i, time_ = -1, [0]
         for t in range(n_points-int(n_points/red_data.red_op.n_points+1)):
             sim.advance(pts_scatter[t])
             if t != 0 and t % int(max(n_points/red_data.red_op.n_points, 1)) == 0:
                 t_i += 1
-                # sensi_scatter.append(t)
-    
-    
-            # for i in range(n_sp):
-
-            #     # conc_ref = gas_red.concentrations.copy()
-            #     # omega_ref = gas_red.net_production_rates.copy()
-
-    
-            #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
-            timescales = np.ones(n_sp)
-            omega_ref  = np.zeros(n_sp)
-            conc_ref = gas_red.concentrations
-            
-            for idx_mech1 in range(n_sp) : 
-                try:
-                    # ----- if spec i in gas_red:
-                    
-                    idx_red = gas_red.species_index(gas_ref.species_name(idx_mech1))
-                    # conc_ref[i]   = gas_red.concentrations[idx_sp_in_red]
-                    omega_ref[idx_mech1]  = gas_red.net_production_rates[idx_red]
-                    conc_i        = conc_ref[idx_red]
-                    
-                    #si la concentration est trop faible tau=1 par defaut
-                    if conc_i > abs_tol:
-                        #calcul du pas de perturbation
-                        dc = abs_tol + conc_i * rel_tol
-                        
-                        #etat perturbé
-                        conc_pert = conc_ref.copy()
-                        conc_pert[idx_red] += dc
-                        
-                        #mise a jour de l'etat cantera
-                        gas_red.concentrations = conc_pert
-                        omega_pert_sp = gas_red.net_production_rates[idx_red]
-                        
-                        
-                        #approximation de la dérivée (Jacobien diagonal)
-                        J_diag_sp = (omega_pert_sp - omega_ref[idx_mech1]) / dc
-                        
-                        #calcul implicite du timescale avec borne max a 1.0
-                        if abs(J_diag_sp) > 1 : 
-                            timescales[idx_mech1] = 1.0 / abs(J_diag_sp)
-                        else : 
-                            timescales[idx_mech1] = 1.0                        
-                        
-                        
-                        # retrait de la perturbation
-                        gas_red.concentrations = conc_ref
-                            
-                    
-                except ValueError: #if spec not in red mech
-                    pass
+                time_.append(t)
                 
+                #on initialise le vecteur timescales avec des 1 (pour pouvoir diviser par Jii ensuite)
+                timescales = np.ones(n_sp)
+                omega_ref  = np.zeros(n_sp)
+                conc_ref = gas_red.concentrations
+                
+                for idx_mech1 in range(n_sp) : 
+                    try:
+                        # ----- if spec i in gas_red:
                         
+                        idx_red = gas_red.species_index(gas_ref.species_name(idx_mech1))
+                        # conc_ref[i]   = gas_red.concentrations[idx_sp_in_red]
+                        omega_ref[idx_mech1]  = gas_red.net_production_rates[idx_red]
+                        conc_i        = conc_ref[idx_red]
+                        
+                        #si la concentration est trop faible tau=1 par defaut
+                        if conc_i > abs_tol:
+                            #calcul du pas de perturbation
+                            dc = abs_tol + conc_i * rel_tol
+                            
+                            #etat perturbé
+                            conc_pert = conc_ref.copy()
+                            conc_pert[idx_red] += dc
+                            
+                            #mise a jour de l'etat cantera
+                            gas_red.concentrations = conc_pert
+                            omega_pert_sp = gas_red.net_production_rates[idx_red]
+                            
+                            
+                            #approximation de la dérivée (Jacobien diagonal)
+                            timescales[idx_mech1] = np.min([abs(dc/(omega_pert_sp - omega_ref[idx_mech1])), 10000])
+                            # J_diag_sp = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                            
+                            # retrait de la perturbation
+                            gas_red.concentrations = conc_ref
+                                
+                        
+                    except ValueError: #if spec not in red mech
+                        pass
                     
-                timescales_all[t_i] = timescales.copy()
+                            
+                        
+                    timescales_all[t_i] = timescales.copy()
             
     
     elif "flame" in conditions.config:
@@ -161,7 +147,7 @@ def LOI_computation(red_data, mech_data, red_results):
         rel_tol = conditions.simul_param.tol_ss[0]
         
         
-        z_i = 0
+        z_i, HAB = 0, [0]
         for z in range(n_points):
             if z % int(max(n_points/n_points_LOI, 1)) == 0 \
                and 0.01*(max(red_results.T)-min(red_results.T)) < T_prof[z]-T_prof[0] < 0.99*(max(red_results.T)-min(red_results.T)):
@@ -173,6 +159,7 @@ def LOI_computation(red_data, mech_data, red_results):
                 timescales = np.ones(n_sp)
                 conc_ref = f.gas.concentrations
                 omega_ref = np.zeros(n_sp)
+                HAB.append(z)
                 
                 for idx_mech1 in range(n_sp):
                     try:
@@ -188,13 +175,15 @@ def LOI_computation(red_data, mech_data, red_results):
                             #mise a jour de l'etat cantera
                             f.gas.concentrations = conc_pert
                             omega_pert_sp = f.gas.net_production_rates[idx_red]
-                            J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                            # J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                            timescales[idx_mech1] = np.min([abs(conc_i/(omega_pert_sp - omega_ref[idx_mech1])), 10000])
+
                             
-                            #calcul implicite du timescale 
-                            if abs(J_diag) > 0 : 
-                                timescales[idx_mech1] = 1.0 / abs(J_diag)
-                            else : 
-                                timescales[idx_mech1] = 1.0                        
+                            # #calcul implicite du timescale 
+                            # if abs(J_diag) > 0 : 
+                            #     timescales[idx_mech1] = 1.0 / abs(J_diag)
+                            # else : 
+                            #     timescales[idx_mech1] = 1.0                        
                             # if J_ii != 0 and abs(J_ii) < 1e30:
                             #     timescales[idx_mech1] = 1.0 / abs(J_ii)
                             # if timescales[idx_mech1] > 1.0:
@@ -326,13 +315,13 @@ def LOI_computation(red_data, mech_data, red_results):
                         omega_pert_sp = gas_red.net_production_rates[idx_red]
 
                         #approximation de la dérivée (Jacobien diagonal)
-                        J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
-                        
+                        # J_diag = (omega_pert_sp - omega_ref[idx_mech1]) / dc
+                        timescales[idx_mech1] = np.min([abs(conc_i/(omega_pert_sp - omega_ref[idx_mech1])), 10000])
                         #calcul implicite du timescale avec borne max a 1.0
-                        if abs(J_diag) > 1 : 
-                            timescales[idx_mech1] = 1.0 / abs(J_diag)
-                        else : 
-                            timescales[idx_mech1] = 1.0                        
+                        # if abs(J_diag) > 1 : 
+                        #     timescales[idx_mech1] = 1.0 / abs(J_diag)
+                        # else : 
+                        #     timescales[idx_mech1] = 1.0                        
                     
                 except ValueError: #if spec not in red mech
                     pass
@@ -341,17 +330,55 @@ def LOI_computation(red_data, mech_data, red_results):
                 
             timescales_all[t_i] = timescales.copy()
    
-    
     timescales_all = np.array(timescales_all)   # taille (n_points_LOI, n_sp)
-    # print('\n\n\ntimescales: ')
-    # print(timescales_all)
     
-    fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
-            +'_'+'%.2f' %conditions.composition.phi\
-            +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)
-    fn = fn.replace('.','p') + '.png'
+    
+    plot_timescale = False
+    if plot_timescale:
+        # Replace values equal to 1 with NaN to remove them from the graph
+        timescales_plot = copy.deepcopy(timescales_all)  # pour pouvoir mettre des NaN
+        timescales_plot[timescales_plot == 1] = np.nan
+        
+        # --------
+        # plot in function of t, z, or T
+        plt.figure()        
+        sp2plot = ['H', 'OH', 'C3H6', 'H', 'OH']
+        # sp2plot = ['H', 'OH']
+        
+        if "reactor" in conditions.config:
+            absissa = time_   ; xlabel = 'Time (s)'
+        elif "flame" in conditions.config:
+            absissa = HAB     ; xlabel = 'z (cm)'
+        elif 'JSR' in conditions.config:
+            absissa = T_list  ; xlabel = 'T (K)'
+        for idx_mech1 in range(n_sp):
+            sp_name = gas_ref.species_name(idx_mech1)
+            # idx_red = gas_red.species_index(sp_name)
+            red_data.targetSpeciesIdx
+            # if sp_name in sp2plot:
+            if idx_mech1 in red_data.targetSpeciesIdx:
+                ordinate = timescales_plot[:len(absissa), idx_mech1]
+                norm_ordinate = ordinate/max(ordinate)
+                log_ordinate = np.log10(ordinate)
+                plt.plot(absissa, log_ordinate, label=sp_name)
+                
+        
+        plt.xlabel(xlabel)
+        
+        plt.ylabel("Chemical timescale (s)")
+        plt.legend()
+        plt.grid()
+        plt.show()  
+        
+        # --------
+        # bargraph
+        fn = conditions.num+'tp_'+conditions.composition.fuel.replace('/','').split('(')[0]\
+                +'_'+'%.2f' %conditions.composition.phi\
+                +'_'+'%.0f'%conditions.state_var.T+'_'+'%.0f'%(conditions.state_var.P)
+        fn = fn.replace('.','p') + '.png'
+        plot_timescales_bars(timescales_all, gas_ref.species_names, list(map(str, range(len(timescales_all)))), fn)
+    
 
-    plot_timescales_bars(timescales_all, gas_ref.species_names, list(map(str, range(len(timescales_all)))), fn)
     
     
     # =============================================================================
@@ -360,8 +387,6 @@ def LOI_computation(red_data, mech_data, red_results):
     
     red_data = sa.sensitivities_computation_SA(red_data, mech_data,red_results,LOI_calc=True)
     S = red_data.red_op.S_AB_z
-    # print('\n\n\nS: ')
-    # print(S)
        
     
     
@@ -421,8 +446,6 @@ def LOI_computation(red_data, mech_data, red_results):
 
     # Calcul du maximum de LOI pour chaque (tsp, spB)
     LOI_max = np.max(np.abs(LOI), axis=0)   # taille = (n_tsp, n_sp)
-    # print('\n\n\nLOI_max: ')
-    # print(LOI_max)
     
     for _t in range(len(LOI_max)):
         loi_max_targ = max(LOI_max[_t])
@@ -556,7 +579,7 @@ def reactionWithdrawal(conditions, mech_data, active_species, red_data, red_meth
 
 
 def plot_timescales_bars(timescales_all, group_labels=None, bar_labels=None,fn='fig.png'):
-    import matplotlib.pyplot as plt    
+    # import matplotlib.pyplot as plt    
     """
     Args:
         timescales_all (np.ndarray): timescales_all 2D of shape (Species names, Position)
